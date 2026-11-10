@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
+import android.widget.Button
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -19,9 +20,12 @@ import app.jingye.reader.eink.RefreshController
 import app.jingye.reader.eink.RefreshControllers
 import app.jingye.reader.reader.PageView
 import app.jingye.reader.reader.ReaderEngine
+import app.jingye.reader.reader.ReaderStyle
 import app.jingye.reader.reader.TurnThrottle
 import app.jingye.reader.ui.settings.SettingsActivity
 import app.jingye.reader.ui.toc.TocActivity
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -30,10 +34,20 @@ import java.util.Locale
 class ReaderActivity : AppCompatActivity() {
 
     private lateinit var pageView: PageView
+    private lateinit var headerChapterTitle: TextView
+    private lateinit var headerBookTitle: TextView
     private lateinit var footer: TextView
     private lateinit var footerClock: TextView
+
+    private lateinit var menuTopBar: View
+    private lateinit var menuTopDivider: View
     private lateinit var menu: View
+    private lateinit var menuBookTitle: TextView
+    private lateinit var menuChapterIndicator: TextView
     private lateinit var sizeLabel: TextView
+    private lateinit var btnMenuBold: Button
+    private lateinit var btnSpacing: Button
+    private lateinit var btnMarginCycle: Button
 
     private lateinit var app: JingyeApp
     private lateinit var book: Book
@@ -42,9 +56,10 @@ class ReaderActivity : AppCompatActivity() {
     private lateinit var ghost: GhostPolicy
     private lateinit var throttle: TurnThrottle
 
-    private var busy = false
+    private var renderJob: Job? = null
+    private var openedOnce = false
     private var lastFrame: ReaderEngine.Frame? = null
-    private var lastStyleSnapshot: app.jingye.reader.reader.ReaderStyle? = null
+    private var lastStyleSnapshot: ReaderStyle? = null
 
     private val tocLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -53,7 +68,7 @@ class ReaderActivity : AppCompatActivity() {
             val c = r.data?.getIntExtra("chapter", -1) ?: -1
             if (c >= 0) {
                 setMenu(false)
-                run(turn = false) { engine.jump(c) }
+                executeAction(turn = false) { engine.jump(c) }
             }
         }
     }
@@ -77,10 +92,23 @@ class ReaderActivity : AppCompatActivity() {
         throttle = TurnThrottle { app.prefs.minTurnIntervalMs }
 
         pageView = findViewById(R.id.pageView)
+        headerChapterTitle = findViewById(R.id.headerChapterTitle)
+        headerBookTitle = findViewById(R.id.headerBookTitle)
         footer = findViewById(R.id.footer)
         footerClock = findViewById(R.id.footerClock)
+
+        menuTopBar = findViewById(R.id.menuTopBar)
+        menuTopDivider = findViewById(R.id.menuTopDivider)
         menu = findViewById(R.id.menu)
+        menuBookTitle = findViewById(R.id.menuBookTitle)
+        menuChapterIndicator = findViewById(R.id.menuChapterIndicator)
         sizeLabel = findViewById(R.id.sizeLabel)
+        btnMenuBold = findViewById(R.id.btnMenuBold)
+        btnSpacing = findViewById(R.id.btnSpacing)
+        btnMarginCycle = findViewById(R.id.btnMarginCycle)
+
+        headerBookTitle.text = "《${book.title}》"
+        menuBookTitle.text = "《${book.title}》"
         pageView.swapZones = app.prefs.swapTapZones
 
         pageView.onTapZone = { zone ->
@@ -104,9 +132,28 @@ class ReaderActivity : AppCompatActivity() {
             @Suppress("DEPRECATION")
             overridePendingTransition(0, 0)
         }
+        findViewById<View>(R.id.btnPrevChapter).setOnClickListener {
+            val cur = lastFrame?.chapter ?: 0
+            if (cur > 0) {
+                executeAction(turn = false) { engine.jump(cur - 1) }
+            } else {
+                footer.text = "已是第一章"
+            }
+        }
+        findViewById<View>(R.id.btnNextChapter).setOnClickListener {
+            val f = lastFrame ?: return@setOnClickListener
+            if (f.chapter + 1 < f.chapterCount) {
+                executeAction(turn = false) { engine.jump(f.chapter + 1) }
+            } else {
+                footer.text = "已是最后一章"
+            }
+        }
         findViewById<View>(R.id.btnSmaller).setOnClickListener { changeSize(-1) }
         findViewById<View>(R.id.btnBigger).setOnClickListener { changeSize(+1) }
-        findViewById<View>(R.id.btnSpacing).setOnClickListener { cycleSpacing() }
+        btnMenuBold.setOnClickListener { toggleBold() }
+        btnSpacing.setOnClickListener { cycleSpacing() }
+        btnMarginCycle.setOnClickListener { cycleMargin() }
+
         findViewById<View>(R.id.btnSettings).setOnClickListener {
             setMenu(false)
             startActivity(Intent(this, SettingsActivity::class.java))
@@ -119,12 +166,31 @@ class ReaderActivity : AppCompatActivity() {
         }
         findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
 
-        footer.text = "加载中…"
+        headerChapterTitle.text = book.title
+        footer.text = "正在排版章节…"
+        syncMenuButtons()
+
+        // 确保在 PageView 完成真实测量（width > 100 && height > 100）后再启动引擎，杜绝 width=0 导致 1px 死循环
+        pageView.addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
+            val w = right - left
+            val h = bottom - top
+            if (!openedOnce && w > 100 && h > 100) {
+                openedOnce = true
+                val style = app.prefs.style()
+                lastStyleSnapshot = style
+                executeAction(turn = false) {
+                    engine.open(w, h, style, book.chapter, book.charOffset)
+                }
+            }
+        }
         pageView.post {
-            val style = app.prefs.style()
-            lastStyleSnapshot = style
-            run(turn = false) {
-                engine.open(pageView.width, pageView.height, style, book.chapter, book.charOffset)
+            if (!openedOnce && pageView.width > 100 && pageView.height > 100) {
+                openedOnce = true
+                val style = app.prefs.style()
+                lastStyleSnapshot = style
+                executeAction(turn = false) {
+                    engine.open(pageView.width, pageView.height, style, book.chapter, book.charOffset)
+                }
             }
         }
     }
@@ -134,17 +200,17 @@ class ReaderActivity : AppCompatActivity() {
         hideSystemBars()
         refresh.onReaderEnter(this)
         pageView.swapZones = app.prefs.swapTapZones
+        syncMenuButtons()
         val currentStyle = app.prefs.style()
-        if (lastFrame != null && lastStyleSnapshot != null && currentStyle != lastStyleSnapshot) {
+        if (openedOnce && lastFrame != null && lastStyleSnapshot != null && currentStyle != lastStyleSnapshot) {
             lastStyleSnapshot = currentStyle
-            run(turn = false) { engine.relayout(currentStyle) }
+            executeAction(turn = false) { engine.relayout(currentStyle) }
         }
     }
 
     override fun onPause() {
         super.onPause()
         refresh.onReaderExit(this)
-        // 海信 A7 后台清理策略严格，必须在 onPause 立即保存章节与字符偏移
         lastFrame?.let {
             app.library.saveProgress(book.id, it.chapter, it.charOffset, it.chapterCount)
         }
@@ -152,19 +218,19 @@ class ReaderActivity : AppCompatActivity() {
 
     private fun turn(delta: Int) {
         if (!throttle.tryAcquire()) return
-        run(turn = true, boundaryMsg = if (delta > 0) "— 全书完 —" else "— 第一页 —") {
+        executeAction(turn = true, boundaryMsg = if (delta > 0) "— 全书完 —" else "— 第一页 —") {
             if (delta > 0) engine.next() else engine.prev()
         }
     }
 
-    private fun run(
+    private fun executeAction(
         turn: Boolean,
         boundaryMsg: String? = null,
         action: suspend () -> ReaderEngine.Frame?
     ) {
-        if (busy) return
-        busy = true
-        lifecycleScope.launch {
+        if (turn && renderJob?.isActive == true) return
+        renderJob?.cancel()
+        renderJob = lifecycleScope.launch {
             try {
                 val f = action()
                 if (f == null) {
@@ -172,8 +238,10 @@ class ReaderActivity : AppCompatActivity() {
                 } else {
                     show(f, clean = turn && ghost.onPageTurned())
                 }
-            } finally {
-                busy = false
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (e: Throwable) {
+                footer.text = "加载异常：${e.message ?: e.javaClass.simpleName}"
             }
         }
     }
@@ -181,27 +249,53 @@ class ReaderActivity : AppCompatActivity() {
     private fun show(f: ReaderEngine.Frame, clean: Boolean) {
         lastFrame = f
         if (clean) refresh.cleanRegion(pageView, f.bitmap) else refresh.showPage(pageView, f.bitmap)
-        updateFooter(f)
-        sizeLabel.text = app.prefs.textSizeSp.toString()
+        updateHeaderAndFooter(f)
+        syncMenuButtons()
         lifecycleScope.launch { engine.prefetch() }
     }
 
-    /** 页脚只在翻页时更新，不开定时器，避免无谓触发墨水屏刷新。 */
-    private fun updateFooter(f: ReaderEngine.Frame) {
+    private fun updateHeaderAndFooter(f: ReaderEngine.Frame) {
+        headerChapterTitle.text = f.title
+        menuChapterIndicator.text = "第 ${f.chapter + 1}/${f.chapterCount} 章 · ${f.title}"
+        val totalPct = if (f.chapterCount > 0) {
+            val chWeight = (f.chapter.toDouble() + (f.pageIndex + 1).toDouble() / f.pageCount.coerceAtLeast(1)) / f.chapterCount
+            String.format(Locale.US, "%.1f%%", (chWeight * 100.0).coerceIn(0.1, 100.0))
+        } else {
+            "0.0%"
+        }
         val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-        footer.text = "${f.title} · ${f.pageIndex + 1}/${f.pageCount}"
+        footer.text = "全书 $totalPct · 本章 ${f.pageIndex + 1}/${f.pageCount}"
         footerClock.text = time
     }
 
+    private fun syncMenuButtons() {
+        sizeLabel.text = "${app.prefs.textSizeSp}"
+        btnMenuBold.text = "加粗:${if (app.prefs.bold) "开" else "关"}"
+        btnSpacing.text = String.format(Locale.US, "行距:%.1f", app.prefs.lineSpacingX10 / 10f)
+        btnMarginCycle.text = "边距:${app.prefs.marginDp}"
+    }
+
     private fun setMenu(show: Boolean) {
-        menu.visibility = if (show) View.VISIBLE else View.GONE
+        val vis = if (show) View.VISIBLE else View.GONE
+        menuTopBar.visibility = vis
+        menuTopDivider.visibility = vis
+        menu.visibility = vis
     }
 
     private fun changeSize(delta: Int) {
         app.prefs.textSizeSp += delta
         val style = app.prefs.style()
         lastStyleSnapshot = style
-        run(turn = false) { engine.relayout(style) }
+        syncMenuButtons()
+        executeAction(turn = false) { engine.relayout(style) }
+    }
+
+    private fun toggleBold() {
+        app.prefs.bold = !app.prefs.bold
+        val style = app.prefs.style()
+        lastStyleSnapshot = style
+        syncMenuButtons()
+        executeAction(turn = false) { engine.relayout(style) }
     }
 
     private fun cycleSpacing() {
@@ -210,7 +304,18 @@ class ReaderActivity : AppCompatActivity() {
         app.prefs.lineSpacingX10 = steps[(steps.indexOfFirst { it >= cur }.coerceAtLeast(0) + 1) % steps.size]
         val style = app.prefs.style()
         lastStyleSnapshot = style
-        run(turn = false) { engine.relayout(style) }
+        syncMenuButtons()
+        executeAction(turn = false) { engine.relayout(style) }
+    }
+
+    private fun cycleMargin() {
+        val steps = listOf(16, 24, 32, 40)
+        val cur = app.prefs.marginDp
+        app.prefs.marginDp = steps[(steps.indexOfFirst { it >= cur }.coerceAtLeast(0) + 1) % steps.size]
+        val style = app.prefs.style()
+        lastStyleSnapshot = style
+        syncMenuButtons()
+        executeAction(turn = false) { engine.relayout(style) }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
@@ -219,7 +324,7 @@ class ReaderActivity : AppCompatActivity() {
             KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_PAGE_UP -> -1
             else -> return super.onKeyDown(keyCode, event)
         }
-        if (event.repeatCount == 0) turn(dir) // 丢弃长按重复事件，避免墨水屏连续刷新
+        if (event.repeatCount == 0) turn(dir)
         return true
     }
 

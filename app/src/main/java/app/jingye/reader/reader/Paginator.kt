@@ -7,8 +7,10 @@ class Paginator(
 ) {
     fun paginate(text: CharSequence): List<PageSlice> {
         if (text.isEmpty()) return listOf(PageSlice(0, 0))
-        val contentW = (viewW - style.marginPx * 2).coerceAtLeast(1)
-        val contentH = (viewH - style.marginPx * 2).coerceAtLeast(1)
+        val safeW = if (viewW > 120) viewW else 720
+        val safeH = if (viewH > 120) viewH else 1280
+        val contentW = (safeW - style.marginPx * 2).coerceAtLeast(100)
+        val contentH = (safeH - style.marginPx * 2).coerceAtLeast(100)
         val layout = buildLayout(text, 0, text.length, style.newPaint(), contentW, style.lineSpacingMult)
 
         val pages = ArrayList<PageSlice>()

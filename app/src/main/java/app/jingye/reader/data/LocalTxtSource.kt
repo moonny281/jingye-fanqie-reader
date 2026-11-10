@@ -10,11 +10,14 @@ import java.nio.charset.CodingErrorAction
 
 class LocalTxtSource(private val library: LibraryStore) : BookSource {
 
-    // 兼容传统 TXT 章节标题（第X章/回/卷/集/部/篇）与 fanqie-novel-downloader 导出的【章节标题】格式
-    private val chapterRegex = Regex(
-        """^[ \t　]*(?:【(?!内容简介)([^】\r\n]{1,60})】|第[0-9零〇一二三四五六七八九十百千两]+[章节回卷集部篇].{0,40})$""",
-        RegexOption.MULTILINE
+    // 单行章节标题匹配（仅对 <= 65 字的单行做匹配，绝不在整本数百万字字符串上做多行回溯）
+    private val stdChapterLineRegex = Regex(
+        "^第[0-9零〇一二三四五六七八九十百千两]+[章节回卷集部篇]([ \\t　:：._-].*|$)"
     )
+    private val specialChapterLineRegex = Regex(
+        "^(楔子|序章|序言|引子|尾声|番外|后记)([ \\t　:：0-9一二三四五六七八九十].*|$)"
+    )
+
     private val cache = HashMap<String, List<Pair<String, String>>>()
 
     fun invalidate(bookId: String) {
@@ -27,12 +30,12 @@ class LocalTxtSource(private val library: LibraryStore) : BookSource {
         synchronized(cache) { cache[bookId] }?.let { return@withContext it }
         val book = library.get(bookId) ?: error("书籍不存在: $bookId")
         val file = File(book.path)
-        val text = if (file.exists()) {
-            decode(file.readBytes()).replace("\r\n", "\n").replace('\r', '\n')
+        val rawText = if (file.isFile) {
+            decode(file.readBytes())
         } else {
             ""
         }
-        val list = split(text)
+        val list = splitLinesFast(rawText)
         if (book.totalChapters != list.size) {
             library.updateTotalChapters(bookId, list.size)
         }
@@ -44,16 +47,19 @@ class LocalTxtSource(private val library: LibraryStore) : BookSource {
 
     override suspend fun chapterTitle(bookId: String, index: Int): String {
         val list = chapters(bookId)
-        return list.getOrNull(index.coerceIn(0, (list.size - 1).coerceAtLeast(0)))?.first ?: "正文"
+        if (list.isEmpty()) return "正文"
+        return list[index.coerceIn(0, list.lastIndex)].first
     }
 
     override suspend fun chapterText(bookId: String, index: Int): CharSequence {
         val list = chapters(bookId)
-        return list.getOrNull(index.coerceIn(0, (list.size - 1).coerceAtLeast(0)))?.second ?: ""
+        if (list.isEmpty()) return ""
+        return list[index.coerceIn(0, list.lastIndex)].second
     }
 
     /** UTF-8 (含 BOM) 优先，严格解码失败则按 GB18030 解码。 */
     private fun decode(b: ByteArray): String {
+        if (b.isEmpty()) return ""
         if (b.size >= 3 && b[0] == 0xEF.toByte() && b[1] == 0xBB.toByte() && b[2] == 0xBF.toByte()) {
             return String(b, 3, b.size - 3, Charsets.UTF_8)
         }
@@ -63,57 +69,99 @@ class LocalTxtSource(private val library: LibraryStore) : BookSource {
                 .onUnmappableCharacter(CodingErrorAction.REPORT)
                 .decode(ByteBuffer.wrap(b))
                 .toString()
-        } catch (e: CharacterCodingException) {
+        } catch (_: CharacterCodingException) {
             String(b, Charset.forName("GB18030"))
         }
     }
 
-    private fun split(text: String): List<Pair<String, String>> {
-        val marks = chapterRegex.findAll(text).toList()
-        if (marks.isEmpty()) return chunk(text)
-        val out = ArrayList<Pair<String, String>>(marks.size + 1)
-        val head = text.substring(0, marks[0].range.first).trim()
-        if (head.isNotEmpty()) {
-            out += "前言" to indent(head)
-        }
-        marks.forEachIndexed { i, m ->
-            val end = marks.getOrNull(i + 1)?.range?.first ?: text.length
-            val rawTitle = m.groups[1]?.value?.trim() ?: m.value.trim()
-            val bodyStart = (m.range.last + 1).coerceAtMost(end)
-            val rawBody = text.substring(bodyStart, end)
-            // 去掉导出文件尾部的分隔线说明
-            val cleanedBody = rawBody.replace(
-                Regex("""={20,}\s*由 fanqie-novel-downloader 导出\s*={20,}\s*$"""),
-                ""
-            )
-            out += rawTitle to indent(cleanedBody)
-        }
-        return out
-    }
-
-    /** 找不到章节标记时，按约 12000 字在换行处切段，避免单章过大。 */
-    private fun chunk(text: String, size: Int = 12000): List<Pair<String, String>> {
-        val out = ArrayList<Pair<String, String>>()
-        var start = 0
-        var n = 1
-        while (start < text.length) {
-            var end = minOf(start + size, text.length)
-            if (end < text.length) {
-                val nl = text.indexOf('\n', end)
-                end = if (nl == -1) text.length else nl
+    /** 判断单行是否为章节标题，若是则返回干净的章节标题，否则返回 null。 */
+    private fun extractChapterHeader(trimmedLine: String): String? {
+        if (trimmedLine.length < 2 || trimmedLine.length > 65) return null
+        // 1. fanqie-novel-downloader 导出的【章节名】格式（排除【内容简介】）
+        if (trimmedLine.startsWith("【") && trimmedLine.endsWith("】")) {
+            val inner = trimmedLine.substring(1, trimmedLine.length - 1).trim()
+            if (inner.isNotEmpty() && inner != "内容简介") {
+                return inner
             }
-            out += "第 $n 段" to indent(text.substring(start, end))
-            start = end
-            n++
+            return null
         }
-        if (out.isEmpty()) out += "全文" to ""
-        return out
+        // 2. 常规小说章节标题：第X章 / 楔子 / 序章 / 番外
+        if (stdChapterLineRegex.matches(trimmedLine) || specialChapterLineRegex.matches(trimmedLine)) {
+            return trimmedLine
+        }
+        return null
     }
 
-    /** 去空行，每段首行两个全角空格缩进。 */
-    private fun indent(s: String): String =
-        s.lineSequence()
-            .map { it.trim().removePrefix("　　").trim() }
-            .filter { it.isNotEmpty() }
-            .joinToString("\n") { "　　$it" }
+    private fun isSeparatorOrFooterLine(trimmed: String): Boolean {
+        if (trimmed.length >= 20 && (trimmed.all { it == '=' } || trimmed.all { it == '-' })) return true
+        if (trimmed == "由 fanqie-novel-downloader 导出") return true
+        return false
+    }
+
+    /** O(N) 单遍扫描按行分章，并对超长单章自动切分为 <= 9000 字的分段，保证 StaticLayout 秒开。 */
+    private fun splitLinesFast(text: String): List<Pair<String, String>> {
+        if (text.isBlank()) return listOf("正文" to "　　（本书内容为空）")
+
+        val rawChapters = ArrayList<Pair<String, List<String>>>()
+        var currentTitle: String? = null
+        var currentParas = ArrayList<String>()
+
+        for (rawLine in text.lineSequence()) {
+            val trimmed = rawLine.trim().replace("\u200b", "").replace("\ufeff", "")
+            if (trimmed.isEmpty() || isSeparatorOrFooterLine(trimmed)) continue
+
+            val headerTitle = extractChapterHeader(trimmed)
+            if (headerTitle != null) {
+                if (currentTitle != null || currentParas.isNotEmpty()) {
+                    rawChapters.add((currentTitle ?: "前言") to currentParas)
+                }
+                currentTitle = headerTitle
+                currentParas = ArrayList()
+            } else {
+                val cleanPara = trimmed.removePrefix("　　").trim()
+                if (cleanPara.isNotEmpty()) {
+                    currentParas.add("　　$cleanPara")
+                }
+            }
+        }
+        if (currentTitle != null || currentParas.isNotEmpty()) {
+            rawChapters.add((currentTitle ?: "全文") to currentParas)
+        }
+
+        if (rawChapters.isEmpty()) {
+            return listOf("正文" to "　　（暂无可读正文）")
+        }
+
+        // 将每一章组装为正文，若某章超过 9000 字（如未分章的纯文本大文件），按段落安全切分
+        val finalChapters = ArrayList<Pair<String, String>>(rawChapters.size)
+        val maxSegmentChars = 9000
+
+        for ((title, paras) in rawChapters) {
+            if (paras.isEmpty()) {
+                finalChapters.add(title to "【$title】\n\n　　（本章无正文）")
+                continue
+            }
+            var segIndex = 1
+            val sb = StringBuilder()
+            sb.append("【").append(title).append("】\n\n")
+
+            for (p in paras) {
+                if (sb.length + p.length + 2 > maxSegmentChars && sb.length > 200) {
+                    val segTitle = if (segIndex == 1 && rawChapters.size > 1) title else if (rawChapters.size == 1) "第 $segIndex 段" else "$title ($segIndex)"
+                    finalChapters.add(segTitle to sb.toString().trimEnd())
+                    segIndex++
+                    sb.setLength(0)
+                    val nextHeader = if (rawChapters.size == 1) "第 $segIndex 段" else "$title ($segIndex)"
+                    sb.append("【").append(nextHeader).append("】\n\n")
+                }
+                sb.append(p).append("\n\n")
+            }
+            if (sb.isNotEmpty()) {
+                val segTitle = if (segIndex == 1) title else if (rawChapters.size == 1) "第 $segIndex 段" else "$title ($segIndex)"
+                finalChapters.add(segTitle to sb.toString().trimEnd())
+            }
+        }
+
+        return if (finalChapters.isEmpty()) listOf("正文" to "") else finalChapters
+    }
 }

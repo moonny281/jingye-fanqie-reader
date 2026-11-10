@@ -4,22 +4,46 @@
     android:layout_height="wrap_content"
     android:orientation="vertical">
 
-    <TextView
-        android:id="@+id/tocItemTitle"
+    <LinearLayout
+        android:id="@+id/tocRowRoot"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="54dp"
         android:background="@drawable/ink_row_bg"
         android:clickable="true"
-        android:ellipsize="end"
         android:focusable="true"
         android:gravity="center_vertical"
-        android:maxLines="1"
-        android:paddingHorizontal="16dp"
-        android:textColor="@color/ink_text"
-        android:textSize="18sp" />
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp">
+
+        <TextView
+            android:id="@+id/tocItemTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:duplicateParentState="true"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/ink_text"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/tocCurrentBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/ink_badge_bg"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="2dp"
+            android:text="当前"
+            android:textColor="#000000"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+    </LinearLayout>
 
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
+        android:layout_marginHorizontal="16dp"
         android:background="#000000" />
 </LinearLayout>

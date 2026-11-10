@@ -18,13 +18,15 @@ class PageRenderer(
         cache.get(index) ?: draw(slice).also { cache.put(index, it) }
 
     private fun draw(s: PageSlice): Bitmap {
-        val safeW = viewW.coerceAtLeast(1)
-        val safeH = viewH.coerceAtLeast(1)
+        val safeW = if (viewW > 120) viewW else 720
+        val safeH = if (viewH > 120) viewH else 1280
         val bmp = Bitmap.createBitmap(safeW, safeH, Bitmap.Config.RGB_565)
         val c = Canvas(bmp)
         c.drawColor(Color.WHITE)
-        val contentW = (safeW - style.marginPx * 2).coerceAtLeast(1)
-        val layout = buildLayout(text, s.start, s.end, paint, contentW, style.lineSpacingMult)
+        val contentW = (safeW - style.marginPx * 2).coerceAtLeast(100)
+        val safeStart = s.start.coerceIn(0, text.length)
+        val safeEnd = s.end.coerceIn(safeStart, text.length)
+        val layout = buildLayout(text, safeStart, safeEnd, paint, contentW, style.lineSpacingMult)
         c.translate(style.marginPx.toFloat(), style.marginPx.toFloat())
         layout.draw(c)
         return bmp

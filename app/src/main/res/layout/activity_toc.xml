@@ -7,30 +7,39 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="60dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="16dp">
+
+        <Button
+            android:id="@+id/btnCloseToc"
+            style="@style/InkButton"
+            android:text="← 返回" />
 
         <TextView
             android:id="@+id/tocHeaderTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
             android:layout_weight="1"
+            android:ellipsize="end"
+            android:fontFamily="serif"
+            android:maxLines="1"
             android:text="目录"
             android:textColor="#000000"
-            android:textSize="22sp"
+            android:textSize="19sp"
             android:textStyle="bold" />
 
         <Button
-            android:id="@+id/btnCloseToc"
+            android:id="@+id/btnReverseToc"
             style="@style/InkButton"
-            android:text="关闭" />
+            android:text="倒序" />
     </LinearLayout>
 
     <View
         android:layout_width="match_parent"
-        android:layout_height="2dp"
+        android:layout_height="1.5dp"
         android:background="#000000" />
 
     <androidx.recyclerview.widget.RecyclerView

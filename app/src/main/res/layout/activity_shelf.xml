@@ -9,45 +9,59 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- 顶栏 56dp, 下方 2dp 黑线 -->
+        <!-- 微信读书墨水屏风格顶栏 -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="60dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingHorizontal="16dp">
 
             <TextView
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:fontFamily="serif"
                 android:text="净页"
                 android:textColor="#000000"
-                android:textSize="22sp"
+                android:textSize="24sp"
                 android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/shelfCountBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:background="@drawable/ink_badge_bg"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="2dp"
+                android:text="0 本"
+                android:textColor="#000000"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
 
             <Button
                 android:id="@+id/btnFanqie"
-                style="@style/InkButton"
-                android:text="番茄" />
+                style="@style/InkButtonSolid"
+                android:text="+ 番茄下载" />
 
             <Button
                 android:id="@+id/btnImport"
                 style="@style/InkButton"
-                android:text="导入" />
-
-            <Button
-                android:id="@+id/btnSettings"
-                style="@style/InkButton"
-                android:text="设置" />
+                android:layout_marginStart="6dp"
+                android:text="导入TXT" />
         </LinearLayout>
 
         <View
             android:layout_width="match_parent"
-            android:layout_height="2dp"
+            android:layout_height="1.5dp"
             android:background="#000000" />
 
-        <!-- 静态提示/错误信息行（不用 Toast 动画） -->
+        <!-- 静态提示/错误信息栏 -->
         <TextView
             android:id="@+id/errorLine"
             android:layout_width="match_parent"
@@ -57,9 +71,109 @@
             android:paddingVertical="8dp"
             android:textColor="#000000"
             android:textSize="14sp"
+            android:textStyle="bold"
             android:visibility="gone" />
 
-        <!-- 书架列表与空状态 -->
+        <!-- 最近在读 Hero 卡片（效仿微信读书墨水屏版顶部「继续阅读」模块） -->
+        <LinearLayout
+            android:id="@+id/recentCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/ink_card_bg"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="12dp"
+            android:visibility="gone">
+
+            <!-- 墨水屏线装书封缩略图 -->
+            <TextView
+                android:id="@+id/recentCoverText"
+                android:layout_width="48dp"
+                android:layout_height="64dp"
+                android:background="@drawable/ink_cover_bg"
+                android:ellipsize="end"
+                android:fontFamily="serif"
+                android:gravity="center"
+                android:maxLines="3"
+                android:padding="6dp"
+                android:textColor="#000000"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="最近在读"
+                    android:textColor="#000000"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/recentBookTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:fontFamily="serif"
+                    android:maxLines="1"
+                    android:textColor="#000000"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/recentBookMeta"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#000000"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/btnContinueRead"
+                style="@style/InkButtonSolid"
+                android:text="继续阅读" />
+        </LinearLayout>
+
+        <!-- 列表分组标题行 -->
+        <LinearLayout
+            android:id="@+id/shelfSectionHeader"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:layout_marginTop="6dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="全部藏书"
+                android:textColor="#000000"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="长按书籍可移出书架"
+                android:textColor="#000000"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- 书架主区域 -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
@@ -69,23 +183,127 @@
                 android:id="@+id/recyclerView"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
+                android:clipToPadding="false"
                 android:overScrollMode="never"
+                android:paddingHorizontal="16dp"
+                android:paddingBottom="12dp"
                 android:scrollbars="none" />
 
-            <TextView
+            <!-- 空书架引导卡片 -->
+            <LinearLayout
                 android:id="@+id/emptyView"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginHorizontal="28dp"
+                android:background="@drawable/ink_card_bg"
                 android:gravity="center"
+                android:orientation="vertical"
                 android:padding="24dp"
-                android:text="书架是空的，点【番茄】在线下载或点【导入】添加 TXT"
-                android:textColor="#000000"
-                android:textSize="18sp"
-                android:visibility="gone" />
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="serif"
+                    android:text="书架暂无藏书"
+                    android:textColor="#000000"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center"
+                    android:lineSpacingMultiplier="1.3"
+                    android:text="支持粘贴番茄小说分享链接免登录下载全书，或直接从本机存储导入 TXT 书籍。"
+                    android:textColor="#000000"
+                    android:textSize="14sp" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnEmptyFanqie"
+                        style="@style/InkButtonSolid"
+                        android:text="去下载番茄小说" />
+
+                    <Button
+                        android:id="@+id/btnEmptyImport"
+                        style="@style/InkButton"
+                        android:layout_marginStart="8dp"
+                        android:text="导入本地 TXT" />
+                </LinearLayout>
+            </LinearLayout>
         </FrameLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1.5dp"
+            android:background="#000000" />
+
+        <!-- 微信读书墨水屏版底部三栏导航 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:background="#FFFFFF"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="● 书架"
+                android:textColor="#000000"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="24dp"
+                android:background="#000000" />
+
+            <TextView
+                android:id="@+id/navFanqie"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/ink_row_bg"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="番茄下载"
+                android:textColor="@color/ink_text"
+                android:textSize="15sp" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="24dp"
+                android:background="#000000" />
+
+            <TextView
+                android:id="@+id/btnSettings"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/ink_row_bg"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="阅读设置"
+                android:textColor="@color/ink_text"
+                android:textSize="15sp" />
+        </LinearLayout>
     </LinearLayout>
 
-    <!-- 长按删除确认面板：瞬时显隐，无系统弹窗动画 -->
+    <!-- 长按删除确认面板：瞬时显隐，无动画 -->
     <FrameLayout
         android:id="@+id/deleteDialogOverlay"
         android:layout_width="match_parent"
@@ -101,15 +319,16 @@
             android:layout_marginHorizontal="24dp"
             android:background="@drawable/ink_panel_bg"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:padding="20dp">
 
             <TextView
                 android:id="@+id/deleteDialogTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="删除本书？"
+                android:fontFamily="serif"
+                android:text="移出书架？"
                 android:textColor="#000000"
-                android:textSize="18sp"
+                android:textSize="19sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -117,14 +336,14 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="将同时删除本地副本与阅读进度"
+                android:text="将同时删除本地书籍文件与阅读进度记录。"
                 android:textColor="#000000"
                 android:textSize="14sp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="18dp"
                 android:gravity="end"
                 android:orientation="horizontal">
 
@@ -135,8 +354,9 @@
 
                 <Button
                     android:id="@+id/btnConfirmDelete"
-                    style="@style/InkButton"
-                    android:text="确认" />
+                    style="@style/InkButtonSolid"
+                    android:layout_marginStart="8dp"
+                    android:text="确认删除" />
             </LinearLayout>
         </LinearLayout>
     </FrameLayout>

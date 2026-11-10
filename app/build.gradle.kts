@@ -14,7 +14,7 @@ fun resolveVersionName(): String {
         val fileVer = rootVersionFile.readText(Charsets.UTF_8).trim().lines().firstOrNull()?.trim()?.removePrefix("v")
         if (!fileVer.isNullOrEmpty()) return fileVer
     }
-    return "0.2.0"
+    return "0.2.1"
 }
 
 fun resolveVersionCode(verName: String): Int {
@@ -24,7 +24,7 @@ fun resolveVersionCode(verName: String): Int {
     val parts = verName.split(Regex("[^0-9]+")).filter { it.isNotEmpty() }.mapNotNull { it.toIntOrNull() }
     val major = parts.getOrElse(0) { 0 }
     val minor = parts.getOrElse(1) { 2 }
-    val patch = parts.getOrElse(2) { 0 }
+    val patch = parts.getOrElse(2) { 1 }
     return (major * 10000 + minor * 100 + patch).coerceAtLeast(1)
 }
 
@@ -58,7 +58,6 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            // 若配置了自定义签名密钥则优先使用，否则默认使用 debug 签名确保构建出的 Release APK 可直接安装
             signingConfig = signingConfigs.findByName("releaseCustom") ?: signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

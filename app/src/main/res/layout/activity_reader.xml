@@ -9,23 +9,49 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
+        <!-- 微信读书墨水屏风格极简顶栏 (28dp) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="28dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="20dp">
+
+            <TextView
+                android:id="@+id/headerChapterTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="#000000"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/headerBookTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="#000000"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- 正文画布 -->
         <app.jingye.reader.reader.PageView
             android:id="@+id/pageView"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1" />
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="#000000" />
-
+        <!-- 微信读书墨水屏风格极简底栏 (28dp) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="28dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingHorizontal="24dp">
+            android:paddingHorizontal="20dp">
 
             <TextView
                 android:id="@+id/footer"
@@ -46,18 +72,68 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- 菜单面板：visibility 瞬时显隐，不做动画 -->
+    <!-- 呼出式顶部操作栏（微信读书墨水屏版：点击屏幕中央同时呼出顶栏与底栏） -->
+    <LinearLayout
+        android:id="@+id/menuTopBar"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_gravity="top"
+        android:background="#FFFFFF"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="12dp"
+        android:visibility="gone">
+
+        <Button
+            android:id="@+id/btnBack"
+            style="@style/InkButton"
+            android:text="← 书架" />
+
+        <TextView
+            android:id="@+id/menuBookTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="10dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:fontFamily="serif"
+            android:maxLines="1"
+            android:textColor="#000000"
+            android:textSize="17sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnCleanNow"
+            style="@style/InkButton"
+            android:text="清残影" />
+
+        <Button
+            android:id="@+id/btnSettings"
+            style="@style/InkButton"
+            android:text="全部设置" />
+    </LinearLayout>
+
+    <View
+        android:id="@+id/menuTopDivider"
+        android:layout_width="match_parent"
+        android:layout_height="2dp"
+        android:layout_gravity="top"
+        android:layout_marginTop="56dp"
+        android:background="#000000"
+        android:visibility="gone" />
+
+    <!-- 呼出式底部控制面板（微信读书墨水屏版布局：章节跳转 + 字号步进 + 行距胶囊 + 目录入口） -->
     <LinearLayout
         android:id="@+id/menu"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:layout_marginBottom="29dp"
         android:background="@drawable/ink_panel_bg"
         android:orientation="vertical"
-        android:padding="8dp"
+        android:padding="14dp"
         android:visibility="gone">
 
+        <!-- 第一行：上一章 / 当前章节进度 / 下一章 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -65,19 +141,61 @@
             android:orientation="horizontal">
 
             <Button
-                android:id="@+id/btnToc"
+                android:id="@+id/btnPrevChapter"
                 style="@style/InkButton"
-                android:text="目录" />
+                android:text="上一章" />
+
+            <TextView
+                android:id="@+id/menuChapterIndicator"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="8dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:gravity="center"
+                android:maxLines="1"
+                android:textColor="#000000"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btnNextChapter"
+                style="@style/InkButton"
+                android:text="下一章" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginVertical="10dp"
+            android:background="#000000" />
+
+        <!-- 第二行：字号调节 + 字重加粗 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="44dp"
+                android:layout_height="wrap_content"
+                android:text="字号"
+                android:textColor="#000000"
+                android:textSize="14sp"
+                android:textStyle="bold" />
 
             <Button
                 android:id="@+id/btnSmaller"
                 style="@style/InkButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:text="A−" />
 
             <TextView
                 android:id="@+id/sizeLabel"
-                android:layout_width="44dp"
-                android:layout_height="48dp"
+                android:layout_width="56dp"
+                android:layout_height="42dp"
                 android:gravity="center"
                 android:textColor="#000000"
                 android:textSize="16sp"
@@ -86,36 +204,47 @@
             <Button
                 android:id="@+id/btnBigger"
                 style="@style/InkButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:text="A+" />
+
+            <Button
+                android:id="@+id/btnMenuBold"
+                style="@style/InkButton"
+                android:layout_marginStart="6dp"
+                android:text="加粗:关" />
+        </LinearLayout>
+
+        <!-- 第三行：行距与目录快捷栏 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnToc"
+                style="@style/InkButtonSolid"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:text="☰ 目录" />
 
             <Button
                 android:id="@+id/btnSpacing"
                 style="@style/InkButton"
-                android:text="行距" />
+                android:layout_width="0dp"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:text="行距:1.5" />
 
             <Button
-                android:id="@+id/btnSettings"
-                style="@style/InkButton"
-                android:text="设置" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:orientation="horizontal">
-
-            <Button
-                android:id="@+id/btnCleanNow"
-                style="@style/InkButton"
-                android:text="局部清影" />
-
-            <Button
-                android:id="@+id/btnBack"
+                android:id="@+id/btnMarginCycle"
                 style="@style/InkButton"
                 android:layout_width="0dp"
+                android:layout_marginStart="6dp"
                 android:layout_weight="1"
-                android:text="返回书架" />
+                android:text="边距:24" />
         </LinearLayout>
     </LinearLayout>
 </FrameLayout>

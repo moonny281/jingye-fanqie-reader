@@ -14,14 +14,9 @@ import app.jingye.reader.JingyeApp
 import app.jingye.reader.R
 import app.jingye.reader.backend.FanqieMetadata
 import app.jingye.reader.ui.reader.ReaderActivity
+import app.jingye.reader.ui.shelf.ShelfActivity
 import kotlinx.coroutines.launch
 
-/**
- * 番茄小说解析与下载前端页（遵循净页墨水屏纯黑白、零动画设计规范）。
- * 支持两种后端工作模式：
- * 1. 本机直连（默认）：内置完整移植自 Jees996/fanqie-novel-downloader 的匿名设备注册、x-argus/x-ladon 签名与 AES 解密内核；
- * 2. 远程后端：连接局域网或服务器运行的 FastAPI `app.py`（POST /api/parse + SSE /api/download/progress）。
- */
 class FanqieActivity : AppCompatActivity() {
 
     private lateinit var app: JingyeApp
@@ -32,6 +27,7 @@ class FanqieActivity : AppCompatActivity() {
     private lateinit var statusTitle: TextView
     private lateinit var statusDetail: TextView
     private lateinit var metaCard: View
+    private lateinit var metaCoverThumb: TextView
     private lateinit var metaTitle: TextView
     private lateinit var metaSummary: TextView
     private lateinit var metaIntro: TextView
@@ -54,6 +50,7 @@ class FanqieActivity : AppCompatActivity() {
         statusTitle = findViewById(R.id.statusTitle)
         statusDetail = findViewById(R.id.statusDetail)
         metaCard = findViewById(R.id.metaCard)
+        metaCoverThumb = findViewById(R.id.metaCoverThumb)
         metaTitle = findViewById(R.id.metaTitle)
         metaSummary = findViewById(R.id.metaSummary)
         metaIntro = findViewById(R.id.metaIntro)
@@ -165,13 +162,15 @@ class FanqieActivity : AppCompatActivity() {
             try {
                 val meta = app.fanqie.parseInput(raw)
                 currentMeta = meta
-                metaTitle.text = "《${meta.title}》"
+                metaCoverThumb.text = ShelfActivity.formatCoverLabel(meta.title)
+                metaTitle.text = meta.title
                 metaSummary.text = "作者：${meta.author} · 评分：${meta.score}\n" +
-                    "字数：${meta.formattedWordCount()} · 状态：${meta.serialStatus} · 共 ${meta.chapterCount} 章 (可下 ${meta.availableChapters} 章)"
+                    "字数：${meta.formattedWordCount()} · ${meta.serialStatus}\n" +
+                    "共 ${meta.chapterCount} 章（可下载 ${meta.availableChapters} 章）"
                 metaIntro.text = meta.intro.ifBlank { "暂无简介" }
                 metaCard.visibility = View.VISIBLE
                 statusTitle.text = "解析成功：《${meta.title}》"
-                statusDetail.text = "书籍 ID：${meta.bookId} · 点击下方按钮开始下载全书"
+                statusDetail.text = "书籍 ID：${meta.bookId} · 点击下方按钮开始全本下载"
             } catch (e: Exception) {
                 statusTitle.text = "解析失败"
                 statusDetail.text = e.message ?: "请检查链接是否有效或网络是否通畅"
@@ -200,7 +199,7 @@ class FanqieActivity : AppCompatActivity() {
                     }
                 }
                 statusTitle.text = "《${savedBook.title}》已加入书架！"
-                statusDetail.text = "全书已按净页墨水屏排版格式保存至本地，随时可离线阅读。"
+                statusDetail.text = "全书已按净页墨水屏排版格式保存至本地，可立即打开阅读。"
                 if (openAfter) {
                     startActivity(Intent(this@FanqieActivity, ReaderActivity::class.java).putExtra("bookId", savedBook.id))
                     @Suppress("DEPRECATION")
