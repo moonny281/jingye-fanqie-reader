@@ -1,0 +1,228 @@
+name: Build & Release JingYe E-Ink Reader
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+    inputs:
+      custom_version:
+        description: "自定义版本号（留空则自动从 Git Tag / VERSION / build.gradle.kts 读取）"
+        required: false
+        default: ""
+      publish_release:
+        description: "构建完成后自动发布/更新到 GitHub Releases"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    name: Auto-Version & Build APK (Hisense A7 E-Ink)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Auto-Detect Version Name & Version Code
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # 1. 按优先级自动解析 VERSION_NAME：
+          #    手动触发输入 > Git Tag (v*) > 根目录 VERSION 文件 > app/build.gradle.kts > 默认值
+          INPUT_VER="${{ github.event.inputs.custom_version }}"
+          REF_NAME="${GITHUB_REF_NAME:-}"
+
+          if [ -n "$INPUT_VER" ]; then
+            RAW_VER="$INPUT_VER"
+            SOURCE="workflow_dispatch input"
+          elif [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+            RAW_VER="${REF_NAME#v}"
+            SOURCE="git tag ($REF_NAME)"
+          elif [ -f "VERSION" ] && [ -n "$(tr -d '[:space:]' < VERSION)" ]; then
+            RAW_VER="$(head -n 1 VERSION | tr -d '[:space:]')"
+            SOURCE="VERSION file"
+          else
+            RAW_VER=$(grep -Eo 'versionName\s*=\s*"[^"]+"' app/build.gradle.kts | head -n 1 | sed -E 's/.*"([^"]+)".*//' || true)
+            if [ -z "$RAW_VER" ]; then
+              RAW_VER="0.2.0"
+            fi
+            SOURCE="app/build.gradle.kts"
+          fi
+
+          # 去掉可能带有前导的 v
+          VERSION_NAME="${RAW_VER#v}"
+
+          # 2. 自动计算单调递增的 VERSION_CODE：
+          #    将语义化版本号 (Major.Minor.Patch) 转为整数基数，并结合 GitHub Actions run_number 保证每次构建均可直接覆盖安装
+          IFS='.-_' read -r MAJOR MINOR PATCH _ <<< "$VERSION_NAME"
+          MAJOR=${MAJOR//[^0-9]/}; MAJOR=${MAJOR:-0}
+          MINOR=${MINOR//[^0-9]/}; MINOR=${MINOR:-2}
+          PATCH=${PATCH//[^0-9]/}; PATCH=${PATCH:-0}
+
+          SEMVER_BASE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
+          RUN_NUM=${GITHUB_RUN_NUMBER:-1}
+          VERSION_CODE=$(( SEMVER_BASE * 1000 + (RUN_NUM % 1000) ))
+          if [ "$VERSION_CODE" -le 0 ]; then
+            VERSION_CODE="$RUN_NUM"
+          fi
+
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          TAG_NAME="v${VERSION_NAME}"
+
+          echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
+          echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
+          echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "source=${SOURCE}" >> "$GITHUB_OUTPUT"
+
+          echo "=================================================="
+          echo "  Resolved Version Name : ${VERSION_NAME} (from ${SOURCE})"
+          echo "  Resolved Version Code : ${VERSION_CODE}"
+          echo "  Release Tag           : ${TAG_NAME}"
+          echo "  Commit SHA            : ${SHORT_SHA}"
+          echo "=================================================="
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle with Cache
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.4'
+
+      - name: Decode Optional Custom Keystore (If Configured in Secrets)
+        env:
+          SIGNING_KEY_BASE64: ${{ secrets.SIGNING_KEY_BASE64 }}
+        run: |
+          if [ -n "${SIGNING_KEY_BASE64:-}" ]; then
+            echo "$SIGNING_KEY_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+            echo "SIGNING_STORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+            echo "SIGNING_STORE_PASSWORD=${{ secrets.SIGNING_STORE_PASSWORD }}" >> "$GITHUB_ENV"
+            echo "SIGNING_KEY_ALIAS=${{ secrets.SIGNING_KEY_ALIAS }}" >> "$GITHUB_ENV"
+            echo "SIGNING_KEY_PASSWORD=${{ secrets.SIGNING_KEY_PASSWORD }}" >> "$GITHUB_ENV"
+            echo "Using custom release keystore from GitHub Secrets."
+          else
+            echo "No custom keystore secret set; using built-in default signing config."
+          fi
+
+      - name: Build Debug & Signed Release APKs with Auto-Detected Version
+        run: |
+          gradle assembleDebug assembleRelease             -PversionName="${{ steps.version.outputs.version_name }}"             -PversionCode="${{ steps.version.outputs.version_code }}"             --stacktrace
+
+      - name: Collect & Rename Versioned APKs and Generate SHA-256 Checksums
+        id: artifacts
+        run: |
+          mkdir -p dist
+          VER="${{ steps.version.outputs.version_name }}"
+          CODE="${{ steps.version.outputs.version_code }}"
+
+          REL_SRC=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          DBG_SRC=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+
+          REL_OUT="dist/jingye-reader-v${VER}-release.apk"
+          DBG_OUT="dist/jingye-reader-v${VER}-debug.apk"
+
+          cp "$REL_SRC" "$REL_OUT"
+          cp "$DBG_SRC" "$DBG_OUT"
+
+          (cd dist && sha256sum *.apk > SHA256SUMS.txt)
+          cat dist/SHA256SUMS.txt
+
+          echo "release_apk=${REL_OUT}" >> "$GITHUB_OUTPUT"
+          echo "debug_apk=${DBG_OUT}" >> "$GITHUB_OUTPUT"
+
+          # 写入 GitHub Actions 构建摘要面板
+          {
+            echo "### 净页 (JingYe) 构建完成摘要"
+            echo ""
+            echo "| 项目 | 值 |"
+            echo "| :--- | :--- |"
+            echo "| **版本号 (versionName)** | \`${VER}\` (来源: ${{ steps.version.outputs.source }}) |"
+            echo "| **构建号 (versionCode)** | \`${CODE}\` |"
+            echo "| **Commit SHA** | \`${{ steps.version.outputs.short_sha }}\` |"
+            echo "| **Release 安装包** | \`jingye-reader-v${VER}-release.apk\` |"
+            echo "| **Debug 调试包** | \`jingye-reader-v${VER}-debug.apk\` |"
+            echo ""
+            echo "#### SHA-256 校验值"
+            echo "\`\`\`text"
+            cat dist/SHA256SUMS.txt
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Release APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jingye-reader-v${{ steps.version.outputs.version_name }}-release-apk
+          path: |
+            dist/jingye-reader-v${{ steps.version.outputs.version_name }}-release.apk
+            dist/SHA256SUMS.txt
+
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jingye-reader-v${{ steps.version.outputs.version_name }}-debug-apk
+          path: dist/jingye-reader-v${{ steps.version.outputs.version_name }}-debug.apk
+
+      - name: Auto-Publish / Update GitHub Release
+        if: >-
+          github.event_name != 'pull_request' &&
+          (startsWith(github.ref, 'refs/tags/v') ||
+           github.ref == 'refs/heads/main' ||
+           github.ref == 'refs/heads/master' ||
+           github.event.inputs.publish_release == 'true')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag_name }}
+          name: "净页 (JingYe) v${{ steps.version.outputs.version_name }}"
+          generate_release_notes: true
+          body: |
+            ### 净页 (JingYe) · 海信 A7 墨水屏阅读器 v${{ steps.version.outputs.version_name }}
+            - **构建版本号 (`versionName`)**：`${{ steps.version.outputs.version_name }}`
+            - **内部构建号 (`versionCode`)**：`${{ steps.version.outputs.version_code }}`
+            - **对应提交 (`Commit`)**：`${{ steps.version.outputs.short_sha }}`
+            - **安装包说明**：请直接下载下方 `jingye-reader-v${{ steps.version.outputs.version_name }}-release.apk` 安装至海信 A7。
+          files: |
+            dist/jingye-reader-v${{ steps.version.outputs.version_name }}-release.apk
+            dist/jingye-reader-v${{ steps.version.outputs.version_name }}-debug.apk
+            dist/SHA256SUMS.txt
+
+  test-backend:
+    name: Verify Python FastAPI Backend Syntax
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Backend Dependencies & Verify Modules
+        working-directory: ./backend
+        run: |
+          pip install -r requirements.txt
+          python -c "import app, core; print('Backend core ready:', app.CORE_READY)"
+          python core/decryptor.py
