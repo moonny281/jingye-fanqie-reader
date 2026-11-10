@@ -41,7 +41,6 @@ android {
         targetSdk = 34
         versionCode = appVersionCode
         versionName = appVersionName
-        setProperty("archivesBaseName", "jingye-reader-v$appVersionName")
     }
 
     signingConfigs {

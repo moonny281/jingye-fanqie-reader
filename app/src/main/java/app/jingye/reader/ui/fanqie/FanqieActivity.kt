@@ -166,8 +166,7 @@ class FanqieActivity : AppCompatActivity() {
                 val meta = app.fanqie.parseInput(raw)
                 currentMeta = meta
                 metaTitle.text = "《${meta.title}》"
-                metaSummary.text = "作者：${meta.author} · 评分：${meta.score}
-" +
+                metaSummary.text = "作者：${meta.author} · 评分：${meta.score}\n" +
                     "字数：${meta.formattedWordCount()} · 状态：${meta.serialStatus} · 共 ${meta.chapterCount} 章 (可下 ${meta.availableChapters} 章)"
                 metaIntro.text = meta.intro.ifBlank { "暂无简介" }
                 metaCard.visibility = View.VISIBLE

@@ -168,24 +168,24 @@ object FanqieCrypto {
         return res.array()
     }
 
-    private fun rol64(v: ULong, n: Int): ULong = (v shl n) or (v shr (64 - n))
-    private fun ror64(v: ULong, n: Int): ULong = (v shl (64 - n)) or (v shr n)
+    private fun rol64(v: Long, n: Int): Long = (v shl n) or (v ushr (64 - n))
+    private fun ror64(v: Long, n: Int): Long = (v shl (64 - n)) or (v ushr n)
 
-    private fun simonKeyExpand(key: ULongArray): ULongArray {
-        val z4 = 0x3DC94C3A046D678BUL
-        val k = ULongArray(72)
+    private fun simonKeyExpand(key: LongArray): LongArray {
+        val z4 = 0x3DC94C3A046D678BL
+        val k = LongArray(72)
         for (i in 0 until 4) k[i] = key[i]
         for (i in 4 until 72) {
             var tmp = ror64(k[i - 1], 3)
             tmp = tmp xor k[i - 3]
             tmp = tmp xor ror64(tmp, 1)
-            val bit = (z4 shr ((i - 4) % 62)) and 1UL
-            k[i] = k[i - 4].inv() xor tmp xor bit xor 3UL
+            val bit = (z4 ushr ((i - 4) % 62)) and 1L
+            k[i] = k[i - 4].inv() xor tmp xor bit xor 3L
         }
         return k
     }
 
-    private fun simonEncrypt(ptLow: ULong, ptHigh: ULong, key: ULongArray): Pair<ULong, ULong> {
+    private fun simonEncrypt(ptLow: Long, ptHigh: Long, key: LongArray): Pair<Long, Long> {
         val k = simonKeyExpand(key)
         var x = ptLow
         var y = ptHigh
@@ -198,23 +198,23 @@ object FanqieCrypto {
         return x to y
     }
 
-    private fun speckKeySchedule(key: ByteArray): ULongArray {
+    private fun speckKeySchedule(key: ByteArray): LongArray {
         val numWords = key.size / 8
-        val ks = ArrayList<ULong>(34)
-        val ls = ArrayList<ULong>(34 + numWords)
+        val ks = LongArray(34)
+        val ls = LongArray(34 + numWords)
         val bb = ByteBuffer.wrap(key).order(ByteOrder.LITTLE_ENDIAN)
-        ks.add(bb.long.toULong())
+        ks[0] = bb.long
         for (i in 1 until numWords) {
-            ls.add(bb.long.toULong())
+            ls[i - 1] = bb.long
         }
         for (x in 0 until 33) {
-            val rsX = (ls[x] shl 56) or (ls[x] shr 8)
-            val newX = x.toULong() xor (rsX + ks[x])
-            val lsY = (ks[x] shr 61) or (ks[x] shl 3)
-            ls.add(newX)
-            ks.add(newX xor lsY)
+            val rsX = (ls[x] shl 56) or (ls[x] ushr 8)
+            val newX = x.toLong() xor (rsX + ks[x])
+            val lsY = (ks[x] ushr 61) or (ks[x] shl 3)
+            ls[x + numWords - 1] = newX
+            ks[x + 1] = newX xor lsY
         }
-        return ks.toULongArray()
+        return ks
     }
 
     fun speckEncrypt(key: ByteArray, plaintext: ByteArray): ByteArray {
@@ -228,16 +228,16 @@ object FanqieCrypto {
         val inBuf = ByteBuffer.wrap(padded).order(ByteOrder.LITTLE_ENDIAN)
 
         for (i in 0 until padded.size step 16) {
-            var y = inBuf.long.toULong()
-            var x = inBuf.long.toULong()
+            var y = inBuf.long
+            var x = inBuf.long
             for (k in ks) {
-                val rotX = (x shl 56) or (x shr 8)
+                val rotX = (x shl 56) or (x ushr 8)
                 x = k xor (rotX + y)
-                val rotY = (y shr 61) or (y shl 3)
+                val rotY = (y ushr 61) or (y shl 3)
                 y = x xor rotY
             }
-            out.putLong(y.toLong())
-            out.putLong(x.toLong())
+            out.putLong(y)
+            out.putLong(x)
         }
         return out.array()
     }
@@ -245,24 +245,24 @@ object FanqieCrypto {
     private class ProtobufWriter {
         private val buf = ByteArrayOutputStream()
 
-        private fun rawVarint(value: ULong): ProtobufWriter {
+        private fun rawVarint(value: Long): ProtobufWriter {
             var v = value
-            while (v >= 0x80UL) {
-                buf.write(((v and 0x7FUL) or 0x80UL).toInt())
-                v = v shr 7
+            while ((v and -0x80L) != 0L) {
+                buf.write((v.toInt() and 0x7F) or 0x80)
+                v = v ushr 7
             }
-            buf.write((v and 0x7FUL).toInt())
+            buf.write(v.toInt() and 0x7F)
             return this
         }
 
         private fun key(field: Int, wire: Int): ProtobufWriter =
-            rawVarint(((field shl 3) or wire).toULong())
+            rawVarint(((field shl 3) or wire).toLong())
 
         fun varint(field: Int, value: Long): ProtobufWriter =
-            key(field, 0).rawVarint(value.toULong())
+            key(field, 0).rawVarint(value)
 
         fun bytes(field: Int, data: ByteArray): ProtobufWriter {
-            key(field, 2).rawVarint(data.size.toULong())
+            key(field, 2).rawVarint(data.size.toLong())
             buf.write(data)
             return this
         }
@@ -335,16 +335,16 @@ object FanqieCrypto {
         val digestInput = SIGN_KEY + LOW_RAND + HIGH_RAND + SIGN_KEY
         val digest = sm3(digestInput)
         val digestBuf = ByteBuffer.wrap(digest).order(ByteOrder.LITTLE_ENDIAN)
-        val simonKey = ULongArray(4) { digestBuf.long.toULong() }
+        val simonKey = LongArray(4) { digestBuf.long }
 
         val encrypted = ByteBuffer.allocate(protobuf.size).order(ByteOrder.LITTLE_ENDIAN)
         val pbBuf = ByteBuffer.wrap(protobuf).order(ByteOrder.LITTLE_ENDIAN)
         for (off in 0 until protobuf.size step 16) {
-            val low = pbBuf.long.toULong()
-            val high = pbBuf.long.toULong()
+            val low = pbBuf.long
+            val high = pbBuf.long
             val (eLow, eHigh) = simonEncrypt(low, high, simonKey)
-            encrypted.putLong(eLow.toLong())
-            encrypted.putLong(eHigh.toLong())
+            encrypted.putLong(eLow)
+            encrypted.putLong(eHigh)
         }
 
         val data = XOR_PREFIX + encrypted.array()
@@ -384,7 +384,7 @@ object FanqieCrypto {
         return headers
     }
 
-    private val URL_QUERY_RE = Regex("""^[^?]+\?([^#]*)""")
+    private val URL_QUERY_RE = Regex("^[^?]+\\?([^#]*)")
 
     /** GZIP 压缩（固定 mtime=0，与 Python gzip.compress(data, mtime=0) 一致） */
     private fun gzipDeterministic(data: ByteArray): ByteArray {
@@ -403,7 +403,6 @@ object FanqieCrypto {
         crc.update(data)
 
         val out = ByteArrayOutputStream()
-        // 10-byte GZIP header with mtime = 0
         out.write(byteArrayOf(0x1f, 0x8b.toByte(), 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff.toByte()))
         out.write(compressedBody.toByteArray())
         val trailer = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN)

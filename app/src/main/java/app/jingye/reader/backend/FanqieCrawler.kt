@@ -27,8 +27,7 @@ class FanqieCrawler(
         private val WS_RE = Regex("[ \\t\\r\\f\\u000B\\u00a0]+")
 
         private fun stripTags(fragment: String): String {
-            val withNl = BR_RE.replace(fragment, "
-")
+            val withNl = BR_RE.replace(fragment, "\n")
             val noTags = TAG_RE.replace(withNl, "")
             return Html.fromHtml(noTags, Html.FROM_HTML_MODE_LEGACY).toString()
         }
@@ -38,9 +37,9 @@ class FanqieCrawler(
             val paragraphs = ArrayList<String>()
             for (m in P_RE.findAll(htmlFragment)) {
                 val text = stripTags(m.groupValues[1])
-                    .replace("​", "")
-                    .replace("﻿", "")
-                    .replace("　", " ")
+                    .replace("\u200b", "")
+                    .replace("\ufeff", "")
+                    .replace("\u3000", " ")
                     .replace(WS_RE, " ")
                     .trim()
                 if (text.isNotEmpty()) paragraphs.add(text)
@@ -48,7 +47,7 @@ class FanqieCrawler(
             if (paragraphs.isNotEmpty()) return paragraphs
 
             for (line in stripTags(htmlFragment).lines()) {
-                val clean = line.replace("　", " ").trim()
+                val clean = line.replace("\u3000", " ").trim()
                 if (clean.isNotEmpty()) paragraphs.add(clean)
             }
             return paragraphs
@@ -67,14 +66,8 @@ class FanqieCrawler(
 
         fun formatChapter(title: String, paragraphs: List<String>): String {
             val body = paragraphs.map { it.trim() }.filter { it.isNotEmpty() }
-                .joinToString("
-
-") { "　　$it" }
-            return "【$title】
-
-$body
-
-"
+                .joinToString("\n\n") { "　　$it" }
+            return "【$title】\n\n$body\n\n"
         }
 
         fun formatBookTxt(
@@ -112,8 +105,7 @@ $body
             lines += "由 fanqie-novel-downloader 导出"
             lines += "=".repeat(46)
 
-            val content = lines.joinToString("
-")
+            val content = lines.joinToString("\n")
             val out = ByteArrayOutputStream()
             // UTF-8 BOM (utf-8-sig)
             out.write(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()))
@@ -286,8 +278,7 @@ $body
         }
         val rawParas = extractReaderParagraphs(html)
         if (rawParas.isEmpty()) throw FanqieException("章节正文为空")
-        val plain = FanqieDecryptor.decryptText(rawParas.joinToString("
-"))
+        val plain = FanqieDecryptor.decryptText(rawParas.joinToString("\n"))
         return plain.lines().map { it.trim() }.filter { it.isNotEmpty() }
     }
 

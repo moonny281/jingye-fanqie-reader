@@ -6,10 +6,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.File
+import java.math.BigInteger
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
-import java.math.BigInteger
 import java.util.Random
 import java.util.UUID
 import java.util.zip.GZIPInputStream
@@ -52,9 +52,9 @@ class FanqieAppApi(
             val noTags = CHAPTER_TAG_RE.replace(fragment, "")
             val unescaped = Html.fromHtml(noTags, Html.FROM_HTML_MODE_LEGACY).toString()
             return unescaped
-                .replace("​", "")
-                .replace("﻿", "")
-                .replace("　", " ")
+                .replace("\u200b", "")
+                .replace("\ufeff", "")
+                .replace("\u3000", " ")
                 .replace(WS_RE, " ")
                 .trim()
         }
