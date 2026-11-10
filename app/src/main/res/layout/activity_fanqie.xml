@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF"
+    android:orientation="vertical">
+
+    <!-- 顶栏 56dp -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="番茄小说下载"
+            android:textColor="#000000"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnToggleBackend"
+            style="@style/InkButton"
+            android:text="通道:本机直连" />
+
+        <Button
+            android:id="@+id/btnClose"
+            style="@style/InkButton"
+            android:text="返回" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="2dp"
+        android:background="#000000" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:overScrollMode="never"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- 远程 FastAPI 后端配置区（仅在切换为远程后端模式时显示） -->
+            <LinearLayout
+                android:id="@+id/remoteConfigBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:background="@drawable/ink_panel_bg"
+                android:orientation="vertical"
+                android:padding="12dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="远程 FastAPI 后端地址 (运行 app.py 的服务端)"
+                    android:textColor="#000000"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <EditText
+                        android:id="@+id/editBackendUrl"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/ink_panel_bg"
+                        android:hint="http://192.168.1.100:8000"
+                        android:inputType="textUri"
+                        android:paddingHorizontal="10dp"
+                        android:singleLine="true"
+                        android:textColor="#000000"
+                        android:textColorHint="#000000"
+                        android:textSize="14sp" />
+
+                    <Button
+                        android:id="@+id/btnSaveBackendUrl"
+                        style="@style/InkButton"
+                        android:text="保存并检测" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- 输入区：分享文案 / 短链 / PC 链接 / 纯数字 book_id -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="粘贴番茄小说分享文案、changdunovel 短链或书籍 ID："
+                android:textColor="#000000"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/editShareInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/ink_panel_bg"
+                android:gravity="top|start"
+                android:hint="例如：推荐一部好书《无人清白》https://changdunovel.com/t/ZPJkJpLOb-M/ 或 7527891257914297368"
+                android:inputType="textMultiLine"
+                android:maxLines="4"
+                android:minHeight="76dp"
+                android:padding="10dp"
+                android:textColor="#000000"
+                android:textSize="16sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnPaste"
+                    style="@style/InkButton"
+                    android:text="粘贴剪贴板" />
+
+                <Button
+                    android:id="@+id/btnClear"
+                    style="@style/InkButton"
+                    android:text="清空" />
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <Button
+                    android:id="@+id/btnParse"
+                    style="@style/InkButton"
+                    android:text="解析书籍" />
+            </LinearLayout>
+
+            <!-- 静态状态与进度显示框 -->
+            <LinearLayout
+                android:id="@+id/statusBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/ink_panel_bg"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    android:id="@+id/statusTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="就绪（免登录 APP 网关直连，支持全本与会员章节）"
+                    android:textColor="#000000"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/statusDetail"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="提示：APP 网关限制每批 30 章、间隔 6 秒串行请求，300 章约需 1 分钟。"
+                    android:textColor="#000000"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <!-- 解析结果卡片 -->
+            <LinearLayout
+                android:id="@+id/metaCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/ink_panel_bg"
+                android:orientation="vertical"
+                android:padding="14dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/metaTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="#000000"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/metaSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="#000000"
+                    android:textSize="14sp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginVertical="10dp"
+                    android:background="#000000" />
+
+                <TextView
+                    android:id="@+id/metaIntro"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:maxLines="8"
+                    android:textColor="#000000"
+                    android:textSize="14sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnDownloadToShelf"
+                        style="@style/InkButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:text="下载全书并入书架" />
+
+                    <Button
+                        android:id="@+id/btnDownloadAndRead"
+                        style="@style/InkButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:text="下载并立即阅读" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

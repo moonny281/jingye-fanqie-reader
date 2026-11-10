@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF"
+    android:orientation="vertical">
+
+    <!-- 顶栏 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="墨水屏调试 (A7)"
+            android:textColor="#000000"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnRefreshSysVals"
+            style="@style/InkButton"
+            android:text="重读系统值" />
+
+        <Button
+            android:id="@+id/btnCloseDebug"
+            style="@style/InkButton"
+            android:text="关闭" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="2dp"
+        android:background="#000000" />
+
+    <!-- 上半部分：测试画布 PageView -->
+    <app.jingye.reader.reader.PageView
+        android:id="@+id/debugPageView"
+        android:layout_width="match_parent"
+        android:layout_height="220dp" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="2dp"
+        android:background="#000000" />
+
+    <!-- 下半部分：控制按钮 + 系统属性列表 -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:overScrollMode="never"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                android:id="@+id/debugStatusText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:text="测试画布就绪"
+                android:textColor="#000000"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <!-- 测试图按钮 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <Button android:id="@+id/btnPatWhite" style="@style/InkButton" android:text="全白" />
+                <Button android:id="@+id/btnPatBlack" style="@style/InkButton" android:text="全黑" />
+                <Button android:id="@+id/btnPatChecker" style="@style/InkButton" android:text="棋盘格" />
+                <Button android:id="@+id/btnPatGray" style="@style/InkButton" android:text="灰阶条" />
+                <Button android:id="@+id/btnPatText" style="@style/InkButton" android:text="文字样张" />
+            </LinearLayout>
+
+            <!-- 局部清影与翻页压力测试 (E4) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal">
+                <Button android:id="@+id/btnCleanRegion" style="@style/InkButton" android:text="局部清影" />
+                <Button android:id="@+id/btnStress250" style="@style/InkButton" android:text="连翻20张(250ms)" />
+                <Button android:id="@+id/btnStress400" style="@style/InkButton" android:text="连翻20张(400ms)" />
+            </LinearLayout>
+
+            <!-- 硬件加速与抗锯齿对比 (E5) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal">
+                <Button android:id="@+id/btnToggleHwAccel" style="@style/InkButton" android:text="硬件加速:开" />
+                <Button android:id="@+id/btnToggleDebugAA" style="@style/InkButton" android:text="抗锯齿:开" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="10dp"
+                android:background="#000000" />
+
+            <!-- Tier 1 只读系统设置与属性 (E1) -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="系统 EPD 设置与属性 (Tier 1 只读感知)："
+                android:textColor="#000000"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/epdReadoutText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/ink_panel_bg"
+                android:fontFamily="monospace"
+                android:padding="10dp"
+                android:textColor="#000000"
+                android:textSize="13sp" />
+
+            <!-- Tier 2 实验写入 (默认折叠关闭, E6) -->
+            <Button
+                android:id="@+id/btnToggleExpWrite"
+                style="@style/InkButton"
+                android:layout_width="match_parent"
+                android:layout_marginTop="12dp"
+                android:text="展开 Tier 2 实验性设置写入 (默认关闭)" />
+
+            <LinearLayout
+                android:id="@+id/expWritePanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/ink_panel_bg"
+                android:orientation="vertical"
+                android:padding="10dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="警告：仅用于实验 E6 验证 Settings.System 写入是否被系统服务响应（需授予修改系统设置权限，不调用危险 binder 接口）。"
+                    android:textColor="#000000"
+                    android:textSize="13sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
+                    <Button android:id="@+id/btnWriteMode1" style="@style/InkButton" android:text="写 epd_mode=1" />
+                    <Button android:id="@+id/btnWriteMode2" style="@style/InkButton" android:text="写 epd_mode=2" />
+                    <Button android:id="@+id/btnWriteMode3" style="@style/InkButton" android:text="写 epd_mode=3" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>
