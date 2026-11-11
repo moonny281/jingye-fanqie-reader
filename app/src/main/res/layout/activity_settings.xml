@@ -1,0 +1,538 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#FFFFFF">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="54dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp">
+
+        <Button
+            android:id="@+id/btnBack"
+            style="@style/Widget.Jingye.Button.Outline"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="← 返回"
+            android:textSize="13sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:text="墨水屏排版与字体设置"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="#000000" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="2dp"
+        android:background="#000000" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:overScrollMode="never"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="14dp"
+                android:background="@drawable/bg_eink_card">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="预设排版方案"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="#000000" />
+
+                <TextView
+                    android:id="@+id/tvCurrentPresetDesc"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="当前：微信精排"
+                    android:textSize="12sp"
+                    android:textColor="#000000" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnSetPresetWeread"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:text="微信精排"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/btnSetPresetCompact"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="6dp"
+                        android:text="紧凑速读"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/btnSetPresetComfort"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="6dp"
+                        android:text="舒朗大字"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnSetPresetClassic"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:text="古籍雅致"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/btnSetPresetCrisp"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="6dp"
+                        android:text="高对比黑"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:orientation="vertical"
+                android:padding="14dp"
+                android:background="@drawable/bg_eink_card">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="阅读字体库"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="#000000" />
+
+                <TextView
+                    android:id="@+id/tvCurrentFontDesc"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="当前字体：思源宋体"
+                    android:textSize="12sp"
+                    android:textColor="#000000" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnSetFontSerif"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:text="思源宋体"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/btnSetFontWenkai"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="6dp"
+                        android:text="霞鹜文楷"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/btnSetFontSans"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="6dp"
+                        android:text="思源黑体"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnSetFontEinkBold"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:text="墨水屏凝黑"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/btnSetFontFangsong"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="6dp"
+                        android:text="古籍刻本"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/btnSetFontRounded"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="6dp"
+                        android:text="护眼柔黑"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/btnImportCustomFont"
+                    style="@style/Widget.Jingye.Button.Outline"
+                    android:layout_width="match_parent"
+                    android:layout_height="38dp"
+                    android:layout_marginTop="8dp"
+                    android:text="导入本地字体文件 (.ttf / .otf)"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:orientation="vertical"
+                android:padding="14dp"
+                android:background="@drawable/bg_eink_card">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="细节微调"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="#000000" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="42dp"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/tvFontSize"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="正文字号：22 sp"
+                        android:textSize="14sp"
+                        android:textColor="#000000" />
+
+                    <Button
+                        android:id="@+id/btnFontMinus"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="52dp"
+                        android:layout_height="34dp"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:text="A-" />
+
+                    <Button
+                        android:id="@+id/btnFontPlus"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="52dp"
+                        android:layout_height="34dp"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:layout_marginStart="8dp"
+                        android:text="A+" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="42dp"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/tvLineSpacing"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="行距倍率：1.4x"
+                        android:textSize="14sp"
+                        android:textColor="#000000" />
+
+                    <Button
+                        android:id="@+id/btnLineMinus"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="52dp"
+                        android:layout_height="34dp"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:text="-" />
+
+                    <Button
+                        android:id="@+id/btnLinePlus"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="52dp"
+                        android:layout_height="34dp"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:layout_marginStart="8dp"
+                        android:text="+" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="42dp"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/tvParaSpacing"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="段间距离：10 dp"
+                        android:textSize="14sp"
+                        android:textColor="#000000" />
+
+                    <Button
+                        android:id="@+id/btnParaMinus"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="52dp"
+                        android:layout_height="34dp"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:text="-" />
+
+                    <Button
+                        android:id="@+id/btnParaPlus"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="52dp"
+                        android:layout_height="34dp"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:layout_marginStart="8dp"
+                        android:text="+" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="42dp"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/tvLetterSpacing"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="字间距离：0.02 em"
+                        android:textSize="14sp"
+                        android:textColor="#000000" />
+
+                    <Button
+                        android:id="@+id/btnLetterMinus"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="52dp"
+                        android:layout_height="34dp"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:text="-" />
+
+                    <Button
+                        android:id="@+id/btnLetterPlus"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="52dp"
+                        android:layout_height="34dp"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:layout_marginStart="8dp"
+                        android:text="+" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="42dp"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/tvMargin"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="左右边距：22 dp"
+                        android:textSize="14sp"
+                        android:textColor="#000000" />
+
+                    <Button
+                        android:id="@+id/btnMarginMinus"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="52dp"
+                        android:layout_height="34dp"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:text="-" />
+
+                    <Button
+                        android:id="@+id/btnMarginPlus"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="52dp"
+                        android:layout_height="34dp"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:layout_marginStart="8dp"
+                        android:text="+" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="42dp"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/tvBoldState"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="墨水屏笔画加深：关闭"
+                        android:textSize="14sp"
+                        android:textColor="#000000" />
+
+                    <Button
+                        android:id="@+id/btnToggleBold"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="wrap_content"
+                        android:layout_height="34dp"
+                        android:minHeight="0dp"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="14dp"
+                        android:text="切换加深" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:orientation="vertical"
+                android:padding="14dp"
+                android:background="@drawable/bg_eink_card">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="海信 A7 墨水屏刷新控制"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="#000000" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="42dp"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/tvFullRefreshEvery"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="全刷去残影步长：12 页"
+                        android:textSize="14sp"
+                        android:textColor="#000000" />
+
+                    <Button
+                        android:id="@+id/btnRefreshMinus"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="52dp"
+                        android:layout_height="34dp"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:text="-" />
+
+                    <Button
+                        android:id="@+id/btnRefreshPlus"
+                        style="@style/Widget.Jingye.Button.Outline"
+                        android:layout_width="52dp"
+                        android:layout_height="34dp"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:layout_marginStart="8dp"
+                        android:text="+" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/btnOpenEpdDebug"
+                    style="@style/Widget.Jingye.Button.Outline"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:layout_marginTop="10dp"
+                    android:text="打开墨水屏残影与刷新实验室"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

@@ -1,0 +1,475 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#FFFFFF">
+
+    <!-- Top WeRead E-Ink App Bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="58dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="14dp"
+        android:background="#FFFFFF">
+
+        <!-- E-Ink Brand Seal -->
+        <TextView
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:gravity="center"
+            android:background="@drawable/bg_eink_tag_inverted"
+            android:text="净"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="10dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="净页书架"
+                android:textSize="19sp"
+                android:textStyle="bold"
+                android:textColor="#000000" />
+
+            <TextView
+                android:id="@+id/tvBookCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0 本藏书 · 墨水屏精排"
+                android:textSize="11sp"
+                android:textColor="#000000" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnCheckAllUpdates"
+            style="@style/Widget.Jingye.Button.Outline"
+            android:layout_width="wrap_content"
+            android:layout_height="34dp"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="检测更新"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/btnFanqie"
+            style="@style/Widget.Jingye.Button.Solid"
+            android:layout_width="wrap_content"
+            android:layout_height="34dp"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:layout_marginStart="6dp"
+            android:paddingStart="11dp"
+            android:paddingEnd="11dp"
+            android:text="+ 搜书"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/btnImportTxt"
+            style="@style/Widget.Jingye.Button.Outline"
+            android:layout_width="wrap_content"
+            android:layout_height="34dp"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:layout_marginStart="6dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="导入"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="2dp"
+        android:background="#000000" />
+
+    <!-- Live Background Download Banner -->
+    <LinearLayout
+        android:id="@+id/shelfDownloadBanner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="10dp"
+        android:padding="12dp"
+        android:orientation="vertical"
+        android:background="@drawable/bg_eink_card"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:paddingTop="1dp"
+                android:paddingBottom="1dp"
+                android:background="@drawable/bg_eink_tag_inverted"
+                android:text="后台任务"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF" />
+
+            <TextView
+                android:id="@+id/tvShelfDownloadTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="正在下载《书名》"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textColor="#000000" />
+
+            <Button
+                android:id="@+id/btnShelfDownloadAction"
+                style="@style/Widget.Jingye.Button.Outline"
+                android:layout_width="wrap_content"
+                android:layout_height="28dp"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:text="暂停存断点"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/btnShelfDownloadClose"
+                style="@style/Widget.Jingye.Button.Outline"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:layout_marginStart="6dp"
+                android:text="×"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <ProgressBar
+            android:id="@+id/pbShelfDownload"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="6dp"
+            android:layout_marginTop="8dp"
+            android:max="100"
+            android:progress="0"
+            android:progressDrawable="@drawable/bg_eink_progress" />
+
+        <TextView
+            android:id="@+id/tvShelfDownloadDetail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:text="状态栏正在同步显示下载进度…"
+            android:textSize="11sp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="#000000" />
+    </LinearLayout>
+
+    <!-- Hero "Continue Reading" Card (Double-Framed WeRead E-Ink Style) -->
+    <LinearLayout
+        android:id="@+id/heroRecentCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="4dp"
+        android:padding="14dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/bg_eink_hero_card"
+        android:visibility="gone">
+
+        <!-- Miniature E-Ink Book Spine Cover -->
+        <LinearLayout
+            android:layout_width="56dp"
+            android:layout_height="76dp"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="6dp"
+            android:background="@drawable/bg_book_cover">
+
+            <TextView
+                android:id="@+id/tvHeroCoverLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:maxLines="3"
+                android:ellipsize="end"
+                android:text="净页"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:textColor="#000000" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="14dp"
+            android:layout_marginEnd="10dp"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="最近在读"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp"
+                    android:paddingTop="1dp"
+                    android:paddingBottom="1dp"
+                    android:background="@drawable/bg_eink_tag_inverted"
+                    android:textColor="#FFFFFF" />
+
+                <TextView
+                    android:id="@+id/tvHeroStatusBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:text="已最新"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp"
+                    android:paddingTop="1dp"
+                    android:paddingBottom="1dp"
+                    android:background="@drawable/bg_eink_tag"
+                    android:textColor="#000000"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvHeroTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="书名"
+                android:textSize="17sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textColor="#000000" />
+
+            <TextView
+                android:id="@+id/tvHeroMeta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:text="继续阅读"
+                android:textSize="12sp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textColor="#000000" />
+
+            <TextView
+                android:id="@+id/tvHeroLatestChapter"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="最新：暂无"
+                android:textSize="11sp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textColor="#000000" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal">
+
+            <Button
+                android:id="@+id/btnHeroRead"
+                style="@style/Widget.Jingye.Button.Solid"
+                android:layout_width="76dp"
+                android:layout_height="32dp"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:text="继续阅读"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/btnHeroUpdate"
+                style="@style/Widget.Jingye.Button.Outline"
+                android:layout_width="76dp"
+                android:layout_height="30dp"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:layout_marginTop="6dp"
+                android:text="检测更新"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Section Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="32dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
+        android:layout_marginTop="4dp">
+
+        <TextView
+            android:id="@+id/tvShelfSectionHint"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="全部藏书（支持检测更新 · 断点续下 · 长按管理）"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="#000000" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:background="#000000" />
+
+    <!-- Main Book List Area -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/shelfRecyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="12dp"
+            android:clipToPadding="false"
+            android:overScrollMode="never"
+            android:scrollbars="none" />
+
+        <LinearLayout
+            android:id="@+id/emptyContainer"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="32dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="书架空空如也"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="#000000" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center"
+                android:lineSpacingMultiplier="1.35"
+                android:text="点击右上角「+ 搜书」按书名搜索番茄小说（支持后台下载与断点续下）\n或点击「导入」加载本地 TXT 小说"
+                android:textSize="13sp"
+                android:textColor="#000000" />
+
+            <Button
+                android:id="@+id/btnLoadDemo"
+                style="@style/Widget.Jingye.Button.Outline"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginTop="18dp"
+                android:paddingStart="18dp"
+                android:paddingEnd="18dp"
+                android:text="加载内置墨水屏精排样章"
+                android:textSize="14sp" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1.5dp"
+        android:background="#000000" />
+
+    <!-- Bottom WeRead E-Ink Tab Bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="#FFFFFF">
+
+        <TextView
+            android:id="@+id/navShelf"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="● 书架"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:textColor="#000000" />
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="24dp"
+            android:background="#000000" />
+
+        <TextView
+            android:id="@+id/navFanqie"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:background="@drawable/bg_eink_item_selector"
+            android:text="番茄搜书"
+            android:textSize="15sp"
+            android:textColor="@color/selector_eink_text" />
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="24dp"
+            android:background="#000000" />
+
+        <TextView
+            android:id="@+id/navSettings"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:background="@drawable/bg_eink_item_selector"
+            android:text="排版与设置"
+            android:textSize="15sp"
+            android:textColor="@color/selector_eink_text" />
+    </LinearLayout>
+
+</LinearLayout>
