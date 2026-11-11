@@ -1,14 +1,18 @@
 package app.jingye.reader.ui.shelf
 
+import android.app.AlertDialog
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import app.jingye.reader.JingyeApp
@@ -17,42 +21,22 @@ import app.jingye.reader.data.Book
 import app.jingye.reader.ui.fanqie.FanqieActivity
 import app.jingye.reader.ui.reader.ReaderActivity
 import app.jingye.reader.ui.settings.SettingsActivity
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class ShelfActivity : AppCompatActivity() {
 
-    private lateinit var app: JingyeApp
-    private lateinit var shelfCountBadge: TextView
-    private lateinit var recentCard: View
-    private lateinit var recentCoverText: TextView
-    private lateinit var recentBookTitle: TextView
-    private lateinit var recentBookMeta: TextView
-    private lateinit var shelfSectionHeader: View
     private lateinit var recyclerView: RecyclerView
-    private lateinit var emptyView: View
-    private lateinit var errorLine: TextView
-    private lateinit var deleteOverlay: View
-    private lateinit var deleteTitle: TextView
-    private lateinit var adapter: BookAdapter
+    private lateinit var emptyContainer: View
+    private lateinit var tvBookCount: TextView
+    private lateinit var heroRecentCard: LinearLayout
+    private lateinit var tvHeroCoverLabel: TextView
+    private lateinit var tvHeroTitle: TextView
+    private lateinit var tvHeroMeta: TextView
 
-    private var pendingDeleteBook: Book? = null
-
-    private val picker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri == null) return@registerForActivityResult
-        errorLine.visibility = View.VISIBLE
-        errorLine.text = "正在导入本地 TXT…"
-        lifecycleScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) { app.library.importTxt(uri) }
-            }.onSuccess {
-                errorLine.visibility = View.GONE
-                reload()
-            }.onFailure {
-                errorLine.visibility = View.VISIBLE
-                errorLine.text = "导入失败：${it.message}"
-            }
+    private val pickTxtLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            importTxtFromUri(uri)
         }
     }
 
@@ -60,160 +44,162 @@ class ShelfActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_shelf)
 
-        app = application as JingyeApp
-        shelfCountBadge = findViewById(R.id.shelfCountBadge)
-        recentCard = findViewById(R.id.recentCard)
-        recentCoverText = findViewById(R.id.recentCoverText)
-        recentBookTitle = findViewById(R.id.recentBookTitle)
-        recentBookMeta = findViewById(R.id.recentBookMeta)
-        shelfSectionHeader = findViewById(R.id.shelfSectionHeader)
-        recyclerView = findViewById(R.id.recyclerView)
-        emptyView = findViewById(R.id.emptyView)
-        errorLine = findViewById(R.id.errorLine)
-        deleteOverlay = findViewById(R.id.deleteDialogOverlay)
-        deleteTitle = findViewById(R.id.deleteDialogTitle)
+        recyclerView = findViewById(R.id.shelfRecyclerView)
+        emptyContainer = findViewById(R.id.emptyContainer)
+        tvBookCount = findViewById(R.id.tvBookCount)
+        heroRecentCard = findViewById(R.id.heroRecentCard)
+        tvHeroCoverLabel = findViewById(R.id.tvHeroCoverLabel)
+        tvHeroTitle = findViewById(R.id.tvHeroTitle)
+        tvHeroMeta = findViewById(R.id.tvHeroMeta)
 
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.itemAnimator = null
-        recyclerView.overScrollMode = View.OVER_SCROLL_NEVER
 
-        adapter = BookAdapter(
-            onClick = { book -> openBook(book) },
-            onLongClick = { book ->
-                pendingDeleteBook = book
-                deleteTitle.text = "将《${book.title}》移出书架？"
-                deleteOverlay.visibility = View.VISIBLE
-            }
-        )
-        recyclerView.adapter = adapter
-
-        val openFanqie = View.OnClickListener {
-            errorLine.visibility = View.GONE
+        findViewById<Button>(R.id.btnFanqie).setOnClickListener {
             startActivity(Intent(this, FanqieActivity::class.java))
-            @Suppress("DEPRECATION")
-            overridePendingTransition(0, 0)
-        }
-        val launchImport = View.OnClickListener {
-            errorLine.visibility = View.GONE
-            picker.launch(arrayOf("text/plain", "text/*"))
-        }
-
-        findViewById<View>(R.id.btnFanqie).setOnClickListener(openFanqie)
-        findViewById<View>(R.id.navFanqie).setOnClickListener(openFanqie)
-        findViewById<View>(R.id.btnEmptyFanqie).setOnClickListener(openFanqie)
-
-        findViewById<View>(R.id.btnImport).setOnClickListener(launchImport)
-        findViewById<View>(R.id.btnEmptyImport).setOnClickListener(launchImport)
-
-        findViewById<View>(R.id.btnSettings).setOnClickListener {
-            errorLine.visibility = View.GONE
-            startActivity(Intent(this, SettingsActivity::class.java))
-            @Suppress("DEPRECATION")
             overridePendingTransition(0, 0)
         }
 
-        findViewById<View>(R.id.btnCancelDelete).setOnClickListener {
-            pendingDeleteBook = null
-            deleteOverlay.visibility = View.GONE
-        }
-
-        findViewById<View>(R.id.btnConfirmDelete).setOnClickListener {
-            pendingDeleteBook?.let { b ->
-                app.library.remove(b.id)
-                app.localSource.invalidate(b.id)
+        findViewById<Button>(R.id.btnImportTxt).setOnClickListener {
+            try {
+                pickTxtLauncher.launch(arrayOf("text/*", "application/octet-stream", "*/*"))
+            } catch (e: Exception) {
+                Toast.makeText(this, "无法打开文件选择器", Toast.LENGTH_SHORT).show()
             }
-            pendingDeleteBook = null
-            deleteOverlay.visibility = View.GONE
-            reload()
+        }
+
+        findViewById<Button>(R.id.btnLoadDemo).setOnClickListener {
+            createSampleBook()
+        }
+
+        findViewById<TextView>(R.id.navFanqie).setOnClickListener {
+            startActivity(Intent(this, FanqieActivity::class.java))
+            overridePendingTransition(0, 0)
+        }
+
+        findViewById<TextView>(R.id.navSettings).setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+            overridePendingTransition(0, 0)
         }
     }
 
     override fun onResume() {
         super.onResume()
-        reload()
+        refreshShelf()
+    }
+
+    private fun refreshShelf() {
+        val app = application as JingyeApp
+        val books = app.library.all()
+        tvBookCount.text = "${books.size} 本藏书"
+
+        if (books.isEmpty()) {
+            heroRecentCard.visibility = View.GONE
+            emptyContainer.visibility = View.VISIBLE
+            recyclerView.visibility = View.GONE
+        } else {
+            emptyContainer.visibility = View.GONE
+            recyclerView.visibility = View.VISIBLE
+
+            val recent = books.first()
+            heroRecentCard.visibility = View.VISIBLE
+            tvHeroCoverLabel.text = recent.title.take(4)
+            tvHeroTitle.text = recent.title
+            val totalCh = recent.totalChapters.coerceAtLeast(1)
+            val curCh = (recent.chapter + 1).coerceAtMost(totalCh)
+            val pct = ((curCh * 100) / totalCh).coerceIn(1, 100)
+            val authorStr = recent.author.ifBlank { "本地藏书" }
+            tvHeroMeta.text = if (recent.totalChapters > 0) {
+                "$authorStr · 已读至第 ${curCh}/${totalCh} 章 ($pct%)"
+            } else {
+                "$authorStr · 点击继续阅读"
+            }
+            heroRecentCard.setOnClickListener {
+                openBook(recent)
+            }
+
+            recyclerView.adapter = BookAdapter(
+                books = books,
+                onClick = { book -> openBook(book) },
+                onLongClick = { book -> showBookActions(book) }
+            )
+        }
     }
 
     private fun openBook(book: Book) {
-        errorLine.visibility = View.GONE
-        startActivity(Intent(this, ReaderActivity::class.java).putExtra("bookId", book.id))
-        @Suppress("DEPRECATION")
+        val intent = Intent(this, ReaderActivity::class.java).apply {
+            putExtra(ReaderActivity.EXTRA_BOOK_ID, book.id)
+        }
+        startActivity(intent)
         overridePendingTransition(0, 0)
     }
 
-    private fun reload() {
-        val books = app.library.all()
-        shelfCountBadge.text = "${books.size} 本"
-        adapter.submit(books)
-
-        if (books.isEmpty()) {
-            recentCard.visibility = View.GONE
-            shelfSectionHeader.visibility = View.GONE
-            emptyView.visibility = View.VISIBLE
-            recyclerView.visibility = View.GONE
-        } else {
-            emptyView.visibility = View.GONE
-            shelfSectionHeader.visibility = View.VISIBLE
-            recyclerView.visibility = View.VISIBLE
-
-            val topBook = books.first()
-            recentCard.visibility = View.VISIBLE
-            recentCoverText.text = formatCoverLabel(topBook.title)
-            recentBookTitle.text = topBook.title
-            recentBookMeta.text = formatProgressText(topBook)
-            recentCard.setOnClickListener { openBook(topBook) }
-            findViewById<View>(R.id.btnContinueRead).setOnClickListener { openBook(topBook) }
-        }
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        if (deleteOverlay.visibility == View.VISIBLE) {
-            pendingDeleteBook = null
-            deleteOverlay.visibility = View.GONE
-        } else {
-            super.onBackPressed()
-        }
-    }
-
-    companion object {
-        fun formatCoverLabel(title: String): String {
-            val clean = title.replace(Regex("[《》【】\\s]"), "").trim()
-            return if (clean.length <= 6) clean else clean.take(6)
-        }
-
-        fun formatProgressText(b: Book): String {
-            val authorPart = if (b.author.isNotBlank()) "${b.author} · " else ""
-            val progPart = when {
-                b.chapter == 0 && b.charOffset == 0 -> "尚未开始阅读"
-                b.totalChapters > 0 -> {
-                    val pct = (((b.chapter + 1) * 100.0) / b.totalChapters).toInt().coerceIn(1, 100)
-                    "读至第 ${b.chapter + 1}/${b.totalChapters} 章 ($pct%)"
+    private fun showBookActions(book: Book) {
+        AlertDialog.Builder(this)
+            .setTitle(book.title)
+            .setItems(arrayOf("立即阅读", "从书架删除")) { _, which ->
+                when (which) {
+                    0 -> openBook(book)
+                    1 -> {
+                        val app = application as JingyeApp
+                        app.library.remove(book.id)
+                        app.localSource.invalidate(book.id)
+                        refreshShelf()
+                    }
                 }
-                else -> "读至第 ${b.chapter + 1} 章"
             }
-            return "$authorPart$progPart"
-        }
+            .show()
+    }
 
-        fun formatBadgeText(b: Book): String = when {
-            b.chapter == 0 && b.charOffset == 0 -> "新书"
-            b.totalChapters > 0 -> {
-                val pct = (((b.chapter + 1) * 100.0) / b.totalChapters).toInt().coerceIn(1, 100)
-                "已读 $pct%"
-            }
-            else -> "第${b.chapter + 1}章"
+    private fun createSampleBook() {
+        val app = application as JingyeApp
+        val sampleContent = buildString {
+            appendLine("【第一章 墨水屏微信读书风格精排导览】")
+            appendLine("　　欢迎使用「净页」海信 A7 墨水屏阅读器 v0.3.0。")
+            appendLine("　　本版本重点升级了阅读界面与番茄搜书功能：")
+            appendLine("　　一、支持按书名或作者名直接搜索番茄小说，点选搜索结果即可一键全本下载并加入书架。")
+            appendLine("　　二、内置多种墨水屏专属字体切换（思源宋体、霞鹜文楷、思源黑体、墨水屏凝黑、古籍刻本、护眼柔黑），并支持导入本地 TTF/OTF 字体文件。")
+            appendLine("　　三、内置五套精调排版预设（微信精排、紧凑速读、舒朗大字、古籍雅致、高对比黑），在阅读页点击屏幕中央呼出菜单即可一键切换。")
+            appendLine()
+            appendLine("【第二章 墨水屏刷新与防残影说明】")
+            appendLine("　　在阅读界面中，点击屏幕右侧或按音量下键翻下一页，点击屏幕左侧或按音量上键翻上一页，点击屏幕中央呼出精排控制面板。")
+            appendLine("　　每翻页一定步数后会自动触发全刷清除墨水屏残影，您也可以随时点击顶部菜单的「全刷清残影」按钮立即刷新。")
+        }
+        val book = app.library.importFanqieTxt(
+            fanqieBookId = "demo_v030",
+            title = "净页墨水屏精排指南",
+            author = "净页开发组",
+            totalChapters = 2,
+            txtContent = sampleContent.toByteArray(Charsets.UTF_8)
+        )
+        app.localSource.invalidate(book.id)
+        refreshShelf()
+        openBook(book)
+    }
+
+    private fun importTxtFromUri(uri: Uri) {
+        try {
+            val app = application as JingyeApp
+            val book = app.library.importTxt(uri)
+            app.localSource.invalidate(book.id)
+            refreshShelf()
+            openBook(book)
+        } catch (e: Exception) {
+            Toast.makeText(this, "导入失败: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
-    private class BookAdapter(
+    private inner class BookAdapter(
+        private val books: List<Book>,
         private val onClick: (Book) -> Unit,
         private val onLongClick: (Book) -> Unit
     ) : RecyclerView.Adapter<BookAdapter.VH>() {
 
-        private var items: List<Book> = emptyList()
-
-        fun submit(list: List<Book>) {
-            items = list
-            notifyDataSetChanged()
+        inner class VH(view: View) : RecyclerView.ViewHolder(view) {
+            val coverThumb: TextView = view.findViewById(R.id.tvCoverThumb)
+            val title: TextView = view.findViewById(R.id.bookTitle)
+            val author: TextView = view.findViewById(R.id.bookAuthor)
+            val progress: TextView = view.findViewById(R.id.bookProgress)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -222,26 +208,32 @@ class ShelfActivity : AppCompatActivity() {
         }
 
         override fun onBindViewHolder(holder: VH, position: Int) {
-            val b = items[position]
-            holder.cover.text = formatCoverLabel(b.title)
-            holder.title.text = b.title
-            holder.sub.text = formatProgressText(b)
-            holder.badge.text = formatBadgeText(b)
-            holder.row.setOnClickListener { onClick(b) }
-            holder.row.setOnLongClickListener {
-                onLongClick(b)
+            val item = books[position]
+            val totalCh = item.totalChapters.coerceAtLeast(1)
+            val curCh = (item.chapter + 1).coerceAtMost(totalCh)
+            val pct = ((curCh * 100) / totalCh).coerceIn(1, 100)
+            val authorStr = item.author.ifBlank { "本地TXT" }
+
+            holder.coverThumb.text = item.title.take(4)
+            holder.title.text = item.title
+            holder.author.text = if (item.totalChapters > 0) {
+                "$authorStr · 共 ${item.totalChapters} 章"
+            } else {
+                authorStr
+            }
+            holder.progress.text = if (item.lastReadAt > 0L && item.totalChapters > 0) {
+                "上次读至：第 $curCh 章 ($pct%)"
+            } else {
+                "点击开始阅读"
+            }
+
+            holder.itemView.setOnClickListener { onClick(item) }
+            holder.itemView.setOnLongClickListener {
+                onLongClick(item)
                 true
             }
         }
 
-        override fun getItemCount(): Int = items.size
-
-        class VH(v: View) : RecyclerView.ViewHolder(v) {
-            val row: View = v.findViewById(R.id.rowRoot)
-            val cover: TextView = v.findViewById(R.id.bookCoverThumb)
-            val title: TextView = v.findViewById(R.id.bookTitle)
-            val sub: TextView = v.findViewById(R.id.bookSub)
-            val badge: TextView = v.findViewById(R.id.bookBadge)
-        }
+        override fun getItemCount(): Int = books.size
     }
 }

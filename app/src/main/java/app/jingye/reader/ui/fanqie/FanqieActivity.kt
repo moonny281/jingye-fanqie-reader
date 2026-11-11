@@ -4,223 +4,330 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.view.KeyEvent
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
 import android.widget.Button
 import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import app.jingye.reader.JingyeApp
 import app.jingye.reader.R
 import app.jingye.reader.backend.FanqieMetadata
+import app.jingye.reader.backend.FanqieParser
+import app.jingye.reader.backend.FanqieSearchItem
 import app.jingye.reader.ui.reader.ReaderActivity
-import app.jingye.reader.ui.shelf.ShelfActivity
 import kotlinx.coroutines.launch
 
 class FanqieActivity : AppCompatActivity() {
 
-    private lateinit var app: JingyeApp
-    private lateinit var btnToggleBackend: Button
-    private lateinit var remoteConfigBox: View
-    private lateinit var editBackendUrl: EditText
-    private lateinit var editShareInput: EditText
-    private lateinit var statusTitle: TextView
-    private lateinit var statusDetail: TextView
-    private lateinit var metaCard: View
-    private lateinit var metaCoverThumb: TextView
-    private lateinit var metaTitle: TextView
-    private lateinit var metaSummary: TextView
-    private lateinit var metaIntro: TextView
-    private lateinit var btnParse: Button
-    private lateinit var btnDownloadToShelf: Button
-    private lateinit var btnDownloadAndRead: Button
+    private lateinit var etServerUrl: EditText
+    private lateinit var configContainer: LinearLayout
+    private lateinit var etBookInput: EditText
+    private lateinit var tvStatus: TextView
 
-    private var currentMeta: FanqieMetadata? = null
-    private var busy = false
+    private lateinit var bookInfoCard: LinearLayout
+    private lateinit var tvBookTitle: TextView
+    private lateinit var tvBookAuthor: TextView
+    private lateinit var tvBookIntro: TextView
+    private lateinit var btnBackToSearch: Button
+    private lateinit var downloadProgressBar: ProgressBar
+    private lateinit var btnDownloadBook: Button
+
+    private lateinit var searchHeaderRow: View
+    private lateinit var tvSearchResultCount: TextView
+    private lateinit var searchRecyclerView: RecyclerView
+
+    private var currentMetadata: FanqieMetadata? = null
+    private var lastSearchResults: List<FanqieSearchItem> = emptyList()
+    private var isBusy = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_fanqie)
 
-        app = application as JingyeApp
-        btnToggleBackend = findViewById(R.id.btnToggleBackend)
-        remoteConfigBox = findViewById(R.id.remoteConfigBox)
-        editBackendUrl = findViewById(R.id.editBackendUrl)
-        editShareInput = findViewById(R.id.editShareInput)
-        statusTitle = findViewById(R.id.statusTitle)
-        statusDetail = findViewById(R.id.statusDetail)
-        metaCard = findViewById(R.id.metaCard)
-        metaCoverThumb = findViewById(R.id.metaCoverThumb)
-        metaTitle = findViewById(R.id.metaTitle)
-        metaSummary = findViewById(R.id.metaSummary)
-        metaIntro = findViewById(R.id.metaIntro)
-        btnParse = findViewById(R.id.btnParse)
-        btnDownloadToShelf = findViewById(R.id.btnDownloadToShelf)
-        btnDownloadAndRead = findViewById(R.id.btnDownloadAndRead)
+        val app = application as JingyeApp
 
-        editBackendUrl.setText(app.prefs.backendUrl)
-        refreshBackendModeUi()
+        etServerUrl = findViewById(R.id.etServerUrl)
+        configContainer = findViewById(R.id.configContainer)
+        etBookInput = findViewById(R.id.etBookInput)
+        tvStatus = findViewById(R.id.tvStatus)
 
-        findViewById<View>(R.id.btnClose).setOnClickListener { finish() }
+        bookInfoCard = findViewById(R.id.bookInfoCard)
+        tvBookTitle = findViewById(R.id.tvBookTitle)
+        tvBookAuthor = findViewById(R.id.tvBookAuthor)
+        tvBookIntro = findViewById(R.id.tvBookIntro)
+        btnBackToSearch = findViewById(R.id.btnBackToSearch)
+        downloadProgressBar = findViewById(R.id.downloadProgressBar)
+        btnDownloadBook = findViewById(R.id.btnDownloadBook)
 
-        btnToggleBackend.setOnClickListener {
-            if (busy) return@setOnClickListener
-            app.prefs.useRemoteBackend = !app.prefs.useRemoteBackend
-            refreshBackendModeUi()
+        searchHeaderRow = findViewById(R.id.searchHeaderRow)
+        tvSearchResultCount = findViewById(R.id.tvSearchResultCount)
+        searchRecyclerView = findViewById(R.id.searchRecyclerView)
+        searchRecyclerView.layoutManager = LinearLayoutManager(this)
+        searchRecyclerView.itemAnimator = null
+
+        etServerUrl.setText(if (app.prefs.useRemoteBackend) app.prefs.backendUrl else "")
+
+        findViewById<Button>(R.id.btnBack).setOnClickListener {
+            finish()
+            overridePendingTransition(0, 0)
         }
 
-        findViewById<View>(R.id.btnSaveBackendUrl).setOnClickListener {
-            if (busy) return@setOnClickListener
-            val url = editBackendUrl.text.toString().trim()
-            if (url.isNotEmpty()) {
-                app.prefs.backendUrl = url
-            }
-            checkRemoteHealth()
+        findViewById<Button>(R.id.btnToggleConfig).setOnClickListener {
+            configContainer.visibility =
+                if (configContainer.visibility == View.VISIBLE) View.GONE else View.VISIBLE
         }
 
-        findViewById<View>(R.id.btnPaste).setOnClickListener {
-            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-            val clipText = cm?.primaryClip?.getItemAt(0)?.coerceToText(this)?.toString() ?: ""
-            if (clipText.isNotBlank()) {
-                editShareInput.setText(clipText)
-                editShareInput.setSelection(clipText.length)
+        findViewById<Button>(R.id.btnSaveServer).setOnClickListener {
+            val url = etServerUrl.text.toString().trim()
+            if (url.isEmpty()) {
+                app.prefs.useRemoteBackend = false
+                Toast.makeText(this, "已切换为手机本地直连引擎", Toast.LENGTH_SHORT).show()
             } else {
-                statusTitle.text = "剪贴板为空"
-                statusDetail.text = "请先在番茄小说 App 复制分享链接，或直接输入书籍 ID。"
+                app.prefs.backendUrl = url
+                app.prefs.useRemoteBackend = true
+                Toast.makeText(this, "已保存远端服务地址：$url", Toast.LENGTH_SHORT).show()
+            }
+            configContainer.visibility = View.GONE
+        }
+
+        findViewById<Button>(R.id.btnPasteClipboard).setOnClickListener {
+            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            val clipText = cm?.primaryClip?.getItemAt(0)?.coerceToText(this)?.toString().orEmpty()
+            if (clipText.isNotBlank()) {
+                etBookInput.setText(clipText)
+                if (FanqieParser.isUrlOrBookId(clipText)) {
+                    parseBook(clipText)
+                } else {
+                    searchByKeyword(clipText)
+                }
+            } else {
+                Toast.makeText(this, "剪贴板为空", Toast.LENGTH_SHORT).show()
             }
         }
 
-        findViewById<View>(R.id.btnClear).setOnClickListener {
-            if (busy) return@setOnClickListener
-            editShareInput.setText("")
-            metaCard.visibility = View.GONE
-            currentMeta = null
-            statusTitle.text = "已清空输入"
-            statusDetail.text = "请粘贴新的番茄小说分享链接或书籍 ID。"
+        findViewById<Button>(R.id.btnClearInput).setOnClickListener {
+            etBookInput.setText("")
+            tvStatus.text = "支持输入书名/作者关键字搜书，或粘贴番茄分享链接/Book ID"
         }
 
-        btnParse.setOnClickListener {
-            if (busy) return@setOnClickListener
-            parseBook()
+        findViewById<Button>(R.id.btnSearchBook).setOnClickListener {
+            val raw = etBookInput.text.toString().trim()
+            if (raw.isEmpty()) {
+                Toast.makeText(this, "请输入书名或作者名", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            if (FanqieParser.isUrlOrBookId(raw)) {
+                parseBook(raw)
+            } else {
+                searchByKeyword(raw)
+            }
         }
 
-        btnDownloadToShelf.setOnClickListener {
-            if (busy) return@setOnClickListener
-            startDownload(openAfter = false)
+        findViewById<Button>(R.id.btnParseBook).setOnClickListener {
+            val raw = etBookInput.text.toString().trim()
+            if (raw.isEmpty()) {
+                Toast.makeText(this, "请输入番茄链接或 19 位 Book ID", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            if (FanqieParser.isUrlOrBookId(raw)) {
+                parseBook(raw)
+            } else {
+                searchByKeyword(raw)
+            }
         }
 
-        btnDownloadAndRead.setOnClickListener {
-            if (busy) return@setOnClickListener
-            startDownload(openAfter = true)
+        etBookInput.setOnEditorActionListener { _, actionId, event ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH ||
+                (event != null && event.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN)
+            ) {
+                val raw = etBookInput.text.toString().trim()
+                if (raw.isNotEmpty()) {
+                    if (FanqieParser.isUrlOrBookId(raw)) parseBook(raw) else searchByKeyword(raw)
+                }
+                true
+            } else {
+                false
+            }
+        }
+
+        btnBackToSearch.setOnClickListener {
+            bookInfoCard.visibility = View.GONE
+            if (lastSearchResults.isNotEmpty()) {
+                searchHeaderRow.visibility = View.VISIBLE
+                searchRecyclerView.visibility = View.VISIBLE
+            }
+        }
+
+        btnDownloadBook.setOnClickListener {
+            val meta = currentMetadata ?: return@setOnClickListener
+            downloadBook(meta)
         }
     }
 
-    private fun refreshBackendModeUi() {
-        if (app.prefs.useRemoteBackend) {
-            btnToggleBackend.text = "通道:远程FastAPI"
-            remoteConfigBox.visibility = View.VISIBLE
-            statusTitle.text = "当前模式：远程 FastAPI 后端 (${app.prefs.backendUrl})"
-            statusDetail.text = "通过 POST /api/parse 与 SSE /api/download/progress 调用外部服务端。"
-        } else {
-            btnToggleBackend.text = "通道:本机直连"
-            remoteConfigBox.visibility = View.GONE
-            statusTitle.text = "当前模式：本机内置网关直连（无需外部服务器）"
-            statusDetail.text = "内置匿名设备注册 + x-argus/x-ladon 签名 + AES 解密，批次间隔 ${app.prefs.appApiIntervalSec} 秒。"
-        }
-    }
+    private fun searchByKeyword(keyword: String) {
+        if (isBusy) return
+        isBusy = true
+        tvStatus.text = "正在搜索「$keyword」..."
+        bookInfoCard.visibility = View.GONE
 
-    private fun checkRemoteHealth() {
-        busy = true
-        statusTitle.text = "正在检测远程后端连接…"
-        statusDetail.text = app.prefs.backendUrl
+        val app = application as JingyeApp
         lifecycleScope.launch {
             try {
-                val msg = app.fanqie.checkRemoteHealth(app.prefs.backendUrl)
-                statusTitle.text = msg
-                statusDetail.text = "远程服务地址已保存：${app.prefs.backendUrl}"
+                val items = app.fanqie.searchBooks(keyword)
+                isBusy = false
+                lastSearchResults = items
+                tvStatus.text = "搜索「$keyword」共找到 ${items.size} 本相关小说，点击任意书籍即可查看详情并全本下载："
+                searchHeaderRow.visibility = View.VISIBLE
+                tvSearchResultCount.text = "搜索结果（共 ${items.size} 本 · 点击选书）"
+                searchRecyclerView.visibility = View.VISIBLE
+                searchRecyclerView.adapter = SearchAdapter(items) { selected ->
+                    onSearchItemSelected(selected)
+                }
             } catch (e: Exception) {
-                statusTitle.text = "连接失败：${e.message}"
-                statusDetail.text = "请确认服务端已执行 python app.py 并监听局域网 IP，或切换回「通道:本机直连」。"
-            } finally {
-                busy = false
+                isBusy = false
+                tvStatus.text = "搜索失败：${e.message}"
             }
         }
     }
 
-    private fun parseBook() {
-        val raw = editShareInput.text.toString().trim()
-        if (raw.isEmpty()) {
-            statusTitle.text = "请输入分享链接或书籍 ID"
-            return
-        }
-        busy = true
-        metaCard.visibility = View.GONE
-        statusTitle.text = "正在解析书籍信息…"
-        statusDetail.text = "正在识别 book_id 并拉取元数据与目录信息"
+    private fun onSearchItemSelected(item: FanqieSearchItem) {
+        if (isBusy) return
+        isBusy = true
+        tvStatus.text = "正在获取《${item.title}》详情与目录..."
 
+        val app = application as JingyeApp
         lifecycleScope.launch {
             try {
-                val meta = app.fanqie.parseInput(raw)
-                currentMeta = meta
-                metaCoverThumb.text = ShelfActivity.formatCoverLabel(meta.title)
-                metaTitle.text = meta.title
-                metaSummary.text = "作者：${meta.author} · 评分：${meta.score}\n" +
-                    "字数：${meta.formattedWordCount()} · ${meta.serialStatus}\n" +
-                    "共 ${meta.chapterCount} 章（可下载 ${meta.availableChapters} 章）"
-                metaIntro.text = meta.intro.ifBlank { "暂无简介" }
-                metaCard.visibility = View.VISIBLE
-                statusTitle.text = "解析成功：《${meta.title}》"
-                statusDetail.text = "书籍 ID：${meta.bookId} · 点击下方按钮开始全本下载"
+                val meta = app.fanqie.parseInput(item.bookId)
+                isBusy = false
+                showBookDetailCard(meta, fromSearch = true)
+            } catch (_: Exception) {
+                isBusy = false
+                val fallbackMeta = FanqieMetadata(
+                    bookId = item.bookId,
+                    title = item.title,
+                    author = item.author,
+                    score = item.score,
+                    coverUrl = item.coverUrl,
+                    intro = item.intro,
+                    wordCount = item.wordCount,
+                    chapterCount = 0,
+                    serialStatus = item.serialStatus,
+                    availableChapters = 0,
+                    pcAvailable = true,
+                    chapterTitles = emptyList()
+                )
+                showBookDetailCard(fallbackMeta, fromSearch = true)
+            }
+        }
+    }
+
+    private fun parseBook(rawInput: String) {
+        if (isBusy) return
+        isBusy = true
+        tvStatus.text = "正在解析书籍详情与章节目录..."
+        bookInfoCard.visibility = View.GONE
+
+        val app = application as JingyeApp
+        lifecycleScope.launch {
+            try {
+                val meta = app.fanqie.parseInput(rawInput)
+                isBusy = false
+                showBookDetailCard(meta, fromSearch = lastSearchResults.isNotEmpty())
             } catch (e: Exception) {
-                statusTitle.text = "解析失败"
-                statusDetail.text = e.message ?: "请检查链接是否有效或网络是否通畅"
-            } finally {
-                busy = false
+                isBusy = false
+                tvStatus.text = "解析失败：${e.message}"
             }
         }
     }
 
-    private fun startDownload(openAfter: Boolean) {
-        val meta = currentMeta ?: return
-        busy = true
-        btnParse.isEnabled = false
-        btnDownloadToShelf.isEnabled = false
-        btnDownloadAndRead.isEnabled = false
+    private fun showBookDetailCard(meta: FanqieMetadata, fromSearch: Boolean) {
+        currentMetadata = meta
+        bookInfoCard.visibility = View.VISIBLE
+        btnBackToSearch.visibility = if (fromSearch) View.VISIBLE else View.GONE
 
-        statusTitle.text = "正在启动下载《${meta.title}》…"
-        statusDetail.text = "首次下载将自动注册匿名设备并换取正文解密密钥…"
+        tvBookTitle.text = meta.title
+        val chCountText = if (meta.chapterCount > 0) "共 ${meta.chapterCount} 章" else "支持全本拉取"
+        val wcText = meta.formattedWordCount()
+        val extra = listOf(meta.author, chCountText, wcText, "ID:${meta.bookId}").filter { it.isNotBlank() }
+        tvBookAuthor.text = extra.joinToString(" · ")
+        tvBookIntro.text = meta.intro.ifBlank { "暂无简介" }
+        tvStatus.text = "已就绪：《${meta.title}》，点击下方「全本下载并立即阅读」即可加入书架。"
+    }
 
+    private fun downloadBook(meta: FanqieMetadata) {
+        if (isBusy) return
+        isBusy = true
+        btnDownloadBook.isEnabled = false
+        downloadProgressBar.visibility = View.VISIBLE
+        downloadProgressBar.progress = 0
+
+        val app = application as JingyeApp
         lifecycleScope.launch {
             try {
-                val savedBook = app.fanqie.downloadAndImport(meta) { prog ->
+                val book = app.fanqie.downloadAndImport(meta) { prog ->
                     runOnUiThread {
-                        statusTitle.text = "下载进度：${prog.percent}% (${prog.current}/${prog.total} 章)"
-                        statusDetail.text = prog.message.ifBlank { prog.chapterTitle }
+                        downloadProgressBar.progress = prog.percent.coerceIn(0, 100)
+                        tvStatus.text = prog.message.ifBlank {
+                            "正在下载 (${prog.current}/${prog.total})：${prog.chapterTitle}"
+                        }
                     }
                 }
-                statusTitle.text = "《${savedBook.title}》已加入书架！"
-                statusDetail.text = "全书已按净页墨水屏排版格式保存至本地，可立即打开阅读。"
-                if (openAfter) {
-                    startActivity(Intent(this@FanqieActivity, ReaderActivity::class.java).putExtra("bookId", savedBook.id))
-                    @Suppress("DEPRECATION")
-                    overridePendingTransition(0, 0)
-                    finish()
+                isBusy = false
+                btnDownloadBook.isEnabled = true
+                tvStatus.text = "下载完成：《${book.title}》已加入书架！"
+                Toast.makeText(this@FanqieActivity, "《${book.title}》已加入书架，正在打开阅读", Toast.LENGTH_SHORT).show()
+                val intent = Intent(this@FanqieActivity, ReaderActivity::class.java).apply {
+                    putExtra(ReaderActivity.EXTRA_BOOK_ID, book.id)
                 }
+                startActivity(intent)
+                overridePendingTransition(0, 0)
+                finish()
             } catch (e: Exception) {
-                statusTitle.text = "下载失败"
-                statusDetail.text = e.message ?: "下载过程中出现异常，请稍后重试"
-            } finally {
-                busy = false
-                btnParse.isEnabled = true
-                btnDownloadToShelf.isEnabled = true
-                btnDownloadAndRead.isEnabled = true
+                isBusy = false
+                btnDownloadBook.isEnabled = true
+                tvStatus.text = "下载失败：${e.message}"
+                Toast.makeText(this@FanqieActivity, "下载失败：${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }
 
-    override fun finish() {
-        super.finish()
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, 0)
+    private inner class SearchAdapter(
+        private val items: List<FanqieSearchItem>,
+        private val onClick: (FanqieSearchItem) -> Unit
+    ) : RecyclerView.Adapter<SearchAdapter.VH>() {
+
+        inner class VH(view: View) : RecyclerView.ViewHolder(view) {
+            val thumb: TextView = view.findViewById(R.id.tvSearchThumb)
+            val title: TextView = view.findViewById(R.id.tvSearchTitle)
+            val meta: TextView = view.findViewById(R.id.tvSearchMeta)
+            val intro: TextView = view.findViewById(R.id.tvSearchIntro)
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
+            val v = LayoutInflater.from(parent.context).inflate(R.layout.item_search_book, parent, false)
+            return VH(v)
+        }
+
+        override fun onBindViewHolder(holder: VH, position: Int) {
+            val item = items[position]
+            holder.thumb.text = item.title.take(4)
+            holder.title.text = item.title
+            holder.meta.text = item.metaLine()
+            holder.intro.text = item.intro.ifBlank { "点击查看详情并下载全本" }
+            holder.itemView.setOnClickListener { onClick(item) }
+        }
+
+        override fun getItemCount(): Int = items.size
     }
 }

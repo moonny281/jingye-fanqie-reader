@@ -13,73 +13,82 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import app.jingye.reader.JingyeApp
 import app.jingye.reader.R
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class TocActivity : AppCompatActivity() {
 
-    private var reversed = false
+    data class TocItem(val index: Int, val title: String)
+
+    private lateinit var recyclerView: RecyclerView
+    private var chapters: List<TocItem> = emptyList()
+    private var currentChapterIndex: Int = 0
+    private var reversed: Boolean = false
+
+    companion object {
+        const val EXTRA_BOOK_ID = "book_id"
+        const val EXTRA_CURRENT_CHAPTER = "current_chapter"
+        const val EXTRA_SELECTED_CHAPTER = "selected_chapter"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_toc)
 
-        val app = application as JingyeApp
-        val bookId = intent.getStringExtra("bookId") ?: run {
+        val bookId = intent.getStringExtra(EXTRA_BOOK_ID) ?: run {
             finish()
             return
         }
-        val currentChapter = intent.getIntExtra("chapter", 0)
+        currentChapterIndex = intent.getIntExtra(EXTRA_CURRENT_CHAPTER, 0)
 
-        val rv = findViewById<RecyclerView>(R.id.tocRecyclerView)
-        val header = findViewById<TextView>(R.id.tocHeaderTitle)
+        val tvTocTitle = findViewById<TextView>(R.id.tvTocTitle)
+        findViewById<Button>(R.id.btnBack).setOnClickListener {
+            finish()
+            overridePendingTransition(0, 0)
+        }
+
         val btnReverse = findViewById<Button>(R.id.btnReverseToc)
+        btnReverse.setOnClickListener {
+            reversed = !reversed
+            btnReverse.text = if (reversed) "正序" else "倒序"
+            bindList()
+        }
 
-        rv.layoutManager = LinearLayoutManager(this)
-        rv.itemAnimator = null
-        rv.overScrollMode = View.OVER_SCROLL_NEVER
+        recyclerView = findViewById(R.id.tocRecyclerView)
+        recyclerView.layoutManager = LinearLayoutManager(this)
+        recyclerView.itemAnimator = null
 
-        findViewById<View>(R.id.btnCloseToc).setOnClickListener { finish() }
-
+        val app = application as JingyeApp
         lifecycleScope.launch {
-            val count = app.source.chapterCount(bookId)
-            val entries = (0 until count).map { i -> i to app.source.chapterTitle(bookId, i) }
-            header.text = "目录 ($count 章)"
-
-            val adapter = TocAdapter(entries, currentChapter) { selectedIndex ->
-                setResult(RESULT_OK, Intent().putExtra("chapter", selectedIndex))
-                finish()
+            val loaded = withContext(Dispatchers.IO) {
+                val count = app.source.chapterCount(bookId)
+                (0 until count).map { idx ->
+                    TocItem(idx, app.source.chapterTitle(bookId, idx))
+                }
             }
-            rv.adapter = adapter
-
-            if (currentChapter in 0 until count) {
-                (rv.layoutManager as? LinearLayoutManager)?.scrollToPositionWithOffset(currentChapter, 160)
-            }
-
-            btnReverse.setOnClickListener {
-                reversed = !reversed
-                btnReverse.text = if (reversed) "正序" else "倒序"
-                val newList = if (reversed) entries.asReversed() else entries
-                adapter.submit(newList)
-                rv.scrollToPosition(0)
+            chapters = loaded
+            tvTocTitle.text = "目录（共 ${chapters.size} 章）"
+            bindList()
+            val scrollTarget = if (reversed) (chapters.size - 1 - currentChapterIndex) else currentChapterIndex
+            if (scrollTarget in chapters.indices) {
+                recyclerView.scrollToPosition(scrollTarget)
             }
         }
     }
 
-    override fun finish() {
-        super.finish()
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, 0)
+    private fun bindList() {
+        val displayList = if (reversed) chapters.reversed() else chapters
+        recyclerView.adapter = TocAdapter(displayList)
     }
 
-    private class TocAdapter(
-        private var items: List<Pair<Int, String>>,
-        private val currentIndex: Int,
-        private val onSelect: (Int) -> Unit
+    private inner class TocAdapter(
+        private val list: List<TocItem>
     ) : RecyclerView.Adapter<TocAdapter.VH>() {
 
-        fun submit(newItems: List<Pair<Int, String>>) {
-            items = newItems
-            notifyDataSetChanged()
+        inner class VH(view: View) : RecyclerView.ViewHolder(view) {
+            val title: TextView = view.findViewById(R.id.tocChapterTitle)
+            val badge: TextView = view.findViewById(R.id.tocCurrentBadge)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -88,20 +97,19 @@ class TocActivity : AppCompatActivity() {
         }
 
         override fun onBindViewHolder(holder: VH, position: Int) {
-            val (origIndex, rawTitle) = items[position]
-            val isCurrent = (origIndex == currentIndex)
-            holder.title.text = rawTitle
-            holder.title.paint.isFakeBoldText = isCurrent
-            holder.badge.visibility = if (isCurrent) View.VISIBLE else View.GONE
-            holder.row.setOnClickListener { onSelect(origIndex) }
+            val item = list[position]
+            holder.title.text = item.title
+            holder.badge.visibility = if (item.index == currentChapterIndex) View.VISIBLE else View.GONE
+            holder.itemView.setOnClickListener {
+                val res = Intent().apply {
+                    putExtra(EXTRA_SELECTED_CHAPTER, item.index)
+                }
+                setResult(RESULT_OK, res)
+                finish()
+                overridePendingTransition(0, 0)
+            }
         }
 
-        override fun getItemCount(): Int = items.size
-
-        class VH(v: View) : RecyclerView.ViewHolder(v) {
-            val row: View = v.findViewById(R.id.tocRowRoot)
-            val title: TextView = v.findViewById(R.id.tocItemTitle)
-            val badge: View = v.findViewById(R.id.tocCurrentBadge)
-        }
+        override fun getItemCount(): Int = list.size
     }
 }

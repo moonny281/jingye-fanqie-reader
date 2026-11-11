@@ -1,18 +1,21 @@
 package app.jingye.reader.reader
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.util.LruCache
 
 class PageRenderer(
-    private val text: CharSequence,
+    rawText: CharSequence,
     private val style: ReaderStyle,
     private val viewW: Int,
-    private val viewH: Int
+    private val viewH: Int,
+    ctx: Context? = null
 ) {
-    private val paint = style.newPaint()
-    private val cache = LruCache<Int, Bitmap>(3) // 当前页 + 前后各一页
+    private val styledText: CharSequence = formatChapterSpannable(rawText, style, ctx)
+    private val paint = style.newPaint(ctx)
+    private val cache = LruCache<Int, Bitmap>(3)
 
     fun render(index: Int, slice: PageSlice): Bitmap =
         cache.get(index) ?: draw(slice).also { cache.put(index, it) }
@@ -24,10 +27,10 @@ class PageRenderer(
         val c = Canvas(bmp)
         c.drawColor(Color.WHITE)
         val contentW = (safeW - style.marginPx * 2).coerceAtLeast(100)
-        val safeStart = s.start.coerceIn(0, text.length)
-        val safeEnd = s.end.coerceIn(safeStart, text.length)
-        val layout = buildLayout(text, safeStart, safeEnd, paint, contentW, style.lineSpacingMult)
-        c.translate(style.marginPx.toFloat(), style.marginPx.toFloat())
+        val safeStart = s.start.coerceIn(0, styledText.length)
+        val safeEnd = s.end.coerceIn(safeStart, styledText.length)
+        val layout = buildLayout(styledText, safeStart, safeEnd, paint, contentW, style.lineSpacingMult)
+        c.translate(style.marginPx.toFloat(), style.marginVPx.toFloat())
         layout.draw(c)
         return bmp
     }

@@ -3,9 +3,6 @@ package app.jingye.reader.backend
 import java.net.HttpURLConnection
 import java.net.URL
 
-/**
- * 番茄小说分享文案 / 短链 / PC 网页链接解析器（对应 core/parser.py）。
- */
 object FanqieParser {
     private val URL_RE = Regex("https?://[^\\s<>\"'）)】\\]，,。；;、]+", RegexOption.IGNORE_CASE)
     private val URL_BOOK_ID_RE = Regex("(?:book_id|bookId|bookid|series_id)=(\\d{10,25})", RegexOption.IGNORE_CASE)
@@ -35,6 +32,15 @@ object FanqieParser {
         return null
     }
 
+    /** 判断用户输入是否为链接或纯数字书籍 ID（若不是，则应走书名/作者关键词搜索）。 */
+    fun isUrlOrBookId(rawInput: String): Boolean {
+        val text = rawInput.trim()
+        if (text.isEmpty()) return false
+        if (extractBookIdFromText(text) != null) return true
+        if (extractFirstUrl(text) != null) return true
+        return false
+    }
+
     private fun bookIdFromHtml(html: String): String? {
         for (regex in HTML_BOOK_ID_RES) {
             regex.find(html)?.groupValues?.getOrNull(1)?.let { return it }
@@ -44,12 +50,12 @@ object FanqieParser {
 
     fun resolveBookId(rawInput: String, timeoutMs: Int = 15000): String {
         val text = rawInput.trim()
-        if (text.isEmpty()) throw FanqieException("请输入番茄小说链接或分享文案")
+        if (text.isEmpty()) throw FanqieException("请输入番茄小说书名、链接或书籍 ID")
 
         extractBookIdFromText(text)?.let { return it }
 
         val initialUrl = extractFirstUrl(text)
-            ?: throw FanqieException("没有找到有效链接，请粘贴包含 http(s) 链接的分享文案或纯数字书籍 ID")
+            ?: throw FanqieException("未找到有效链接，请直接点击【搜索】按书名查找")
 
         var currentUrl = initialUrl
         var htmlBody = ""
@@ -106,6 +112,6 @@ object FanqieParser {
             }
         }
 
-        throw FanqieException("未能从链接中提取 book_id，请换一条链接或直接粘贴书籍 ID")
+        throw FanqieException("未能从链接中提取 book_id，请换一条链接或直接输入书名搜索")
     }
 }

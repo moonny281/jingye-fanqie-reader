@@ -2,48 +2,45 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:background="@drawable/bg_eink_item_selector">
 
     <LinearLayout
-        android:id="@+id/tocRowRoot"
         android:layout_width="match_parent"
-        android:layout_height="54dp"
-        android:background="@drawable/ink_row_bg"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center_vertical"
+        android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingHorizontal="16dp">
+        android:gravity="center_vertical"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
+        android:paddingTop="13dp"
+        android:paddingBottom="13dp">
 
         <TextView
-            android:id="@+id/tocItemTitle"
+            android:id="@+id/tocChapterTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:duplicateParentState="true"
-            android:ellipsize="end"
+            android:textSize="15sp"
             android:maxLines="1"
-            android:textColor="@color/ink_text"
-            android:textSize="16sp" />
+            android:ellipsize="end"
+            android:textColor="@color/selector_eink_text" />
 
         <TextView
             android:id="@+id/tocCurrentBadge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:background="@drawable/ink_badge_bg"
-            android:paddingHorizontal="6dp"
-            android:paddingVertical="2dp"
-            android:text="当前"
-            android:textColor="#000000"
-            android:textSize="11sp"
+            android:text="[当前]"
+            android:textSize="12sp"
             android:textStyle="bold"
+            android:textColor="@color/selector_eink_text"
             android:visibility="gone" />
     </LinearLayout>
 
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:layout_marginHorizontal="16dp"
+        android:layout_marginStart="18dp"
+        android:layout_marginEnd="18dp"
         android:background="#000000" />
 </LinearLayout>

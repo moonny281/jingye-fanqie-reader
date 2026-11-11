@@ -1,15 +1,14 @@
 package app.jingye.reader.backend
 
 import android.text.Html
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 
-/**
- * 番茄小说元数据、目录、APP 网关全量下载与网页通道兜底（对应 core/crawler.py）。
- */
 class FanqieCrawler(
     private val cacheFile: File,
     private val appApiIntervalSec: Int = 6,
@@ -21,6 +20,13 @@ class FanqieCrawler(
         private const val READER_PAGE = "https://fanqienovel.com/reader/%s"
         private const val PC_PAGE = "https://fanqienovel.com/page/%s"
 
+        // 番茄小说免签名公开搜索端点（主线路 + 备用线路 + 网页搜索线路）
+        private val SEARCH_ENDPOINTS = listOf(
+            "https://novel.snssdk.com/api/novel/channel/homepage/search/search/v1/?device_platform=android&parent_enterfrom=novel_channel_search.tab.&offset=0&aid=1967&q=%s",
+            "https://api-lf.fanqiesdk.com/api/novel/channel/homepage/search/search/v1/?device_platform=android&parent_enterfrom=novel_channel_search.tab.&offset=0&aid=1967&q=%s",
+            "https://fanqienovel.com/api/author/search/search_book/v1?filter=127,127,127,127&page_count=18&page_index=0&query_type=0&query_word=%s"
+        )
+
         private val TAG_RE = Regex("<[^>]+>")
         private val P_RE = Regex("<p(?:\\s[^>]*)?>(.*?)</p>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
         private val BR_RE = Regex("<br\\s*/?>", RegexOption.IGNORE_CASE)
@@ -31,6 +37,9 @@ class FanqieCrawler(
             val noTags = TAG_RE.replace(withNl, "")
             return Html.fromHtml(noTags, Html.FROM_HTML_MODE_LEGACY).toString()
         }
+
+        private fun cleanHighlightText(raw: String): String =
+            TAG_RE.replace(raw, "").replace("《", "").replace("》", "").trim()
 
         fun cleanParagraphs(htmlFragment: String): List<String> {
             if (htmlFragment.isBlank()) return emptyList()
@@ -107,7 +116,6 @@ class FanqieCrawler(
 
             val content = lines.joinToString("\n")
             val out = ByteArrayOutputStream()
-            // UTF-8 BOM (utf-8-sig)
             out.write(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()))
             out.write(content.toByteArray(Charsets.UTF_8))
             return out.toByteArray()
@@ -144,6 +152,121 @@ class FanqieCrawler(
             }
         }
         throw FanqieException("网络请求失败：${lastErr?.message ?: "未知错误"}", lastErr)
+    }
+
+    /**
+     * 按书名或作者名搜索番茄小说，自动轮询 3 条免签名公开搜索通道并去重。
+     */
+    fun searchBooks(keyword: String): List<FanqieSearchItem> {
+        val cleanKw = keyword.trim()
+        if (cleanKw.isEmpty()) throw FanqieException("请输入要搜索的书名或作者名")
+        val encoded = URLEncoder.encode(cleanKw, "UTF-8")
+
+        val seenIds = HashSet<String>()
+        val results = ArrayList<FanqieSearchItem>()
+        var lastError: Exception? = null
+
+        for (tpl in SEARCH_ENDPOINTS) {
+            val url = String.format(tpl, encoded)
+            try {
+                val (code, text) = httpGetText(url, mobile = "snssdk" in tpl || "fanqiesdk" in tpl)
+                if (code != 200 || text.isBlank()) continue
+                val root = JSONObject(text)
+                val data = root.optJSONObject("data") ?: root
+                parseSearchJsonCandidates(data, seenIds, results)
+                if (results.isNotEmpty()) return results
+            } catch (e: Exception) {
+                lastError = e
+            }
+        }
+
+        if (results.isEmpty() && lastError != null) {
+            throw FanqieException("搜索请求失败：${lastError.message}")
+        }
+        return results
+    }
+
+    private fun parseSearchJsonCandidates(
+        data: JSONObject,
+        seenIds: MutableSet<String>,
+        out: MutableList<FanqieSearchItem>
+    ) {
+        val candidateArrays = listOfNotNull(
+            data.optJSONArray("ret_data"),
+            data.optJSONArray("search_book_data_list"),
+            data.optJSONArray("book_list"),
+            data.optJSONArray("data")
+        )
+        for (arr in candidateArrays) {
+            extractBooksFromArray(arr, seenIds, out)
+        }
+        // 兼容 search_tab 接口的 search_tabs[*].data[*] 结构
+        val tabs = data.optJSONArray("search_tabs")
+        if (tabs != null) {
+            for (t in 0 until tabs.length()) {
+                val tabObj = tabs.optJSONObject(t) ?: continue
+                val tabData = tabObj.optJSONArray("data") ?: continue
+                extractBooksFromArray(tabData, seenIds, out)
+            }
+        }
+    }
+
+    private fun extractBooksFromArray(
+        arr: JSONArray,
+        seenIds: MutableSet<String>,
+        out: MutableList<FanqieSearchItem>
+    ) {
+        for (i in 0 until arr.length()) {
+            val rawItem = arr.optJSONObject(i) ?: continue
+            // 有些接口直接是书籍对象，有些嵌套在 book_data 数组或 book_info 对象中
+            val bookObj = rawItem.optJSONObject("book_info")
+                ?: rawItem.optJSONArray("book_data")?.optJSONObject(0)
+                ?: rawItem
+
+            val bookId = bookObj.optString("book_id")
+                .ifBlank { bookObj.optString("bookId") }
+                .trim()
+            if (bookId.length < 10 || !seenIds.add(bookId)) continue
+
+            val rawTitle = bookObj.optString("book_name")
+                .ifBlank { bookObj.optString("title") }
+            val title = cleanHighlightText(rawTitle)
+            if (title.isBlank()) continue
+
+            val rawAuthor = bookObj.optString("author")
+                .ifBlank { bookObj.optJSONObject("author_info")?.optString("name") ?: "" }
+            val author = cleanHighlightText(rawAuthor).ifBlank { "未知作者" }
+
+            val category = cleanHighlightText(bookObj.optString("category", ""))
+            val score = bookObj.optString("score", "").takeIf { it.isNotBlank() && it != "0" } ?: ""
+            val wordCount = bookObj.optInt("word_number", 0).let {
+                if (it > 0) it else bookObj.optInt("word_count", 0)
+            }
+            val creationStatus = bookObj.optInt("creation_status", -1)
+            val serialStatus = when (creationStatus) {
+                0 -> "已完结"
+                1 -> "连载中"
+                else -> bookObj.optString("CreationStatus", "")
+            }
+            val intro = cleanHighlightText(
+                bookObj.optString("abstract").ifBlank { bookObj.optString("intro", "") }
+            )
+            val coverUrl = bookObj.optString("thumb_url").ifBlank { bookObj.optString("cover_url", "") }
+
+            out.add(
+                FanqieSearchItem(
+                    bookId = bookId,
+                    title = title,
+                    author = author,
+                    category = category,
+                    score = score,
+                    wordCount = wordCount,
+                    serialStatus = serialStatus,
+                    intro = intro,
+                    coverUrl = coverUrl
+                )
+            )
+        }
     }
 
     private fun fetchLandingData(bookId: String): JSONObject {

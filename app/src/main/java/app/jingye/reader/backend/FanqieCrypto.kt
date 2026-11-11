@@ -12,10 +12,6 @@ import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
-/**
- * 番茄 APP 网关加解密与请求签名核心（对应 core/appapi.py）。
- * 包含 AES-CBC、SM3 (GB/T 32905-2016)、Simon-4-72、SPECK-64、Protobuf、x-argus、x-ladon 与 TTEncrypt。
- */
 object FanqieCrypto {
     const val AID = "1967"
     const val LICENSE_ID = "1611921764"
@@ -89,7 +85,6 @@ object FanqieCrypto {
     private fun sm3P0(x: Int): Int = x xor rotl32(x, 9) xor rotl32(x, 17)
     private fun sm3P1(x: Int): Int = x xor rotl32(x, 15) xor rotl32(x, 23)
 
-    /** SM3 摘要 (GB/T 32905-2016) */
     fun sm3(data: ByteArray): ByteArray {
         val bitLen = data.size.toLong() * 8L
         val out = ByteArrayOutputStream()
@@ -386,7 +381,6 @@ object FanqieCrypto {
 
     private val URL_QUERY_RE = Regex("^[^?]+\\?([^#]*)")
 
-    /** GZIP 压缩（固定 mtime=0，与 Python gzip.compress(data, mtime=0) 一致） */
     private fun gzipDeterministic(data: ByteArray): ByteArray {
         val deflater = Deflater(Deflater.BEST_COMPRESSION, true)
         deflater.setInput(data)

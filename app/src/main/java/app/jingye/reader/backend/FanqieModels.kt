@@ -1,5 +1,34 @@
 package app.jingye.reader.backend
 
+data class FanqieSearchItem(
+    val bookId: String,
+    val title: String,
+    val author: String,
+    val category: String,
+    val score: String,
+    val wordCount: Int,
+    val serialStatus: String,
+    val intro: String,
+    val coverUrl: String = ""
+) {
+    fun formattedWordCount(): String = when {
+        wordCount >= 100_000_000 -> String.format("%.2f亿字", wordCount / 100_000_000.0)
+        wordCount >= 10_000 -> String.format("%.1f万字", wordCount / 10_000.0)
+        wordCount > 0 -> "${wordCount}字"
+        else -> ""
+    }
+
+    fun metaLine(): String {
+        val parts = ArrayList<String>()
+        if (author.isNotBlank()) parts.add(author)
+        if (category.isNotBlank()) parts.add(category)
+        if (serialStatus.isNotBlank()) parts.add(serialStatus)
+        val wc = formattedWordCount()
+        if (wc.isNotBlank()) parts.add(wc)
+        return parts.joinToString(" · ")
+    }
+}
+
 data class FanqieMetadata(
     val bookId: String,
     val title: String,

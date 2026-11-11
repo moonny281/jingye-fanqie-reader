@@ -1,8 +1,5 @@
 package app.jingye.reader.backend
 
-/**
- * 番茄小说动态字体 (awesome-font) PUA 逆向解密表（362 项全覆盖，与 core/decryptor.py 完全一致）。
- */
 object FanqieDecryptor {
     private const val PUA_START = 0xE000
     private const val PUA_END = 0xF8FF

@@ -2,77 +2,96 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginTop="8dp"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:background="@drawable/bg_eink_item_selector">
 
     <LinearLayout
-        android:id="@+id/rowRoot"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/ink_card_clickable_bg"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:padding="12dp">
+        android:gravity="center_vertical"
+        android:paddingTop="14dp"
+        android:paddingBottom="14dp"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp">
 
-        <!-- 微信读书墨水屏风格精装书封 -->
-        <TextView
-            android:id="@+id/bookCoverThumb"
-            android:layout_width="46dp"
-            android:layout_height="62dp"
-            android:background="@drawable/ink_cover_bg"
-            android:ellipsize="end"
-            android:fontFamily="serif"
+        <LinearLayout
+            android:layout_width="48dp"
+            android:layout_height="64dp"
+            android:orientation="vertical"
             android:gravity="center"
-            android:maxLines="3"
             android:padding="5dp"
-            android:textColor="#000000"
-            android:textSize="11sp"
-            android:textStyle="bold" />
+            android:background="@drawable/bg_book_cover">
+
+            <TextView
+                android:id="@+id/tvCoverThumb"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:maxLines="3"
+                android:ellipsize="end"
+                android:text="小说"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:textColor="#000000" />
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="12dp"
             android:layout_weight="1"
-            android:duplicateParentState="true"
+            android:layout_marginStart="14dp"
+            android:layout_marginEnd="10dp"
             android:orientation="vertical">
 
             <TextView
                 android:id="@+id/bookTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:duplicateParentState="true"
-                android:ellipsize="end"
-                android:fontFamily="serif"
-                android:maxLines="1"
-                android:textColor="@color/ink_text"
                 android:textSize="17sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:textColor="@color/selector_eink_text"
+                android:maxLines="1"
+                android:ellipsize="end" />
 
             <TextView
-                android:id="@+id/bookSub"
+                android:id="@+id/bookAuthor"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:duplicateParentState="true"
-                android:ellipsize="end"
+                android:textSize="13sp"
+                android:textColor="@color/selector_eink_text"
                 android:maxLines="1"
-                android:textColor="@color/ink_text"
-                android:textSize="13sp" />
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/bookProgress"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:textSize="12sp"
+                android:textColor="@color/selector_eink_text"
+                android:maxLines="1"
+                android:ellipsize="end" />
         </LinearLayout>
 
         <TextView
             android:id="@+id/bookBadge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="@drawable/ink_badge_bg"
-            android:paddingHorizontal="8dp"
-            android:paddingVertical="4dp"
-            android:text="未读"
-            android:textColor="#000000"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="5dp"
+            android:paddingBottom="5dp"
+            android:background="@drawable/bg_eink_tag"
+            android:text="阅读"
             android:textSize="12sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:textColor="#000000" />
     </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#000000" />
 </LinearLayout>

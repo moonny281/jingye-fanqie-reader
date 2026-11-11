@@ -22,7 +22,6 @@ object EpdSettings {
 
     data class Item(val key: String, val namespace: String?, val value: String?)
 
-    /** 依次在 system / global / secure 三个命名空间里找键。 */
     fun read(ctx: Context): List<Item> {
         val cr = ctx.contentResolver
         return KEYS.map { k ->
@@ -43,7 +42,6 @@ object EpdSettings {
         }
     }
 
-    /** 反射读取系统属性；被限制时返回 null。 */
     fun prop(key: String): String? = try {
         val cls = Class.forName("android.os.SystemProperties")
         val method = cls.getMethod("get", String::class.java)
@@ -52,7 +50,6 @@ object EpdSettings {
         null
     }
 
-    /** Tier 2 实验写入（仅在调试页手动触发）。 */
     fun tryWriteSystemInt(ctx: Context, key: String, value: Int): Result<Unit> = runCatching {
         if (!Settings.System.canWrite(ctx)) {
             error("尚未授予 WRITE_SETTINGS 权限")

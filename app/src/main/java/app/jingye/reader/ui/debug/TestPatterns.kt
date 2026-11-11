@@ -1,67 +1,101 @@
 package app.jingye.reader.ui.debug
 
-import android.graphics.Bitmap
+import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import app.jingye.reader.reader.ReaderStyle
-import app.jingye.reader.reader.buildLayout
+import android.util.AttributeSet
+import android.view.View
 
-object TestPatterns {
-    fun solid(w: Int, h: Int, color: Int): Bitmap =
-        Bitmap.createBitmap(w.coerceAtLeast(1), h.coerceAtLeast(1), Bitmap.Config.RGB_565).also {
-            Canvas(it).drawColor(color)
+class TestPatterns @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null
+) : View(context, attrs) {
+
+    var patternIndex: Int = 0
+        set(value) {
+            field = value % 3
+            invalidate()
         }
 
-    fun checker(w: Int, h: Int, cell: Int = 64): Bitmap {
-        val safeW = w.coerceAtLeast(1)
-        val safeH = h.coerceAtLeast(1)
-        val bmp = Bitmap.createBitmap(safeW, safeH, Bitmap.Config.RGB_565)
-        val c = Canvas(bmp)
-        val p = Paint()
-        for (y in 0 until safeH step cell) {
-            for (x in 0 until safeW step cell) {
-                p.color = if (((x / cell) + (y / cell)) % 2 == 0) Color.BLACK else Color.WHITE
-                c.drawRect(x.toFloat(), y.toFloat(), (x + cell).toFloat(), (y + cell).toFloat(), p)
+    var flashColor: Int? = null
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    private val blackPaint = Paint().apply {
+        color = Color.BLACK
+        style = Paint.Style.FILL
+        isAntiAlias = false
+    }
+
+    private val textPaint = Paint().apply {
+        color = Color.BLACK
+        textSize = 40f
+        isAntiAlias = true
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        val fc = flashColor
+        if (fc != null) {
+            canvas.drawColor(fc)
+            return
+        }
+        canvas.drawColor(Color.WHITE)
+        when (patternIndex) {
+            0 -> drawCheckerboard(canvas)
+            1 -> drawStripes(canvas)
+            else -> drawContrastText(canvas)
+        }
+    }
+
+    private fun drawCheckerboard(canvas: Canvas) {
+        val cell = 64
+        var y = 0
+        var row = 0
+        while (y < height) {
+            var x = 0
+            var col = 0
+            while (x < width) {
+                if ((row + col) % 2 == 0) {
+                    canvas.drawRect(
+                        x.toFloat(),
+                        y.toFloat(),
+                        (x + cell).toFloat(),
+                        (y + cell).toFloat(),
+                        blackPaint
+                    )
+                }
+                x += cell
+                col++
             }
+            y += cell
+            row++
         }
-        return bmp
     }
 
-    fun grayRamp(w: Int, h: Int, steps: Int = 16): Bitmap {
-        val safeW = w.coerceAtLeast(1)
-        val safeH = h.coerceAtLeast(1)
-        val bmp = Bitmap.createBitmap(safeW, safeH, Bitmap.Config.RGB_565)
-        val c = Canvas(bmp)
-        val p = Paint()
-        val bw = safeW / steps.toFloat()
-        for (i in 0 until steps) {
-            val g = i * 255 / (steps - 1)
-            p.color = Color.rgb(g, g, g)
-            c.drawRect(i * bw, 0f, (i + 1) * bw, safeH.toFloat(), p)
+    private fun drawStripes(canvas: Canvas) {
+        val bar = 24
+        var y = 0
+        var idx = 0
+        while (y < height) {
+            if (idx % 2 == 0) {
+                canvas.drawRect(0f, y.toFloat(), width.toFloat(), (y + bar).toFloat(), blackPaint)
+            }
+            y += bar
+            idx++
         }
-        return bmp
     }
 
-    fun sampleText(w: Int, h: Int, style: ReaderStyle, pageNo: Int = 1): Bitmap {
-        val safeW = w.coerceAtLeast(1)
-        val safeH = h.coerceAtLeast(1)
-        val bmp = Bitmap.createBitmap(safeW, safeH, Bitmap.Config.RGB_565)
-        val c = Canvas(bmp)
-        c.drawColor(Color.WHITE)
-        val sample = "【海信 A7 墨水屏文字样张 · 第 $pageNo 帧】\n" +
-            "　　墨水屏残影来自电泳微胶囊粒子的残余位移。净页通过预渲染位图、纯黑白绘制与文字区局部闪烁（黑→白→内容），在不触发整屏闪烁的前提下抑制残影累积。\n" +
-            "　　天地玄黄，宇宙洪荒。日月盈昃，辰宿列张。寒来暑往，秋收冬藏。闰余成岁，律吕调阳。"
-        val layout = buildLayout(
-            sample,
-            0,
-            sample.length,
-            style.newPaint(),
-            (safeW - style.marginPx * 2).coerceAtLeast(1),
-            style.lineSpacingMult
-        )
-        c.translate(style.marginPx.toFloat(), style.marginPx.toFloat())
-        layout.draw(c)
-        return bmp
+    private fun drawContrastText(canvas: Canvas) {
+        val sizes = listOf(28f, 36f, 44f, 54f, 64f)
+        var y = 90f
+        for (sz in sizes) {
+            textPaint.textSize = sz
+            canvas.drawText("净页墨水屏残影与锐度测试 ${sz.toInt()}px", 36f, y, textPaint)
+            y += sz + 36f
+        }
     }
 }

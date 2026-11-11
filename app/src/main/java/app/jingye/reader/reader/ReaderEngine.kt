@@ -1,11 +1,16 @@
 package app.jingye.reader.reader
 
+import android.content.Context
 import android.graphics.Bitmap
 import app.jingye.reader.data.BookSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class ReaderEngine(private val source: BookSource, private val bookId: String) {
+class ReaderEngine(
+    private val source: BookSource,
+    private val bookId: String,
+    private val ctx: Context? = null
+) {
 
     data class Frame(
         val bitmap: Bitmap,
@@ -36,7 +41,6 @@ class ReaderEngine(private val source: BookSource, private val bookId: String) {
         return frame()
     }
 
-    /** 字号/行距/边距变化后重新排版，保持当前阅读位置。 */
     suspend fun relayout(newStyle: ReaderStyle): Frame {
         val offset = pages.getOrNull(index)?.start ?: 0
         style = newStyle
@@ -49,7 +53,6 @@ class ReaderEngine(private val source: BookSource, private val bookId: String) {
         return frame()
     }
 
-    /** 返回 null 表示已到全书末尾。 */
     suspend fun next(): Frame? {
         when {
             index + 1 < pages.size -> index++
@@ -59,17 +62,15 @@ class ReaderEngine(private val source: BookSource, private val bookId: String) {
         return frame()
     }
 
-    /** 返回 null 表示已在全书第一页。 */
     suspend fun prev(): Frame? {
         when {
             index > 0 -> index--
-            chapter > 0 -> loadChapter(chapter - 1, Int.MAX_VALUE) // 落在上一章最后一页
+            chapter > 0 -> loadChapter(chapter - 1, Int.MAX_VALUE)
             else -> return null
         }
         return frame()
     }
 
-    /** 显示完当前页后调用，预渲染前后页。 */
     suspend fun prefetch() = withContext(Dispatchers.Default) {
         val r = renderer ?: return@withContext
         listOf(index + 1, index - 1).filter { it in pages.indices }.forEach {
@@ -80,11 +81,11 @@ class ReaderEngine(private val source: BookSource, private val bookId: String) {
     private suspend fun loadChapter(c: Int, charOffset: Int) {
         val text = source.chapterText(bookId, c)
         val t = source.chapterTitle(bookId, c)
-        val p = withContext(Dispatchers.Default) { Paginator(style, w, h).paginate(text) }
+        val p = withContext(Dispatchers.Default) { Paginator(style, w, h, ctx).paginate(text) }
         chapter = c
         title = t
         pages = p
-        renderer = PageRenderer(text, style, w, h)
+        renderer = PageRenderer(text, style, w, h, ctx)
         index = p.indexOfLast { it.start <= charOffset }.coerceAtLeast(0)
     }
 

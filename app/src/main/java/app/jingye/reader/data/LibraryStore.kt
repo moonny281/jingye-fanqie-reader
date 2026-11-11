@@ -34,7 +34,6 @@ class LibraryStore(private val ctx: Context) {
     fun findByFanqieId(fanqieBookId: String): Book? =
         if (fanqieBookId.isBlank()) null else read().firstOrNull { it.fanqieBookId == fanqieBookId }
 
-    /** 在 IO 线程调用：导入本地选中的 TXT 文件。 */
     fun importTxt(uri: Uri): Book {
         val name = ctx.contentResolver.query(uri, null, null, null, null)?.use { c ->
             val i = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
@@ -62,7 +61,6 @@ class LibraryStore(private val ctx: Context) {
         return book
     }
 
-    /** 在 IO 线程调用：把番茄后端下载生成的 TXT 导入书架（同 book_id 已存在则覆盖正文并保留进度）。 */
     fun importFanqieTxt(
         fanqieBookId: String,
         title: String,

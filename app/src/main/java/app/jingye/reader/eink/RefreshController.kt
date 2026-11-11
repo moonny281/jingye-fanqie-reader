@@ -11,13 +11,11 @@ import app.jingye.reader.reader.PageView
 interface RefreshController {
     val name: String
     fun showPage(view: PageView, bitmap: Bitmap)
-    /** 局部清影：黑 → 白 → 内容，仅限文字区。 */
     fun cleanRegion(view: PageView, bitmap: Bitmap)
     fun onReaderEnter(activity: Activity) {}
     fun onReaderExit(activity: Activity) {}
 }
 
-/** Tier 0：通用 View 层。 */
 class DefaultRefreshController : RefreshController {
     override val name = "default"
     private val handler = Handler(Looper.getMainLooper())
@@ -36,6 +34,5 @@ class DefaultRefreshController : RefreshController {
 }
 
 object RefreshControllers {
-    /** 默认返回 Tier 0。Tier 2/3 经实验验证有效后，在此按设置切换。 */
     fun create(ctx: Context): RefreshController = DefaultRefreshController()
 }

@@ -33,7 +33,6 @@ class PageView @JvmOverloads constructor(
         invalidate()
     }
 
-    /** 在整个视图（=文字区）内闪一帧纯色，用于局部清影。 */
     fun flash(color: Int) {
         flashColor = color
         invalidate()

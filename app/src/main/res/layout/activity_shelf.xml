@@ -1,363 +1,297 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
     android:background="#FFFFFF">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical">
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="18dp"
+        android:paddingEnd="14dp"
+        android:background="#FFFFFF">
 
-        <!-- 微信读书墨水屏风格顶栏 -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="60dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingHorizontal="16dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="serif"
-                android:text="净页"
-                android:textColor="#000000"
-                android:textSize="24sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/shelfCountBadge"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
-                android:background="@drawable/ink_badge_bg"
-                android:paddingHorizontal="8dp"
-                android:paddingVertical="2dp"
-                android:text="0 本"
-                android:textColor="#000000"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-
-            <View
-                android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:layout_weight="1" />
-
-            <Button
-                android:id="@+id/btnFanqie"
-                style="@style/InkButtonSolid"
-                android:text="+ 番茄下载" />
-
-            <Button
-                android:id="@+id/btnImport"
-                style="@style/InkButton"
-                android:layout_marginStart="6dp"
-                android:text="导入TXT" />
-        </LinearLayout>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1.5dp"
-            android:background="#000000" />
-
-        <!-- 静态提示/错误信息栏 -->
         <TextView
-            android:id="@+id/errorLine"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="#FFFFFF"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="8dp"
-            android:textColor="#000000"
-            android:textSize="14sp"
+            android:text="净页 · 书架"
+            android:textSize="22sp"
             android:textStyle="bold"
-            android:visibility="gone" />
+            android:textColor="#000000" />
 
-        <!-- 最近在读 Hero 卡片（效仿微信读书墨水屏版顶部「继续阅读」模块） -->
-        <LinearLayout
-            android:id="@+id/recentCard"
-            android:layout_width="match_parent"
+        <TextView
+            android:id="@+id/tvBookCount"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="16dp"
-            android:layout_marginTop="12dp"
-            android:background="@drawable/ink_card_bg"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:padding="12dp"
-            android:visibility="gone">
+            android:layout_weight="1"
+            android:layout_marginStart="10dp"
+            android:text="0 本藏书"
+            android:textSize="13sp"
+            android:textColor="#000000" />
 
-            <!-- 墨水屏线装书封缩略图 -->
-            <TextView
-                android:id="@+id/recentCoverText"
-                android:layout_width="48dp"
-                android:layout_height="64dp"
-                android:background="@drawable/ink_cover_bg"
-                android:ellipsize="end"
-                android:fontFamily="serif"
-                android:gravity="center"
-                android:maxLines="3"
-                android:padding="6dp"
-                android:textColor="#000000"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginHorizontal="12dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="最近在读"
-                    android:textColor="#000000"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/recentBookTitle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:ellipsize="end"
-                    android:fontFamily="serif"
-                    android:maxLines="1"
-                    android:textColor="#000000"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/recentBookMeta"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:textColor="#000000"
-                    android:textSize="13sp" />
-            </LinearLayout>
-
-            <Button
-                android:id="@+id/btnContinueRead"
-                style="@style/InkButtonSolid"
-                android:text="继续阅读" />
-        </LinearLayout>
-
-        <!-- 列表分组标题行 -->
-        <LinearLayout
-            android:id="@+id/shelfSectionHeader"
-            android:layout_width="match_parent"
+        <Button
+            android:id="@+id/btnFanqie"
+            style="@style/Widget.Jingye.Button.Solid"
+            android:layout_width="wrap_content"
             android:layout_height="36dp"
-            android:layout_marginTop="6dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingHorizontal="16dp">
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="搜书 / 下载"
+            android:textSize="13sp" />
 
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="全部藏书"
-                android:textColor="#000000"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="长按书籍可移出书架"
-                android:textColor="#000000"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <!-- 书架主区域 -->
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1">
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/recyclerView"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:clipToPadding="false"
-                android:overScrollMode="never"
-                android:paddingHorizontal="16dp"
-                android:paddingBottom="12dp"
-                android:scrollbars="none" />
-
-            <!-- 空书架引导卡片 -->
-            <LinearLayout
-                android:id="@+id/emptyView"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:layout_marginHorizontal="28dp"
-                android:background="@drawable/ink_card_bg"
-                android:gravity="center"
-                android:orientation="vertical"
-                android:padding="24dp"
-                android:visibility="gone">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="serif"
-                    android:text="书架暂无藏书"
-                    android:textColor="#000000"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:gravity="center"
-                    android:lineSpacingMultiplier="1.3"
-                    android:text="支持粘贴番茄小说分享链接免登录下载全书，或直接从本机存储导入 TXT 书籍。"
-                    android:textColor="#000000"
-                    android:textSize="14sp" />
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/btnEmptyFanqie"
-                        style="@style/InkButtonSolid"
-                        android:text="去下载番茄小说" />
-
-                    <Button
-                        android:id="@+id/btnEmptyImport"
-                        style="@style/InkButton"
-                        android:layout_marginStart="8dp"
-                        android:text="导入本地 TXT" />
-                </LinearLayout>
-            </LinearLayout>
-        </FrameLayout>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1.5dp"
-            android:background="#000000" />
-
-        <!-- 微信读书墨水屏版底部三栏导航 -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:background="#FFFFFF"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingHorizontal="12dp">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:text="● 书架"
-                android:textColor="#000000"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-
-            <View
-                android:layout_width="1dp"
-                android:layout_height="24dp"
-                android:background="#000000" />
-
-            <TextView
-                android:id="@+id/navFanqie"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:background="@drawable/ink_row_bg"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:text="番茄下载"
-                android:textColor="@color/ink_text"
-                android:textSize="15sp" />
-
-            <View
-                android:layout_width="1dp"
-                android:layout_height="24dp"
-                android:background="#000000" />
-
-            <TextView
-                android:id="@+id/btnSettings"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:background="@drawable/ink_row_bg"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:text="阅读设置"
-                android:textColor="@color/ink_text"
-                android:textSize="15sp" />
-        </LinearLayout>
+        <Button
+            android:id="@+id/btnImportTxt"
+            style="@style/Widget.Jingye.Button.Outline"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:layout_marginStart="8dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="导入TXT"
+            android:textSize="13sp" />
     </LinearLayout>
 
-    <!-- 长按删除确认面板：瞬时显隐，无动画 -->
-    <FrameLayout
-        android:id="@+id/deleteDialogOverlay"
+    <View
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:clickable="true"
-        android:focusable="true"
+        android:layout_height="2dp"
+        android:background="#000000" />
+
+    <!-- Hero "Continue Reading" Banner (WeRead E-Ink signature layout) -->
+    <LinearLayout
+        android:id="@+id/heroRecentCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="14dp"
+        android:layout_marginBottom="6dp"
+        android:padding="14dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/bg_eink_card"
         android:visibility="gone">
 
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_marginHorizontal="24dp"
-            android:background="@drawable/ink_panel_bg"
+            android:layout_width="54dp"
+            android:layout_height="72dp"
             android:orientation="vertical"
-            android:padding="20dp">
+            android:gravity="center"
+            android:padding="6dp"
+            android:background="@drawable/bg_book_cover">
 
             <TextView
-                android:id="@+id/deleteDialogTitle"
+                android:id="@+id/tvHeroCoverLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:fontFamily="serif"
-                android:text="移出书架？"
-                android:textColor="#000000"
-                android:textSize="19sp"
-                android:textStyle="bold" />
+                android:gravity="center"
+                android:maxLines="3"
+                android:ellipsize="end"
+                android:text="净页"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:textColor="#000000" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="14dp"
+            android:layout_marginEnd="10dp"
+            android:orientation="vertical">
 
             <TextView
-                android:id="@+id/deleteDialogSub"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="将同时删除本地书籍文件与阅读进度记录。"
-                android:textColor="#000000"
-                android:textSize="14sp" />
+                android:text="最近在读"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:paddingTop="1dp"
+                android:paddingBottom="1dp"
+                android:background="@drawable/bg_eink_tag"
+                android:textColor="#000000" />
 
-            <LinearLayout
+            <TextView
+                android:id="@+id/tvHeroTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="书名"
+                android:textSize="17sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textColor="#000000" />
+
+            <TextView
+                android:id="@+id/tvHeroMeta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:text="继续阅读"
+                android:textSize="13sp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textColor="#000000" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:background="@drawable/bg_eink_button_solid"
+            android:text="继续阅读"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:textColor="@color/selector_eink_text_solid" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="34dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
+        android:layout_marginTop="4dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="全部书籍（点按阅读 · 长按管理）"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textColor="#000000" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:background="#000000" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/shelfRecyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:clipToPadding="false"
+            android:overScrollMode="never"
+            android:scrollbars="none" />
+
+        <LinearLayout
+            android:id="@+id/emptyContainer"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="32dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="书架空空如也"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="#000000" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center"
+                android:lineSpacingMultiplier="1.35"
+                android:text="点击右上角「搜书 / 下载」按书名搜索番茄小说\n或点击「导入TXT」加载本地小说与内置样章"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+
+            <Button
+                android:id="@+id/btnLoadDemo"
+                style="@style/Widget.Jingye.Button.Outline"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
                 android:layout_marginTop="18dp"
-                android:gravity="end"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/btnCancelDelete"
-                    style="@style/InkButton"
-                    android:text="取消" />
-
-                <Button
-                    android:id="@+id/btnConfirmDelete"
-                    style="@style/InkButtonSolid"
-                    android:layout_marginStart="8dp"
-                    android:text="确认删除" />
-            </LinearLayout>
+                android:paddingStart="18dp"
+                android:paddingEnd="18dp"
+                android:text="加载内置墨水屏精排样章"
+                android:textSize="14sp" />
         </LinearLayout>
     </FrameLayout>
-</FrameLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1.5dp"
+        android:background="#000000" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="#FFFFFF">
+
+        <TextView
+            android:id="@+id/navShelf"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="● 书架"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:textColor="#000000" />
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="24dp"
+            android:background="#000000" />
+
+        <TextView
+            android:id="@+id/navFanqie"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:background="@drawable/bg_eink_item_selector"
+            android:text="番茄搜书"
+            android:textSize="15sp"
+            android:textColor="@color/selector_eink_text" />
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="24dp"
+            android:background="#000000" />
+
+        <TextView
+            android:id="@+id/navSettings"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:background="@drawable/bg_eink_item_selector"
+            android:text="排版与设置"
+            android:textSize="15sp"
+            android:textColor="@color/selector_eink_text" />
+    </LinearLayout>
+
+</LinearLayout>

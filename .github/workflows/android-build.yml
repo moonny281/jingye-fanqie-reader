@@ -42,8 +42,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          # 1. 按优先级自动解析 VERSION_NAME：
-          #    手动触发输入 > Git Tag (v*) > 根目录 VERSION 文件 > app/build.gradle.kts > 默认值
           INPUT_VER="${{ github.event.inputs.custom_version }}"
           REF_NAME="${GITHUB_REF_NAME:-}"
 
@@ -57,18 +55,15 @@ jobs:
             RAW_VER="$(head -n 1 VERSION | tr -d '[:space:]')"
             SOURCE="VERSION file"
           else
-            RAW_VER=$(python3 -c 'import re,pathlib; m=re.search(r"\"([0-9]+\.[0-9]+\.[0-9]+[^\"]*)\"", pathlib.Path("app/build.gradle.kts").read_text(encoding="utf-8")); print(m.group(1) if m else "0.2.0")')
+            RAW_VER=$(python3 -c 'import re,pathlib; m=re.search(r"\"([0-9]+\.[0-9]+\.[0-9]+[^\"]*)\"", pathlib.Path("app/build.gradle.kts").read_text(encoding="utf-8")); print(m.group(1) if m else "0.3.0")')
             SOURCE="app/build.gradle.kts"
           fi
 
-          # 去掉可能带有前导的 v
           VERSION_NAME="${RAW_VER#v}"
 
-          # 2. 自动计算单调递增的 VERSION_CODE：
-          #    将语义化版本号 (Major.Minor.Patch) 转为整数基数，并结合 GitHub Actions run_number 保证每次构建均可直接覆盖安装
           IFS='.-_' read -r MAJOR MINOR PATCH _ <<< "$VERSION_NAME"
           MAJOR=${MAJOR//[^0-9]/}; MAJOR=${MAJOR:-0}
-          MINOR=${MINOR//[^0-9]/}; MINOR=${MINOR:-2}
+          MINOR=${MINOR//[^0-9]/}; MINOR=${MINOR:-3}
           PATCH=${PATCH//[^0-9]/}; PATCH=${PATCH:-0}
 
           SEMVER_BASE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
@@ -94,6 +89,19 @@ jobs:
           echo "  Commit SHA            : ${SHORT_SHA}"
           echo "=================================================="
 
+      - name: Bundle Open-Source Chinese E-Ink Fonts into APK Assets
+        shell: bash
+        run: |
+          mkdir -p app/src/main/assets/fonts
+          echo "Downloading open-source Chinese reading fonts (LXGW WenKai & Noto Serif SC)..."
+          curl -fL --connect-timeout 15 --max-time 120 \
+            "https://github.com/lxgw/LxgwWenKai-Lite/releases/download/v1.500/LXGWWenKaiLite-Regular.ttf" \
+            -o app/src/main/assets/fonts/wenkai.ttf || rm -f app/src/main/assets/fonts/wenkai.ttf
+          curl -fL --connect-timeout 15 --max-time 120 \
+            "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Serif/OTF/SimplifiedChinese/NotoSerifCJKsc-Regular.otf" \
+            -o app/src/main/assets/fonts/serif.otf || rm -f app/src/main/assets/fonts/serif.otf
+          ls -lh app/src/main/assets/fonts/ || true
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -113,7 +121,6 @@ jobs:
           echo "ANDROID_SDK_ROOT=$SDK_DIR" >> "$GITHUB_ENV"
           echo "sdk.dir=$SDK_DIR" > local.properties
 
-          # 预写入全部标准 Android SDK 许可证哈希，免除 sdkmanager 交互与路径兼容问题
           mkdir -p "$SDK_DIR/licenses"
           printf "\n24333f8a63b6825ea9c5514f83c2829b004d1fee\nd56f5187479451eabf01fb78af6dfcb131a6481e\n8933bad161af4178b1185d1a37fbf41ea5269c55\n" > "$SDK_DIR/licenses/android-sdk-license"
           printf "\n84831b9409646a918e30573bab4c9c91346d8abd\n" > "$SDK_DIR/licenses/android-sdk-preview-license"

@@ -27,6 +27,12 @@ class FanqieService(
         remoteClient.checkHealth(url)
     }
 
+    /** 按书名或作者名搜索书籍列表。 */
+    suspend fun searchBooks(keyword: String): List<FanqieSearchItem> = withContext(Dispatchers.IO) {
+        newLocalCrawler().searchBooks(keyword)
+    }
+
+    /** 解析分享链接或数字 book_id 为完整书籍详情。 */
     suspend fun parseInput(rawInput: String): FanqieMetadata = withContext(Dispatchers.IO) {
         if (prefs.useRemoteBackend) {
             remoteClient.parse(prefs.backendUrl, rawInput)

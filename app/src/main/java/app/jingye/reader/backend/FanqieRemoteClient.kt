@@ -5,13 +5,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
-/**
- * 远程 FastAPI 后端客户端（对接 Jees996/fanqie-novel-downloader 的 app.py）：
- * - GET  /api/health
- * - POST /api/parse
- * - GET  /api/download/progress?book_id=... (SSE)
- * - GET  /api/download/file/{filename}
- */
 class FanqieRemoteClient(private val timeoutMs: Int = 45000) {
 
     fun checkHealth(baseUrl: String): String {

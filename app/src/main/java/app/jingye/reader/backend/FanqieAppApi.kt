@@ -14,10 +14,6 @@ import java.util.Random
 import java.util.UUID
 import java.util.zip.GZIPInputStream
 
-/**
- * 番茄 APP 正文接口客户端（对应 core/appapi.py）。
- * 免登录注册匿名设备 + 换取正文密钥 + 批量拉取全书加密 XHTML 章节。
- */
 class FanqieAppApi(
     private val cacheFile: File,
     private val timeoutMs: Int = 25000,

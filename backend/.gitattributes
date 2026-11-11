@@ -1,0 +1,22 @@
+# 统一换行符：仓库内一律存 LF，检出时按平台转换
+* text=auto eol=lf
+
+# Windows 批处理必须 CRLF：按原样入库（-text 关闭转换），
+# 保证 GitHub ZIP / raw 下载后 cmd.exe 仍能正确解析
+*.bat -text
+*.cmd -text
+
+# shell 脚本必须 LF
+*.sh text eol=lf
+
+# 二进制文件不做换行符转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.zip binary
+*.gz binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
