@@ -5,6 +5,7 @@ import android.content.Context
 import android.util.SparseArray
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.core.util.size
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -15,12 +16,9 @@ import io.legado.app.utils.withTimeoutOrNullAsync
 import kotlinx.coroutines.ensureActive
 import splitties.views.onLongClick
 import java.util.Collections
-import androidx.core.util.size
 
 /**
- * Created by Invincible on 2017/11/24.
- *
- * 通用的adapter 可添加header，footer，以及不同类型item
+ * 通用的adapter（原生墨水屏模式：已禁用所有列表项加载动画与 RecyclerView ItemAnimator）
  */
 @Suppress("unused", "MemberVisibilityCanBePrivate")
 abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Context) :
@@ -51,6 +49,7 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
     }
 
     fun bindToRecyclerView(recyclerView: RecyclerView) {
+        recyclerView.itemAnimator = null
         recyclerView.adapter = this
     }
 
@@ -116,7 +115,7 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
         skipDiff: Boolean = false
     ) {
         kotlin.runCatching {
-            if (!isResumed) { //全量标记更新
+            if (!isResumed) {
                 setItems(items)
                 return@runCatching
             }
@@ -338,14 +337,9 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
 
     fun isNotEmpty() = items.isNotEmpty()
 
-    /**
-     * 除去header和footer
-     */
     fun getActualItemCount() = items.size
 
-
     fun getHeaderCount() = headerItems.size
-
 
     fun getFooterCount() = footerItems.size
 
@@ -357,9 +351,6 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
 
     protected open fun getItemViewType(item: ITEM, position: Int) = 0
 
-    /**
-     * grid 模式下使用
-     */
     protected open fun getSpanSize(viewType: Int, position: Int) = 1
 
     final override fun getItemCount() = getActualItemCount() + getHeaderCount() + getFooterCount()
@@ -373,7 +364,6 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
     }
 
     open fun onCurrentListChanged() {
-
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = when {
@@ -429,13 +419,12 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
 
     override fun onViewAttachedToWindow(holder: ItemViewHolder) {
         super.onViewAttachedToWindow(holder)
-        if (!isHeader(holder.layoutPosition) && !isFooter(holder.layoutPosition)) {
-            addAnimation(holder)
-        }
+        // 墨水屏模式禁用列表项进入动画
     }
 
     override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
         super.onAttachedToRecyclerView(recyclerView)
+        recyclerView.itemAnimator = null
         val manager = recyclerView.layoutManager
         if (manager is GridLayoutManager) {
             manager.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
@@ -446,7 +435,7 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
         }
     }
 
-    fun upResumed(isResumed : Boolean) {
+    fun upResumed(isResumed: Boolean) {
         if (!isResumed) {
             diffJob?.cancel()
             diffJob = null
@@ -461,30 +450,10 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
 
     private fun getActualPosition(position: Int) = position - getHeaderCount()
 
-    private fun addAnimation(holder: ItemViewHolder) {
-        itemAnimation?.let {
-            if (it.itemAnimEnabled) {
-                if (!it.itemAnimFirstOnly || holder.layoutPosition > it.itemAnimStartPosition) {
-                    startAnimation(holder, it)
-                    it.itemAnimStartPosition = holder.layoutPosition
-                }
-            }
-        }
-    }
-
     protected open fun startAnimation(holder: ItemViewHolder, item: ItemAnimation) {
-        item.itemAnimation?.let {
-            for (anim in it.getAnimators(holder.itemView)) {
-                anim.setDuration(item.itemAnimDuration).start()
-                anim.interpolator = item.itemAnimInterpolator
-            }
-        }
+        // 墨水屏模式禁用列表项动画
     }
 
-    /**
-     * 如果使用了事件回调,回调里不要直接使用item,会出现不更新的问题,
-     * 使用getItem(holder.layoutPosition)来获取item
-     */
     abstract fun convert(
         holder: ItemViewHolder,
         binding: VB,
@@ -492,9 +461,6 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
         payloads: MutableList<Any>
     )
 
-    /**
-     * 注册事件
-     */
     abstract fun registerListener(holder: ItemViewHolder, binding: VB)
 
     companion object {
@@ -504,7 +470,3 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
     }
 
 }
-
-
-
-

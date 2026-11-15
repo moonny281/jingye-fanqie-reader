@@ -2,7 +2,9 @@ package io.legado.app.base
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.util.AttributeSet
@@ -17,15 +19,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.viewbinding.ViewBinding
 import io.legado.app.R
 import io.legado.app.constant.AppConst
-import io.legado.app.constant.AppLog
 import io.legado.app.constant.Theme
-import io.legado.app.help.config.AppConfig
-import io.legado.app.help.config.ThemeConfig
-import io.legado.app.lib.theme.ThemeStore
-import io.legado.app.lib.theme.backgroundColor
-import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.widget.TitleBar
-import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.applyBackgroundTint
 import io.legado.app.utils.applyOpenTint
 import io.legado.app.utils.applyTint
@@ -35,15 +30,14 @@ import io.legado.app.utils.hideSoftInput
 import io.legado.app.utils.setLightStatusBar
 import io.legado.app.utils.setNavigationBarColorAuto
 import io.legado.app.utils.setStatusBarColorAuto
-import io.legado.app.utils.toastOnUi
-import io.legado.app.utils.windowSize
 
+@Suppress("DEPRECATION")
 abstract class BaseActivity<VB : ViewBinding>(
     val fullScreen: Boolean = true,
-    private val theme: Theme = Theme.Auto,
-    private val toolBarTheme: Theme = Theme.Auto,
+    private val theme: Theme = Theme.EInk,
+    private val toolBarTheme: Theme = Theme.EInk,
     private val transparent: Boolean = false,
-    private val imageBg: Boolean = true,
+    private val imageBg: Boolean = false,
     private val showOpenMenuIcon: Boolean = true
 ) : AppCompatActivity() {
 
@@ -70,7 +64,7 @@ abstract class BaseActivity<VB : ViewBinding>(
         attrs: AttributeSet
     ): View? {
         if (AppConst.menuViewNames.contains(name) && parent?.parent is FrameLayout) {
-            (parent.parent as View).setBackgroundColor(backgroundColor)
+            (parent.parent as View).setBackgroundColor(Color.WHITE)
         }
         return super.onCreateView(parent, name, context, attrs)
     }
@@ -78,6 +72,7 @@ abstract class BaseActivity<VB : ViewBinding>(
     @SuppressLint("ObsoleteSdkInt")
     override fun onCreate(savedInstanceState: Bundle?) {
         window.decorView.disableAutoFill()
+        window.setWindowAnimations(0)
         initTheme()
         super.onCreate(savedInstanceState)
         setupSystemBar()
@@ -92,7 +87,17 @@ abstract class BaseActivity<VB : ViewBinding>(
         }
         observeLiveBus()
         onActivityCreated(savedInstanceState)
-        if (AppConfig.isEInkMode) overridePendingTransition(0, 0)
+        overridePendingTransition(0, 0)
+    }
+
+    override fun startActivity(intent: Intent?) {
+        super.startActivity(intent)
+        overridePendingTransition(0, 0)
+    }
+
+    override fun startActivity(intent: Intent?, options: Bundle?) {
+        super.startActivity(intent, null)
+        overridePendingTransition(0, 0)
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -127,7 +132,7 @@ abstract class BaseActivity<VB : ViewBinding>(
 
     final override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId == android.R.id.home) {
-            supportFinishAfterTransition()
+            finish()
             return true
         }
         return onCompatOptionsItemSelected(item)
@@ -138,63 +143,28 @@ abstract class BaseActivity<VB : ViewBinding>(
     open fun initTheme() {
         when (theme) {
             Theme.Transparent -> setTheme(R.style.AppTheme_Transparent)
-            Theme.Dark -> {
-                setTheme(R.style.AppTheme_Dark)
-               window.decorView.applyBackgroundTint(backgroundColor)
-            }
-
-            Theme.Light -> {
-                setTheme(R.style.AppTheme_Light)
-               window.decorView.applyBackgroundTint(backgroundColor)
-            }
-
             else -> {
-                if (ColorUtils.isColorLight(primaryColor)) {
-                    setTheme(R.style.AppTheme_Light)
-                } else {
-                    setTheme(R.style.AppTheme_Dark)
-                }
-               window.decorView.applyBackgroundTint(backgroundColor)
+                setTheme(R.style.AppTheme_Light)
+                window.decorView.applyBackgroundTint(Color.WHITE)
             }
         }
     }
 
     open fun upBackgroundImage() {
-        if (imageBg) {
-            try {
-                ThemeConfig.getBgImage(this, windowManager.windowSize)?.let { drawable ->
-                   window.decorView.background = drawable
-                }
-            } catch (_: OutOfMemoryError) {
-                toastOnUi("背景图片太大,内存溢出")
-            } catch (e: Exception) {
-                AppLog.put("加载背景出错\n${e.localizedMessage}", e)
-            }
-        }
+        // 原生墨水屏锁定纯白画布，不加载任何背景图
     }
 
     open fun setupSystemBar() {
         if (fullScreen && !isInMultiWindow) {
             fullScreen()
         }
-        val isTransparentStatusBar = AppConfig.isTransparentStatusBar
-        val statusBarColor = ThemeStore.statusBarColor(this, isTransparentStatusBar)
-        setStatusBarColorAuto(statusBarColor, isTransparentStatusBar, fullScreen)
-        if (toolBarTheme == Theme.Dark) {
-            setLightStatusBar(false)
-        } else if (toolBarTheme == Theme.Light) {
-            setLightStatusBar(true)
-        }
+        setStatusBarColorAuto(Color.WHITE, false, fullScreen)
+        setLightStatusBar(true)
         upNavigationBarColor()
     }
 
     open fun upNavigationBarColor() {
-        if (AppConfig.immNavigationBar) {
-            setNavigationBarColorAuto(ThemeStore.navigationBarColor(this))
-        } else {
-            val nbColor = ColorUtils.darkenColor(ThemeStore.navigationBarColor(this))
-            setNavigationBarColorAuto(nbColor)
-        }
+        setNavigationBarColorAuto(Color.WHITE)
     }
 
     open fun observeLiveBus() {
@@ -212,6 +182,6 @@ abstract class BaseActivity<VB : ViewBinding>(
     override fun finish() {
         currentFocus?.hideSoftInput()
         super.finish()
-        if (AppConfig.isEInkMode) overridePendingTransition(0, 0)
+        overridePendingTransition(0, 0)
     }
 }

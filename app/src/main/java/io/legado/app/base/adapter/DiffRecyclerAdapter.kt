@@ -12,7 +12,7 @@ import androidx.viewbinding.ViewBinding
 import splitties.views.onLongClick
 
 /**
- * Created by Invincible on 2017/12/15.
+ * DiffRecyclerAdapter（原生墨水屏模式：已禁用所有列表项加载动画与 ItemAnimator）
  */
 @Suppress("unused", "MemberVisibilityCanBePrivate")
 abstract class DiffRecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Context) :
@@ -53,6 +53,7 @@ abstract class DiffRecyclerAdapter<ITEM, VB : ViewBinding>(protected val context
     }
 
     fun bindToRecyclerView(recyclerView: RecyclerView) {
+        recyclerView.itemAnimator = null
         recyclerView.adapter = this
     }
 
@@ -112,9 +113,6 @@ abstract class DiffRecyclerAdapter<ITEM, VB : ViewBinding>(protected val context
 
     fun getItems(): List<ITEM> = asyncListDiffer.currentList
 
-    /**
-     * grid 模式下使用
-     */
     protected open fun getSpanSize(viewType: Int, position: Int) = 1
 
     final override fun getItemCount() = getItems().size
@@ -132,7 +130,6 @@ abstract class DiffRecyclerAdapter<ITEM, VB : ViewBinding>(protected val context
     final override fun onBindViewHolder(holder: ItemViewHolder, position: Int) {}
 
     open fun onCurrentListChanged() {
-        //可继承
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -168,11 +165,12 @@ abstract class DiffRecyclerAdapter<ITEM, VB : ViewBinding>(protected val context
 
     override fun onViewAttachedToWindow(holder: ItemViewHolder) {
         super.onViewAttachedToWindow(holder)
-        addAnimation(holder)
+        // 墨水屏模式禁用列表项进入动画
     }
 
     override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
         super.onAttachedToRecyclerView(recyclerView)
+        recyclerView.itemAnimator = null
         val manager = recyclerView.layoutManager
         layoutManager = manager
         if (manager is GridLayoutManager) {
@@ -184,30 +182,10 @@ abstract class DiffRecyclerAdapter<ITEM, VB : ViewBinding>(protected val context
         }
     }
 
-    private fun addAnimation(holder: ItemViewHolder) {
-        itemAnimation?.let {
-            if (it.itemAnimEnabled) {
-                if (!it.itemAnimFirstOnly || holder.layoutPosition > it.itemAnimStartPosition) {
-                    startAnimation(holder, it)
-                    it.itemAnimStartPosition = holder.layoutPosition
-                }
-            }
-        }
-    }
-
     protected open fun startAnimation(holder: ItemViewHolder, item: ItemAnimation) {
-        item.itemAnimation?.let {
-            for (anim in it.getAnimators(holder.itemView)) {
-                anim.setDuration(item.itemAnimDuration).start()
-                anim.interpolator = item.itemAnimInterpolator
-            }
-        }
+        // 墨水屏模式禁用列表项动画
     }
 
-    /**
-     * 如果使用了事件回调,回调里不要直接使用item,会出现不更新的问题,
-     * 使用getItem(holder.layoutPosition)来获取item
-     */
     abstract fun convert(
         holder: ItemViewHolder,
         binding: VB,
@@ -215,9 +193,6 @@ abstract class DiffRecyclerAdapter<ITEM, VB : ViewBinding>(protected val context
         payloads: MutableList<Any>
     )
 
-    /**
-     * 注册事件
-     */
     abstract fun registerListener(holder: ItemViewHolder, binding: VB)
 
 }
