@@ -32,16 +32,6 @@
         android:title="@string/dict_rule"
         app:iconSpaceReserved="false" />
 
-    <io.legado.app.lib.prefs.NameListPreference
-        android:defaultValue="0"
-        android:entries="@array/theme_mode"
-        android:entryValues="@array/theme_mode_v"
-        android:icon="@drawable/ic_cfg_theme"
-        android:key="themeMode"
-        android:summary="@string/theme_mode_desc"
-        android:title="@string/theme_mode"
-        app:iconSpaceReserved="false" />
-
     <io.legado.app.lib.prefs.SwitchPreference
         android:defaultValue="false"
         android:icon="@drawable/ic_cfg_web"
@@ -58,17 +48,17 @@
         app:iconSpaceReserved="false">
 
         <io.legado.app.lib.prefs.Preference
+            android:icon="@drawable/ic_cfg_theme"
+            android:key="eink_refresh_setting"
+            android:summary="配置局部刷新、全局清残影频率、阅读进度栏开关与自适应显示面积"
+            android:title="原生墨水屏与刷新设置"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
             android:icon="@drawable/ic_cfg_backup"
             android:key="web_dav_setting"
             android:summary="@string/web_dav_set_import_old"
             android:title="@string/backup_restore"
-            app:iconSpaceReserved="false" />
-
-        <io.legado.app.lib.prefs.Preference
-            android:icon="@drawable/ic_cfg_theme"
-            android:key="theme_setting"
-            android:summary="@string/theme_setting_s"
-            android:title="@string/theme_setting"
             app:iconSpaceReserved="false" />
 
         <io.legado.app.lib.prefs.Preference
