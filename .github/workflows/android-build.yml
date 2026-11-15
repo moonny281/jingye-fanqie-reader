@@ -1,4 +1,4 @@
-name: Android CI & Auto Release (Legado-E + Fanqie v0.3.1)
+name: Android CI & Auto Release (Legado-E + Fanqie v0.3.2)
 
 on:
   push:
@@ -43,7 +43,7 @@ jobs:
             RAW_VER=$(cat VERSION | tr -d '[:space:]')
           fi
           if [ -z "$RAW_VER" ]; then
-            RAW_VER="0.3.1"
+            RAW_VER="0.3.2"
           fi
           CLEAN_VER="${RAW_VER#[vV]}"
           echo "APP_VERSION_NAME=${CLEAN_VER}" >> $GITHUB_ENV

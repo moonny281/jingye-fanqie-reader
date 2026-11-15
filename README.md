@@ -1,4 +1,4 @@
-# 阅读Sigma (Legado-E) · 净页墨水屏深度优化与番茄小说全本下载聚合版 (`v0.3.1`)
+# 阅读Sigma (Legado-E) · 净页墨水屏深度优化与番茄小说全本下载聚合版 (`v0.3.2`)
 
 本项目以 **`legado-E-main`（阅读Sigma 墨水屏版）** 为主体工程，深度聚合了 **[Jees996/fanqie-novel-downloader](https://github.com/Jees996/fanqie-novel-downloader)** 番茄小说全本下载内核与 **净页 (JingYe) 海信 A7 墨水屏专属优化组件**。
 
@@ -31,7 +31,7 @@
 
 ## 🚀 GitHub Actions 自动版本号构建说明
 
-- 根目录 `VERSION` 文件当前为 `0.3.1`。
+- 根目录 `VERSION` 文件当前为 `0.3.2`。
 - 推送到 GitHub 后，`.github/workflows/android-build.yml` 会自动：
   1. 读取 `VERSION`（或 Git Tag）生成版本号；
   2. 自动下载开源中文字体（霞鹜文楷 + 思源宋体）打入 `app/src/main/assets/fonts/`；
