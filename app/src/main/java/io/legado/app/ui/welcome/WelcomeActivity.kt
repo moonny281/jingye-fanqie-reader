@@ -1,30 +1,19 @@
 package io.legado.app.ui.welcome
 
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
-import androidx.core.graphics.drawable.toDrawable
-import androidx.core.view.postDelayed
 import io.legado.app.base.BaseActivity
 import io.legado.app.constant.PreferKey
-import io.legado.app.constant.Theme
 import io.legado.app.data.appDb
 import io.legado.app.databinding.ActivityWelcomeBinding
-import io.legado.app.help.config.AppConfig
-import io.legado.app.help.config.ThemeConfig
-import io.legado.app.lib.theme.accentColor
-import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.ui.book.read.ReadBookActivity
 import io.legado.app.ui.main.MainActivity
-import io.legado.app.utils.BitmapUtils
 import io.legado.app.utils.fullScreen
 import io.legado.app.utils.getPrefBoolean
-import io.legado.app.utils.getPrefInt
-import io.legado.app.utils.getPrefString
 import io.legado.app.utils.setStatusBarColorAuto
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.viewbindingdelegate.viewBinding
-import io.legado.app.utils.visible
-import io.legado.app.utils.windowSize
 
 open class WelcomeActivity : BaseActivity<ActivityWelcomeBinding>() {
 
@@ -32,70 +21,21 @@ open class WelcomeActivity : BaseActivity<ActivityWelcomeBinding>() {
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         if (intent.flags and Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT != 0) {
-            // 避免从桌面启动程序后，会重新实例化入口类的activity
             finish()
         } else {
-            val welcomeShowTime = getPrefInt(PreferKey.welcomeShowTime, 500)
-            if (welcomeShowTime == 0) {
-                startMainActivity()
-            } else {
-                binding.root.postDelayed(welcomeShowTime.toLong()) { startMainActivity() }
-            }
+            // 墨水屏模式秒开直达主页，无启动页等待与动画
+            startMainActivity()
         }
-        binding.ivBook.setColorFilter(accentColor)
-        binding.vwTitleLine.setBackgroundColor(accentColor)
     }
 
     override fun setupSystemBar() {
         fullScreen()
-        setStatusBarColorAuto(backgroundColor, true, fullScreen)
+        setStatusBarColorAuto(Color.WHITE, true, fullScreen)
         upNavigationBarColor()
     }
 
     override fun upBackgroundImage() {
-        if (getPrefBoolean(PreferKey.customWelcome)) {
-            kotlin.runCatching {
-                when (ThemeConfig.getTheme()) {
-                    Theme.Dark -> {
-                        getPrefString(PreferKey.welcomeImageDark)?.let { path ->
-                            if (path.endsWith(".9.png")) {
-                                BitmapUtils.decodeNinePatchDrawable(path)?.let {
-                                    window.decorView.background = it
-                                }
-                            } else {
-                                val size = windowManager.windowSize
-                                BitmapUtils.decodeBitmap(path, size.widthPixels, size.heightPixels)?.let {
-                                    window.decorView.background = it.toDrawable(resources)
-                                }
-                            }
-                        }
-                        binding.tvLegado.visible(AppConfig.welcomeShowTextDark)
-                        binding.ivBook.visible(AppConfig.welcomeShowIconDark)
-                        binding.tvGzh.visible(AppConfig.welcomeShowTextDark)
-                        return
-                    }
-                    else -> {
-                        getPrefString(PreferKey.welcomeImage)?.let { path ->
-                            if (path.endsWith(".9.png")) {
-                                BitmapUtils.decodeNinePatchDrawable(path)?.let {
-                                    window.decorView.background = it
-                                }
-                            } else {
-                                val size = windowManager.windowSize
-                                BitmapUtils.decodeBitmap(path, size.widthPixels, size.heightPixels)?.let {
-                                    window.decorView.background = it.toDrawable(resources)
-                                }
-                            }
-                        }
-                        binding.tvLegado.visible(AppConfig.welcomeShowText)
-                        binding.ivBook.visible(AppConfig.welcomeShowIcon)
-                        binding.tvGzh.visible(AppConfig.welcomeShowText)
-                        return
-                    }
-                }
-            }
-        }
-        super.upBackgroundImage()
+        // 锁定纯白墨水屏背景
     }
 
     private fun startMainActivity() {
@@ -104,6 +44,7 @@ open class WelcomeActivity : BaseActivity<ActivityWelcomeBinding>() {
             startActivity<ReadBookActivity>()
         }
         finish()
+        overridePendingTransition(0, 0)
     }
 
 }
