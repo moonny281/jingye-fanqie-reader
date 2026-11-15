@@ -164,214 +164,177 @@
         <!-- 书籍详情页 -->
         <activity
             android:name=".ui.book.info.BookInfoActivity"
-            android:exported="false"
             android:launchMode="singleTop" />
         <!-- 书籍信息编辑 -->
         <activity
             android:name=".ui.book.info.edit.BookInfoEditActivity"
-            android:exported="false"
             android:launchMode="singleTask" />
         <!-- 音频播放界面 -->
         <activity
             android:name="io.legado.app.ui.book.audio.AudioPlayActivity"
-            android:exported="false"
             android:launchMode="singleTask" />
         <!-- 视频播放器界面 -->
         <activity
             android:name="io.legado.app.ui.video.VideoPlayerActivity"
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
-            android:exported="false"
             android:launchMode="singleTask" />
         <!-- 授权界面 -->
         <activity
             android:name="io.legado.app.lib.permission.PermissionActivity"
-            android:exported="false"
             android:theme="@style/Activity.Permission" />
         <!-- 二维码扫描 -->
         <activity
             android:name=".ui.qrcode.QrCodeActivity"
-            android:exported="false"
             android:launchMode="singleTask" />
         <!-- 规则订阅 -->
         <activity
             android:name=".ui.rss.subscription.RuleSubActivity"
-            android:exported="false"
             android:launchMode="singleTask" />
         <!-- 书源编辑 -->
         <activity
             android:name=".ui.book.source.edit.BookSourceEditActivity"
             android:configChanges="locale|keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout"
-            android:exported="false"
             android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize|stateHidden" />
         <!-- 订阅源编辑 -->
         <activity
             android:name=".ui.rss.source.edit.RssSourceEditActivity"
             android:configChanges="locale|keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout"
-            android:exported="false"
             android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize|stateHidden" />
         <!-- 替换规则编辑 -->
         <activity
             android:name=".ui.replace.edit.ReplaceEditActivity"
             android:configChanges="locale|keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout"
-            android:exported="false"
             android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize|stateHidden" />
         <!-- 代码文本编辑 -->
         <activity
             android:name=".ui.code.CodeEditActivity"
             android:configChanges="locale|keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout"
-            android:exported="false"
             android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize|stateHidden" />
         <!-- 配置界面 -->
         <activity
             android:name=".ui.config.ConfigActivity"
-            android:exported="false"
             android:launchMode="standard" />
         <!-- 搜索界面 -->
         <activity
             android:name=".ui.book.search.SearchActivity"
-            android:exported="false"
             android:launchMode="standard" />
         <!-- 关于界面 -->
         <activity
             android:name=".ui.about.AboutActivity"
-            android:exported="false"
             android:launchMode="singleTask"
             android:screenOrientation="behind" />
         <!-- 书源管理 -->
         <activity
             android:name=".ui.book.source.manage.BookSourceActivity"
-            android:exported="false"
             android:launchMode="singleTop"
             android:screenOrientation="behind" />
         <!-- 订阅源管理 -->
         <activity
             android:name=".ui.rss.source.manage.RssSourceActivity"
-            android:exported="false"
             android:launchMode="singleTop"
             android:screenOrientation="behind" />
         <!-- txt目录规则管理 -->
         <activity
             android:name=".ui.book.toc.rule.TxtTocRuleActivity"
-            android:exported="false"
             android:launchMode="singleTop"
             android:screenOrientation="behind" />
         <!-- 替换规则界面 -->
         <activity
             android:name=".ui.replace.ReplaceRuleActivity"
-            android:exported="false"
             android:launchMode="singleTop"
             android:screenOrientation="behind" />
         <!-- 书籍管理 -->
         <activity
             android:name=".ui.book.manage.BookshelfManageActivity"
-            android:exported="false"
             android:launchMode="singleTop"
             android:screenOrientation="behind" />
         <!-- 书源调试 -->
         <activity
             android:name=".ui.book.source.debug.BookSourceDebugActivity"
-            android:exported="false"
             android:launchMode="singleTop"
             android:screenOrientation="behind" />
         <!-- 目录 -->
         <activity
             android:name=".ui.book.toc.TocActivity"
-            android:exported="false"
             android:launchMode="singleTop"
             android:screenOrientation="behind" />
         <!-- 正文搜索 -->
         <activity
             android:name=".ui.book.searchContent.SearchContentActivity"
-            android:exported="false"
             android:launchMode="singleTop"
             android:screenOrientation="behind" />
         <!-- RSS条目 -->
         <activity
             android:name=".ui.rss.article.RssSortActivity"
-            android:exported="false"
             android:launchMode="singleTop" />
         <!-- RSS阅读 -->
         <activity
             android:name=".ui.rss.read.ReadRssActivity"
             android:configChanges="orientation|screenSize"
-            android:exported="false"
             android:hardwareAccelerated="true"
             android:launchMode="standard" />
         <!-- 导入书籍 -->
         <activity
             android:name=".ui.book.import.local.ImportBookActivity"
-            android:exported="false"
             android:launchMode="singleTop" />
         <!-- 添加远程 -->
         <activity
             android:name=".ui.book.import.remote.RemoteBookActivity"
-            android:exported="false"
             android:launchMode="singleTop" />
         <!-- 发现界面 -->
         <activity
             android:name=".ui.book.explore.ExploreShowActivity"
-            android:exported="false"
             android:launchMode="singleTop" />
         <!-- 订阅源调试 -->
         <activity
             android:name=".ui.rss.source.debug.RssSourceDebugActivity"
-            android:exported="false"
             android:launchMode="singleTop" />
         <!-- Rss收藏 -->
         <activity
             android:name=".ui.rss.favorites.RssFavoritesActivity"
-            android:exported="false"
             android:launchMode="singleTop" />
         <!-- 书签 -->
         <activity
             android:name=".ui.book.bookmark.AllBookmarkActivity"
-            android:exported="false"
             android:launchMode="singleTop" />
         <!-- 缓存界面 -->
         <activity
             android:name=".ui.book.cache.CacheActivity"
-            android:exported="false"
             android:launchMode="singleTop" />
         <!-- WebView界面 -->
         <activity
             android:name=".ui.browser.WebViewActivity"
             android:configChanges="locale|keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout"
-            android:exported="false"
             android:launchMode="standard" />
         <!-- 书源登录 -->
         <activity
             android:name="io.legado.app.ui.login.SourceLoginActivity"
             android:configChanges="orientation|screenSize"
-            android:exported="false"
             android:hardwareAccelerated="true"
             android:theme="@style/AppTheme.Transparent" />
         <!-- 阅读记录 -->
         <activity
             android:name=".ui.about.ReadRecordActivity"
             android:configChanges="orientation|screenSize"
-            android:exported="false"
             android:hardwareAccelerated="true" />
         <!-- 字典管理 -->
         <activity
             android:name=".ui.dict.rule.DictRuleActivity"
             android:configChanges="orientation|screenSize"
-            android:exported="false"
             android:hardwareAccelerated="true" />
         <!-- 文件管理 -->
         <activity
             android:name=".ui.file.FileManageActivity"
             android:configChanges="orientation|screenSize"
-            android:exported="false"
             android:hardwareAccelerated="true" />
         <!-- 选择文件 -->
         <activity
             android:name=".ui.file.HandleFileActivity"
             android:configChanges="orientation|screenSize"
-            android:exported="false"
             android:hardwareAccelerated="true"
             android:theme="@style/AppTheme.Transparent" />
         <!-- 文字处理 -->
@@ -415,13 +378,11 @@
         <activity
             android:name=".ui.association.VerificationCodeActivity"
             android:configChanges="locale|keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout"
-            android:exported="false"
             android:theme="@style/AppTheme.Transparent" />
         <!-- 跳转确认 -->
         <activity
             android:name=".ui.association.OpenUrlConfirmActivity"
             android:configChanges="locale|keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout"
-            android:exported="false"
             android:theme="@style/AppTheme.Transparent" />
         <!-- 打开文件 -->
         <activity
@@ -516,19 +477,15 @@
 
         <service
             android:name=".service.CheckSourceService"
-            android:exported="false"
             android:foregroundServiceType="dataSync" />
         <service
             android:name=".service.CacheBookService"
-            android:exported="false"
             android:foregroundServiceType="dataSync" />
         <service
             android:name=".service.ExportBookService"
-            android:exported="false"
             android:foregroundServiceType="dataSync" />
         <service
             android:name=".service.WebService"
-            android:exported="false"
             android:foregroundServiceType="dataSync" />
         <service
             android:name=".service.WebTileService"
@@ -544,23 +501,18 @@
         </service>
         <service
             android:name=".service.TTSReadAloudService"
-            android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
         <service
             android:name=".service.HttpReadAloudService"
-            android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
         <service
             android:name=".service.AudioPlayService"
-            android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
         <service
             android:name=".service.VideoPlayService"
-            android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
         <service
             android:name=".service.DownloadService"
-            android:exported="false"
             android:foregroundServiceType="dataSync" />
 
         <receiver
@@ -590,7 +542,7 @@
         <meta-data
             android:name="channel"
             android:value="${APP_CHANNEL_VALUE}" />
-
+    
         <!-- 番茄搜书与后台断点下载中心 -->
         <activity
             android:name=".ui.fanqie.FanqieActivity"
@@ -598,7 +550,7 @@
             android:screenOrientation="portrait"
             android:windowSoftInputMode="stateHidden|adjustResize" />
 
-        <!-- 海信 AI 墨水屏刷新与残影实验室 -->
+        <!-- 海信 A7 墨水屏刷新与残影实验室 -->
         <activity
             android:name=".eink.EpdDebugActivity"
             android:exported="false"
