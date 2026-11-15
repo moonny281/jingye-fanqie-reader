@@ -51,8 +51,8 @@
     "tipFooterLeft": 6,
     "tipFooterMiddle": 0,
     "tipFooterRight": 10,
-    "tipColor": -16777216,
-    "tipDividerColor": -16777216,
+    "tipColor": 0,
+    "tipDividerColor": 0,
     "headerMode": 1,
     "footerMode": 0
   },
@@ -108,8 +108,8 @@
     "tipFooterLeft": 6,
     "tipFooterMiddle": 0,
     "tipFooterRight": 10,
-    "tipColor": -16777216,
-    "tipDividerColor": -16777216,
+    "tipColor": 0,
+    "tipDividerColor": 0,
     "headerMode": 1,
     "footerMode": 0
   },
@@ -165,8 +165,8 @@
     "tipFooterLeft": 6,
     "tipFooterMiddle": 0,
     "tipFooterRight": 10,
-    "tipColor": -16777216,
-    "tipDividerColor": -16777216,
+    "tipColor": 0,
+    "tipDividerColor": 0,
     "headerMode": 1,
     "footerMode": 0
   },
@@ -222,8 +222,8 @@
     "tipFooterLeft": 6,
     "tipFooterMiddle": 0,
     "tipFooterRight": 10,
-    "tipColor": -16777216,
-    "tipDividerColor": -16777216,
+    "tipColor": 0,
+    "tipDividerColor": 0,
     "headerMode": 1,
     "footerMode": 0
   },
@@ -279,8 +279,8 @@
     "tipFooterLeft": 6,
     "tipFooterMiddle": 0,
     "tipFooterRight": 10,
-    "tipColor": -16777216,
-    "tipDividerColor": -16777216,
+    "tipColor": 0,
+    "tipDividerColor": 0,
     "headerMode": 1,
     "footerMode": 0
   },
@@ -336,8 +336,8 @@
     "tipFooterLeft": 6,
     "tipFooterMiddle": 0,
     "tipFooterRight": 10,
-    "tipColor": -16777216,
-    "tipDividerColor": -16777216,
+    "tipColor": 0,
+    "tipDividerColor": 0,
     "headerMode": 1,
     "footerMode": 0
   }

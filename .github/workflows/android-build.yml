@@ -39,7 +39,7 @@ jobs:
           if [ -f "VERSION" ]; then
             RAW_VERSION=$(head -n 1 VERSION | tr -d '[:space:]')
           else
-            RAW_VERSION="0.4.0"
+            RAW_VERSION="0.4.1"
           fi
           CLEAN_VERSION="${RAW_VERSION#v}"
           echo "version=${CLEAN_VERSION}" >> "$GITHUB_OUTPUT"

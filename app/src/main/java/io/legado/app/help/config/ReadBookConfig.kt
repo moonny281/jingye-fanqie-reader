@@ -40,8 +40,8 @@ import androidx.core.graphics.drawable.toDrawable
 @Suppress("ConstPropertyName")
 @Keep
 object ReadBookConfig {
-    const val configFileName = "readConfig_v040.json"
-    const val shareConfigFileName = "shareReadConfig_v040.json"
+    const val configFileName = "readConfig.json"
+    const val shareConfigFileName = "shareReadConfig.json"
     val configFilePath = FileUtils.getPath(appCtx.filesDir, configFileName)
     val shareConfigFilePath = FileUtils.getPath(appCtx.filesDir, shareConfigFileName)
     val configList: ArrayList<Config> = arrayListOf()
@@ -76,6 +76,12 @@ object ReadBookConfig {
     }
 
     fun initConfigs() {
+        val migPref = appCtx.getSharedPreferences("eink_refresh_prefs", android.content.Context.MODE_PRIVATE)
+        if (!migPref.getBoolean("migrated_read_config_v041", false)) {
+            FileUtils.delete(configFilePath)
+            FileUtils.delete(shareConfigFilePath)
+            migPref.edit().putBoolean("migrated_read_config_v041", true).apply()
+        }
         val configFile = File(configFilePath)
         var configs: List<Config>? = null
         if (configFile.exists()) {
@@ -89,6 +95,8 @@ object ReadBookConfig {
         (configs ?: DefaultData.readConfigs).let {
             configList.clear()
             configList.addAll(it)
+            if (readStyleSelect !in configList.indices) readStyleSelect = 0
+            if (comicStyleSelect !in configList.indices) comicStyleSelect = 0
         }
     }
 

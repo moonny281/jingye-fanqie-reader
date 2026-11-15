@@ -204,17 +204,12 @@ class ReadMenu @JvmOverloads constructor(
         if (AppConfig.isEInkMode) {
             titleBar.setBackgroundResource(R.drawable.bg_eink_border_bottom)
             llBottomBg.setBackgroundResource(R.drawable.bg_eink_border_top)
-        } else {
-            if (AppConfig.isEInkMode) {
-            titleBar.setBackgroundResource(R.drawable.bg_eink_border_bottom)
-            llBottomBg.setBackgroundResource(R.drawable.bg_eink_border_top)
             llFloatingButton.gone()
             llBrightness.gone()
             llEinkQuickBar.visible()
         } else {
             llBottomBg.setBackgroundColor(bgColor)
             llEinkQuickBar.gone()
-        }
         }
         fabSearch.backgroundTintList = bottomBackgroundList
         fabSearch.setColorFilter(textColor)

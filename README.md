@@ -1,8 +1,8 @@
-# 阅读Sigma (`legado-E`) × 番茄小说墨水屏原生聚合版 (`v0.4.0`)
+# 阅读Sigma (`legado-E`) × 番茄小说墨水屏原生聚合版 (`v0.4.1`)
 
 本工程以 **`legado-E`（阅读 Sigma 墨水屏版）** 为主体框架，深度内嵌 **[Jees996/fanqie-novel-downloader](https://github.com/Jees996/fanqie-novel-downloader)** 番茄小说全本搜书/解密引擎，并针对 **海信 A7（20:9）** 等电子墨水屏设备完成了原生级 UI 重绘与无缝阅读衔接。
 
-## v0.4.0 核心修复与升级亮点
+## v0.4.1 核心修复与升级亮点
 
 1. **彻底修复阅读时反复检查更新与弹出屏幕测试格 Bug**
    - 清理了 `ReadBookActivity.upMenu()` 遍历菜单项时的误触发分支，确保翻章、打开书籍或刷新菜单时绝不自动请求更新或弹出测试界面。
