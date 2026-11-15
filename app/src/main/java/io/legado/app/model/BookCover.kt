@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 import androidx.annotation.Keep
+import androidx.core.graphics.drawable.toDrawable
 import com.bumptech.glide.Glide
 import com.bumptech.glide.RequestBuilder
 import com.bumptech.glide.load.DataSource
@@ -12,7 +13,6 @@ import com.bumptech.glide.load.Transformation
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.load.engine.GlideException
 import com.bumptech.glide.load.resource.bitmap.CenterCrop
-import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.bumptech.glide.request.RequestListener
 import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.Target
@@ -38,7 +38,6 @@ import io.legado.app.utils.getPrefString
 import kotlinx.coroutines.currentCoroutineContext
 import splitties.init.appCtx
 import java.io.File
-import androidx.core.graphics.drawable.toDrawable
 
 @Keep
 @Suppress("ConstPropertyName")
@@ -54,31 +53,22 @@ object BookCover {
     lateinit var defaultDrawable: Drawable
         private set
 
-
     init {
         upDefaultCover()
     }
 
     @SuppressLint("UseCompatLoadingForDrawables")
     fun upDefaultCover() {
-        var path: String?
-        val isNightTheme = AppConfig.isNightTheme
-        if (isNightTheme) {
-            drawBookName = appCtx.getPrefBoolean(PreferKey.coverShowNameN, true)
-            drawBookAuthor = appCtx.getPrefBoolean(PreferKey.coverShowAuthorN, true)
-            path = appCtx.getPrefString(PreferKey.defaultCoverDark)
-        } else {
-            drawBookName = appCtx.getPrefBoolean(PreferKey.coverShowName, true)
-            drawBookAuthor = appCtx.getPrefBoolean(PreferKey.coverShowAuthor, true)
-            path = appCtx.getPrefString(PreferKey.defaultCover)
-        }
+        drawBookName = appCtx.getPrefBoolean(PreferKey.coverShowName, true)
+        drawBookAuthor = appCtx.getPrefBoolean(PreferKey.coverShowAuthor, true)
+        val path = appCtx.getPrefString(PreferKey.defaultCover)
         defaultDrawable = runCatching {
             BitmapUtils.decodeBitmap(path!!, 600, 900)!!.toDrawable(appCtx.resources)
         }.getOrDefault(appCtx.resources.getDrawable(R.drawable.image_cover_default, null))
     }
 
     /**
-     * 加载封面
+     * 加载封面（墨水屏模式禁用渐变淡入动画 dontAnimate）
      */
     fun load(
         context: Context,
@@ -89,6 +79,7 @@ object BookCover {
     ): RequestBuilder<Drawable> {
         if (AppConfig.useDefaultCover) {
             return ImageLoader.load(context, defaultDrawable)
+                .dontAnimate()
                 .centerCrop()
         }
         var options = RequestOptions().set(OkHttpModelLoader.loadOnlyWifiOption, loadOnlyWifi)
@@ -97,6 +88,7 @@ object BookCover {
         }
         var builder = ImageLoader.load(context, path)
             .apply(options)
+            .dontAnimate()
         if (onLoadFinish != null) {
             builder = builder.addListener(object : RequestListener<Drawable> {
                 override fun onLoadFailed(
@@ -123,11 +115,12 @@ object BookCover {
         }
         return builder.placeholder(defaultDrawable)
             .error(defaultDrawable)
+            .dontAnimate()
             .centerCrop()
     }
 
     /**
-     * 加载漫画图片
+     * 加载漫画图片（禁用动画）
      */
     fun loadManga(
         context: Context,
@@ -143,6 +136,7 @@ object BookCover {
         }
         return ImageLoader.load(context, path)
             .apply(options)
+            .dontAnimate()
             .override(context.resources.displayMetrics.widthPixels, SIZE_ORIGINAL)
             .diskCacheStrategy(DiskCacheStrategy.ALL)
             .skipMemoryCache(true).let {
@@ -172,7 +166,7 @@ object BookCover {
     }
 
     /**
-     * 加载模糊封面
+     * 加载模糊封面（墨水屏模式移除 1500ms crossFade 渐变动画，避免连续刷屏残影）
      */
     fun loadBlur(
         context: Context,
@@ -181,6 +175,7 @@ object BookCover {
         sourceOrigin: String? = null,
     ): RequestBuilder<Drawable> {
         val loadBlur = ImageLoader.load(context, defaultDrawable)
+            .dontAnimate()
             .transform(BlurTransformation(25), CenterCrop())
         if (AppConfig.useDefaultCover) {
             return loadBlur
@@ -191,8 +186,8 @@ object BookCover {
         }
         return ImageLoader.load(context, path)
             .apply(options)
+            .dontAnimate()
             .transform(BlurTransformation(25), CenterCrop())
-            .transition(DrawableTransitionOptions.withCrossFade(1500))
             .thumbnail(loadBlur)
     }
 
