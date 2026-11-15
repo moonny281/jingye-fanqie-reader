@@ -341,6 +341,22 @@
                         android:textColor="@color/primaryText"
                         android:textSize="15sp" />
 
+                    <TextView
+                        android:id="@+id/tv_fanqie_info_action"
+                        android:layout_width="0dp"
+                        android:layout_height="50dp"
+                        android:layout_weight="1.1"
+                        android:background="@drawable/bg_eink_button_outline"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:text="检测更新 / 续下"
+                        android:textColor="@color/primaryText"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
+
                     <io.legado.app.ui.widget.text.AccentBgTextView
                         android:id="@+id/tv_read"
                         android:layout_width="0dp"
