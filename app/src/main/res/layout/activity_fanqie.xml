@@ -15,7 +15,9 @@
 
         <Button
             android:id="@+id/btnBack"
-            style="@style/Widget.Jingye.Button.Outline"
+            android:background="@drawable/bg_eink_button_outline"
+                android:textColor="@color/selector_eink_text"
+                android:textStyle="bold"
             android:layout_width="wrap_content"
             android:layout_height="36dp"
             android:minHeight="0dp"
@@ -37,7 +39,9 @@
 
         <Button
             android:id="@+id/btnToggleConfig"
-            style="@style/Widget.Jingye.Button.Outline"
+            android:background="@drawable/bg_eink_button_outline"
+                android:textColor="@color/selector_eink_text"
+                android:textStyle="bold"
             android:layout_width="wrap_content"
             android:layout_height="34dp"
             android:minHeight="0dp"
@@ -87,7 +91,9 @@
 
             <Button
                 android:id="@+id/btnSearchBook"
-                style="@style/Widget.Jingye.Button.Solid"
+                android:background="@drawable/bg_eink_button_solid"
+                android:textColor="@color/selector_eink_text_solid"
+                android:textStyle="bold"
                 android:layout_width="0dp"
                 android:layout_height="38dp"
                 android:layout_weight="1.3"
@@ -96,7 +102,9 @@
 
             <Button
                 android:id="@+id/btnParseBook"
-                style="@style/Widget.Jingye.Button.Outline"
+                android:background="@drawable/bg_eink_button_outline"
+                android:textColor="@color/selector_eink_text"
+                android:textStyle="bold"
                 android:layout_width="0dp"
                 android:layout_height="38dp"
                 android:layout_weight="1"
@@ -106,7 +114,9 @@
 
             <Button
                 android:id="@+id/btnPasteClipboard"
-                style="@style/Widget.Jingye.Button.Outline"
+                android:background="@drawable/bg_eink_button_outline"
+                android:textColor="@color/selector_eink_text"
+                android:textStyle="bold"
                 android:layout_width="wrap_content"
                 android:layout_height="38dp"
                 android:minWidth="0dp"
@@ -118,7 +128,9 @@
 
             <Button
                 android:id="@+id/btnClearInput"
-                style="@style/Widget.Jingye.Button.Outline"
+                android:background="@drawable/bg_eink_button_outline"
+                android:textColor="@color/selector_eink_text"
+                android:textStyle="bold"
                 android:layout_width="wrap_content"
                 android:layout_height="38dp"
                 android:minWidth="0dp"
@@ -177,7 +189,9 @@
 
         <Button
             android:id="@+id/btnSaveServer"
-            style="@style/Widget.Jingye.Button.Outline"
+            android:background="@drawable/bg_eink_button_outline"
+                android:textColor="@color/selector_eink_text"
+                android:textStyle="bold"
             android:layout_width="match_parent"
             android:layout_height="36dp"
             android:layout_marginTop="8dp"
@@ -219,7 +233,9 @@
 
             <Button
                 android:id="@+id/btnBackToSearch"
-                style="@style/Widget.Jingye.Button.Outline"
+                android:background="@drawable/bg_eink_button_outline"
+                android:textColor="@color/selector_eink_text"
+                android:textStyle="bold"
                 android:layout_width="wrap_content"
                 android:layout_height="30dp"
                 android:minHeight="0dp"
@@ -292,7 +308,9 @@
 
             <Button
                 android:id="@+id/btnDownloadBook"
-                style="@style/Widget.Jingye.Button.Solid"
+                android:background="@drawable/bg_eink_button_solid"
+                android:textColor="@color/selector_eink_text_solid"
+                android:textStyle="bold"
                 android:layout_width="0dp"
                 android:layout_height="40dp"
                 android:layout_weight="1"
@@ -301,7 +319,9 @@
 
             <Button
                 android:id="@+id/btnPauseDownload"
-                style="@style/Widget.Jingye.Button.Outline"
+                android:background="@drawable/bg_eink_button_outline"
+                android:textColor="@color/selector_eink_text"
+                android:textStyle="bold"
                 android:layout_width="wrap_content"
                 android:layout_height="40dp"
                 android:layout_marginStart="8dp"
@@ -313,7 +333,9 @@
 
             <Button
                 android:id="@+id/btnOpenDownloadedBook"
-                style="@style/Widget.Jingye.Button.Outline"
+                android:background="@drawable/bg_eink_button_outline"
+                android:textColor="@color/selector_eink_text"
+                android:textStyle="bold"
                 android:layout_width="wrap_content"
                 android:layout_height="40dp"
                 android:layout_marginStart="8dp"

@@ -1,22 +1,17 @@
-name: Build & Release JingYe E-Ink Reader
+name: Android CI & Auto Release (Legado-E + Fanqie v0.3.1)
 
 on:
   push:
-    branches: [ "main", "master" ]
-    tags: [ "v*" ]
+    branches: [ main, master ]
+    tags: [ 'v*', 'V*' ]
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [ main, master ]
   workflow_dispatch:
     inputs:
       custom_version:
-        description: "自定义版本号（留空则自动从 Git Tag / VERSION / build.gradle.kts 读取）"
+        description: '自定义版本号（留空则自动从 Tag / VERSION 文件读取）'
         required: false
-        default: ""
-      publish_release:
-        description: "构建完成后自动发布/更新到 GitHub Releases"
-        required: false
-        type: boolean
-        default: true
+        default: ''
 
 permissions:
   contents: write
@@ -26,227 +21,117 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-android:
-    name: Auto-Version & Build APK (Hisense A7 E-Ink)
+  build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Repository
+      - name: Checkout Source Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Auto-Detect Version Name & Version Code
+      - name: Auto Resolve Version Name & Code
         id: version
         shell: bash
         run: |
-          set -euo pipefail
-
-          INPUT_VER="${{ github.event.inputs.custom_version }}"
-          REF_NAME="${GITHUB_REF_NAME:-}"
-
-          if [ -n "$INPUT_VER" ]; then
-            RAW_VER="$INPUT_VER"
-            SOURCE="workflow_dispatch input"
-          elif [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
-            RAW_VER="${REF_NAME#v}"
-            SOURCE="git tag ($REF_NAME)"
-          elif [ -f "VERSION" ] && [ -n "$(tr -d '[:space:]' < VERSION)" ]; then
-            RAW_VER="$(head -n 1 VERSION | tr -d '[:space:]')"
-            SOURCE="VERSION file"
-          else
-            RAW_VER=$(python3 -c 'import re,pathlib; m=re.search(r"\"([0-9]+\.[0-9]+\.[0-9]+[^\"]*)\"", pathlib.Path("app/build.gradle.kts").read_text(encoding="utf-8")); print(m.group(1) if m else "0.3.0")')
-            SOURCE="app/build.gradle.kts"
+          set -e
+          RAW_VER=""
+          if [ -n "${{ github.event.inputs.custom_version }}" ]; then
+            RAW_VER="${{ github.event.inputs.custom_version }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            RAW_VER="${GITHUB_REF#refs/tags/}"
+          elif [ -f "VERSION" ]; then
+            RAW_VER=$(cat VERSION | tr -d '[:space:]')
           fi
-
-          VERSION_NAME="${RAW_VER#v}"
-
-          IFS='.-_' read -r MAJOR MINOR PATCH _ <<< "$VERSION_NAME"
-          MAJOR=${MAJOR//[^0-9]/}; MAJOR=${MAJOR:-0}
-          MINOR=${MINOR//[^0-9]/}; MINOR=${MINOR:-3}
-          PATCH=${PATCH//[^0-9]/}; PATCH=${PATCH:-0}
-
-          SEMVER_BASE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
-          RUN_NUM=${GITHUB_RUN_NUMBER:-1}
-          VERSION_CODE=$(( SEMVER_BASE * 1000 + (RUN_NUM % 1000) ))
-          if [ "$VERSION_CODE" -le 0 ]; then
-            VERSION_CODE="$RUN_NUM"
+          if [ -z "$RAW_VER" ]; then
+            RAW_VER="0.3.1"
           fi
-
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          TAG_NAME="v${VERSION_NAME}"
-
-          echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
-          echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
-          echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
-          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-          echo "source=${SOURCE}" >> "$GITHUB_OUTPUT"
-
-          echo "=================================================="
-          echo "  Resolved Version Name : ${VERSION_NAME} (from ${SOURCE})"
-          echo "  Resolved Version Code : ${VERSION_CODE}"
-          echo "  Release Tag           : ${TAG_NAME}"
-          echo "  Commit SHA            : ${SHORT_SHA}"
-          echo "=================================================="
-
-      - name: Bundle Open-Source Chinese E-Ink Fonts into APK Assets
-        shell: bash
-        run: |
-          mkdir -p app/src/main/assets/fonts
-          echo "Downloading open-source Chinese reading fonts (LXGW WenKai & Noto Serif SC)..."
-          curl -fL --connect-timeout 15 --max-time 120 \
-            "https://github.com/lxgw/LxgwWenKai-Lite/releases/download/v1.500/LXGWWenKaiLite-Regular.ttf" \
-            -o app/src/main/assets/fonts/wenkai.ttf || rm -f app/src/main/assets/fonts/wenkai.ttf
-          curl -fL --connect-timeout 15 --max-time 120 \
-            "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Serif/OTF/SimplifiedChinese/NotoSerifCJKsc-Regular.otf" \
-            -o app/src/main/assets/fonts/serif.otf || rm -f app/src/main/assets/fonts/serif.otf
-          ls -lh app/src/main/assets/fonts/ || true
+          CLEAN_VER="${RAW_VER#[vV]}"
+          echo "APP_VERSION_NAME=${CLEAN_VER}" >> $GITHUB_ENV
+          echo "version_name=${CLEAN_VER}" >> $GITHUB_OUTPUT
+          echo "tag_name=v${CLEAN_VER}" >> $GITHUB_OUTPUT
+          echo "Resolved Version: ${CLEAN_VER}"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
           distribution: 'temurin'
+          java-version: '17'
 
-      - name: Configure Pre-installed Android SDK & Accept Licenses
+      - name: Configure Android SDK & Licenses
         shell: bash
         run: |
-          set -euo pipefail
-          SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
-          if [ ! -d "$SDK_DIR" ]; then
-            echo "Error: Android SDK directory not found at $SDK_DIR"
-            exit 1
-          fi
-          echo "ANDROID_HOME=$SDK_DIR" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=$SDK_DIR" >> "$GITHUB_ENV"
+          set -e
+          SDK_DIR="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          export ANDROID_HOME="$SDK_DIR"
+          export ANDROID_SDK_ROOT="$SDK_DIR"
+          echo "ANDROID_HOME=$SDK_DIR" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$SDK_DIR" >> $GITHUB_ENV
+          mkdir -p "$SDK_DIR/licenses"
+          printf "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$SDK_DIR/licenses/android-sdk-license"
+          printf "\n84831b9409646a918e30573bab4c9c91346d8abd" > "$SDK_DIR/licenses/android-sdk-preview-license"
+          printf "\nd975f751698a77b662f1254ddbeed3901e976f5a" > "$SDK_DIR/licenses/intel-android-extra-license"
           echo "sdk.dir=$SDK_DIR" > local.properties
 
-          mkdir -p "$SDK_DIR/licenses"
-          printf "\n24333f8a63b6825ea9c5514f83c2829b004d1fee\nd56f5187479451eabf01fb78af6dfcb131a6481e\n8933bad161af4178b1185d1a37fbf41ea5269c55\n" > "$SDK_DIR/licenses/android-sdk-license"
-          printf "\n84831b9409646a918e30573bab4c9c91346d8abd\n" > "$SDK_DIR/licenses/android-sdk-preview-license"
-          echo "Configured Android SDK at: $SDK_DIR"
-
-      - name: Setup Gradle 8.4
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.4'
-
-      - name: Decode Optional Custom Keystore (If Configured in Secrets)
-        env:
-          SIGNING_KEY_BASE64: ${{ secrets.SIGNING_KEY_BASE64 }}
+      - name: Bundle Open-Source E-Ink Reading Fonts (霞鹜文楷 & 思源宋体)
+        shell: bash
         run: |
-          if [ -n "${SIGNING_KEY_BASE64:-}" ]; then
-            echo "$SIGNING_KEY_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
-            echo "SIGNING_STORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
-            echo "SIGNING_STORE_PASSWORD=${{ secrets.SIGNING_STORE_PASSWORD }}" >> "$GITHUB_ENV"
-            echo "SIGNING_KEY_ALIAS=${{ secrets.SIGNING_KEY_ALIAS }}" >> "$GITHUB_ENV"
-            echo "SIGNING_KEY_PASSWORD=${{ secrets.SIGNING_KEY_PASSWORD }}" >> "$GITHUB_ENV"
-            echo "Using custom release keystore from GitHub Secrets."
-          else
-            echo "No custom keystore secret set; using built-in default signing config."
+          mkdir -p app/src/main/assets/fonts
+          curl -L --retry 3 --connect-timeout 20 -o app/src/main/assets/fonts/wenkai.ttf \
+            "https://github.com/lxgw/LxgwWenKai-Lite/releases/download/v1.500/LXGWWenKaiLite-Regular.ttf" || true
+          curl -L --retry 3 --connect-timeout 20 -o app/src/main/assets/fonts/serif.otf \
+            "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Serif/OTF/SimplifiedChinese/NotoSerifCJKsc-Regular.otf" || true
+          ls -lh app/src/main/assets/fonts/
+
+      - name: Configure APK Signing (legado.jks)
+        shell: bash
+        run: |
+          echo "" > app/src/main/assets/18PlusList.txt
+          if [ -f ".github/workflows/legado.jks" ]; then
+            cp .github/workflows/legado.jks app/legado.jks
+            cat >> gradle.properties << 'EOF'
+
+          RELEASE_STORE_FILE=./legado.jks
+          RELEASE_KEY_ALIAS=legado
+          RELEASE_STORE_PASSWORD=gedoor_legado
+          RELEASE_KEY_PASSWORD=gedoor_legado
+          EOF
           fi
 
-      - name: Build Debug & Signed Release APKs with Auto-Detected Version
-        run: |
-          gradle assembleDebug assembleRelease \
-            -PversionName="${{ steps.version.outputs.version_name }}" \
-            -PversionCode="${{ steps.version.outputs.version_code }}" \
-            --no-daemon --stacktrace
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
 
-      - name: Collect & Rename Versioned APKs and Generate SHA-256 Checksums
-        id: artifacts
+      - name: Build Signed Release APK
+        shell: bash
         run: |
+          chmod +x gradlew
+          ./gradlew assembleAppRelease \
+            -PappVersionName="${{ steps.version.outputs.version_name }}" \
+            --build-cache --parallel --daemon --stacktrace
           mkdir -p dist
-          VER="${{ steps.version.outputs.version_name }}"
-          CODE="${{ steps.version.outputs.version_code }}"
+          find app/build/outputs/apk -name "*.apk" -exec cp {} dist/ \;
+          ls -lh dist/
 
-          REL_SRC=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
-          DBG_SRC=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
-
-          REL_OUT="dist/jingye-reader-v${VER}-release.apk"
-          DBG_OUT="dist/jingye-reader-v${VER}-debug.apk"
-
-          cp "$REL_SRC" "$REL_OUT"
-          cp "$DBG_SRC" "$DBG_OUT"
-
-          (cd dist && sha256sum *.apk > SHA256SUMS.txt)
-          cat dist/SHA256SUMS.txt
-
-          echo "release_apk=${REL_OUT}" >> "$GITHUB_OUTPUT"
-          echo "debug_apk=${DBG_OUT}" >> "$GITHUB_OUTPUT"
-
-          {
-            echo "### 净页 (JingYe) 构建完成摘要"
-            echo ""
-            echo "| 项目 | 值 |"
-            echo "| :--- | :--- |"
-            echo "| **版本号 (versionName)** | \`${VER}\` (来源: ${{ steps.version.outputs.source }}) |"
-            echo "| **构建号 (versionCode)** | \`${CODE}\` |"
-            echo "| **Commit SHA** | \`${{ steps.version.outputs.short_sha }}\` |"
-            echo "| **Release 安装包** | \`jingye-reader-v${VER}-release.apk\` |"
-            echo "| **Debug 调试包** | \`jingye-reader-v${VER}-debug.apk\` |"
-            echo ""
-            echo "#### SHA-256 校验值"
-            echo '```text'
-            cat dist/SHA256SUMS.txt
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload Release APK Artifact
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: jingye-reader-v${{ steps.version.outputs.version_name }}-release-apk
-          path: |
-            dist/jingye-reader-v${{ steps.version.outputs.version_name }}-release.apk
-            dist/SHA256SUMS.txt
+          name: legado-eink-fanqie-v${{ steps.version.outputs.version_name }}
+          path: dist/*.apk
+          if-no-files-found: error
 
-      - name: Upload Debug APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: jingye-reader-v${{ steps.version.outputs.version_name }}-debug-apk
-          path: dist/jingye-reader-v${{ steps.version.outputs.version_name }}-debug.apk
-
-      - name: Auto-Publish / Update GitHub Release
-        continue-on-error: true
-        if: >-
-          github.event_name != 'pull_request' &&
-          (startsWith(github.ref, 'refs/tags/v') ||
-           github.ref == 'refs/heads/main' ||
-           github.ref == 'refs/heads/master' ||
-           github.event.inputs.publish_release == 'true')
+      - name: Publish GitHub Release
+        if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag_name }}
-          target_commitish: ${{ github.sha }}
-          name: "净页 (JingYe) v${{ steps.version.outputs.version_name }}"
-          generate_release_notes: true
+          name: "阅读Sigma · 净页墨水屏番茄聚合版 v${{ steps.version.outputs.version_name }}"
           body: |
-            ### 净页 (JingYe) · 海信 A7 墨水屏阅读器 v${{ steps.version.outputs.version_name }}
-            - **构建版本号 (`versionName`)**：`${{ steps.version.outputs.version_name }}`
-            - **内部构建号 (`versionCode`)**：`${{ steps.version.outputs.version_code }}`
-            - **对应提交 (`Commit`)**：`${{ steps.version.outputs.short_sha }}`
-            - **安装包说明**：请直接下载下方 `jingye-reader-v${{ steps.version.outputs.version_name }}-release.apk` 安装至海信 A7。
-          files: |
-            dist/jingye-reader-v${{ steps.version.outputs.version_name }}-release.apk
-            dist/jingye-reader-v${{ steps.version.outputs.version_name }}-debug.apk
-            dist/SHA256SUMS.txt
-
-  test-backend:
-    name: Verify Python FastAPI Backend Syntax
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install Backend Dependencies & Verify Modules
-        working-directory: ./backend
-        run: |
-          pip install -r requirements.txt
-          python -c "import app, core; print('Backend core ready:', app.CORE_READY)"
-          python core/decryptor.py
+            ### 阅读Sigma (Legado-E) · 海信 A7 墨水屏优化与番茄全本下载聚合版 `v${{ steps.version.outputs.version_name }}`
+            - **主体内核**：基于 `legado-E` (阅读Sigma) 完整书源、本地 TXT/EPUB/MOBI/PDF 阅读与书架管理系统。
+            - **墨水屏深度优化**：默认开启纯黑白高对比 E-Ink 模式、无动画翻页、左右滑动翻页抗抖动优化、每 N 页自动黑白全刷清残影，以及墨水屏残影测试实验室。
+            - **内置字体与微信读书精排**：内置 6 款墨水屏专用字体（思源宋体、霞鹜文楷、思源黑体、墨水屏凝黑、古籍刻本、护眼柔黑）与 6 套微信读书风格精排预设。
+            - **内嵌番茄小说全本下载器 (`fanqie-novel-downloader`)**：支持按书名/作者关键字直接搜书、链接/ID 解析、独立前台服务后台下载、系统状态栏实时进度通知、30章批次实时断点续下、书架一键检测更新与最新章节提示。
+          draft: false
+          prerelease: false
+          files: dist/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
