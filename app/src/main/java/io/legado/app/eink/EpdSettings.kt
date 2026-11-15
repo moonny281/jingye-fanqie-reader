@@ -4,19 +4,20 @@ import android.graphics.Rect
 import android.view.View
 
 enum class EpdDisplayMode(val displayName: String) {
-    CLEAR("高清阅读模式 (GC16/REGAL 抗残影)"),
-    BALANCED("均衡刷新模式 (GU/DU 局刷增强)"),
-    FAST("快速局刷模式 (A2 极速无闪)")
+    CLEAR("高清精排模式 (GC16/REGAL 深度消残影)"),
+    BALANCED("均衡刷新模式 (GU/DU 局刷白场增强)"),
+    FAST("极速黑白模式 (A2/DU 1-Bit 线性无残影)")
 }
 
 object EpdSettings {
     var currentMode: EpdDisplayMode = EpdDisplayMode.CLEAR
 
     /**
-     * 调用系统底层 EPD 驱动（兼容海信 Hisense、文石 Onyx、博阅 Boyue、掌阅 iReader、RK3566 等墨水屏反射接口）
+     * 调用系统底层 EPD 硬件驱动（兼容海信 Hisense、文石 Onyx BOOX、掌阅 iReader、博阅 Boyue/Meebook、汉王 Hanvon、RK3566 等墨水屏接口）
      */
     fun applyRefresh(view: View, forceFull: Boolean = false) {
         try {
+            invokeOnyxController(view, full = forceFull)
             val clazz = view.javaClass
             val methodNames = if (forceFull) {
                 listOf(
@@ -24,7 +25,8 @@ object EpdSettings {
                     "invalidateEpd",
                     "resetEpdMode",
                     "setEpdFullMode",
-                    "setEpdMode"
+                    "setEpdMode",
+                    "refreshScreen"
                 )
             } else {
                 listOf(
@@ -44,29 +46,27 @@ object EpdSettings {
             }
         } catch (_: Throwable) {
         }
-        view.postInvalidate()
+        view.postInvalidateOnAnimation()
     }
 
     /**
-     * 针对指定矩形区域执行墨水屏局部刷新（Region Partial Refresh），仅刷新文字变动区域而不触发全屏黑闪
+     * 针对指定矩形区域执行墨水屏局部刷新（Region Partial Refresh）
      */
     fun applyPartialRefresh(view: View, dirtyRect: Rect? = null) {
         val rect = dirtyRect ?: Rect(0, 0, view.width, view.height)
         try {
             val clazz = view.javaClass
-            // 优先尝试带区域参数的 EPD 局部刷新接口
             val rectMethod = clazz.methods.firstOrNull {
                 (it.name.equals("invalidateEpd", ignoreCase = true) ||
-                        it.name.equals("requestEpdPartialRefresh", ignoreCase = true) ||
-                        it.name.equals("refreshEpdRegion", ignoreCase = true)) &&
-                        it.parameterCount == 1 &&
-                        it.parameterTypes[0] == Rect::class.java
+                    it.name.equals("requestEpdPartialRefresh", ignoreCase = true) ||
+                    it.name.equals("refreshEpdRegion", ignoreCase = true)) &&
+                    it.parameterCount == 1 &&
+                    it.parameterTypes[0] == Rect::class.java
             }
             if (rectMethod != null) {
                 rectMethod.invoke(view, rect)
             } else {
-                // 尝试 Onyx / RK3566 EpdController 静态局部刷新反射
-                invokeVendorControllerPartial(view)
+                invokeOnyxController(view, full = false)
             }
         } catch (_: Throwable) {
         }
@@ -77,20 +77,47 @@ object EpdSettings {
         }
     }
 
-    private fun invokeVendorControllerPartial(view: View) {
+    private fun invokeOnyxController(view: View, full: Boolean) {
+        // 1. 尝试 Onyx BOOX EpdController.invalidate(View, UpdateMode)
+        try {
+            val epdCls = Class.forName("com.onyx.android.sdk.api.device.epd.EpdController")
+            val modeCls = Class.forName("com.onyx.android.sdk.api.device.epd.UpdateMode")
+            val targetEnumName = if (full) "GC" else "GU"
+            val modeConst = modeCls.enumConstants?.firstOrNull {
+                it.toString().equals(targetEnumName, ignoreCase = true) ||
+                    (full && it.toString().contains("GC")) ||
+                    (!full && (it.toString().contains("GU") || it.toString().contains("DU")))
+            }
+            if (modeConst != null) {
+                val invMethod = epdCls.methods.firstOrNull {
+                    it.name == "invalidate" &&
+                        it.parameterCount == 2 &&
+                        it.parameterTypes[0].isAssignableFrom(View::class.java) &&
+                        it.parameterTypes[1] == modeCls
+                }
+                if (invMethod != null) {
+                    invMethod.invoke(null, view, modeConst)
+                    return
+                }
+            }
+        } catch (_: Throwable) {
+        }
+
+        // 2. 尝试通用静态控制器反射（海信 / RK3566 / 博阅）
         val controllerClasses = listOf(
             "com.onyx.android.sdk.api.device.epd.EpdController",
             "android.hardware.epd.EpdManager",
-            "com.hmct.epd.EpdManager"
+            "com.hmct.epd.EpdManager",
+            "android.eink.EinkManager"
         )
         for (clsName in controllerClasses) {
             try {
                 val cls = Class.forName(clsName)
                 val m = cls.methods.firstOrNull {
                     (it.name.contains("invalidate", ignoreCase = true) ||
-                            it.name.contains("refresh", ignoreCase = true)) &&
-                            it.parameterCount == 1 &&
-                            it.parameterTypes[0].isAssignableFrom(View::class.java)
+                        it.name.contains("refresh", ignoreCase = true)) &&
+                        it.parameterCount == 1 &&
+                        it.parameterTypes[0].isAssignableFrom(View::class.java)
                 }
                 if (m != null) {
                     m.invoke(null, view)

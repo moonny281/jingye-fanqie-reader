@@ -1,6 +1,8 @@
 package io.legado.app.ui.book.toc
 
 import android.content.Context
+import android.graphics.Color
+import android.graphics.Typeface
 import android.os.Handler
 import android.os.Looper
 import android.view.ViewGroup
@@ -14,9 +16,6 @@ import io.legado.app.databinding.ItemChapterListBinding
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
-import io.legado.app.lib.theme.ThemeUtils
-import io.legado.app.lib.theme.accentColor
-import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.gone
 import io.legado.app.utils.longToastOnUi
 import io.legado.app.utils.visible
@@ -25,6 +24,12 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 
+/**
+ * 微信读书墨水屏风格纯黑白线性目录适配器 (v0.4.3)：
+ * - 分卷标题行（isVolume = true）采用纯黑底白字粗体横幅（#000000 底 + #FFFFFF 字），层级一目了然；
+ * - 普通章节行采用纯白底 + 1dp 纯黑底分割线，当前阅读章节自动加粗并标注「【当前】」前缀；
+ * - 彻底移除灰阶背景、水波纹与多余小图标。
+ */
 class ChapterListAdapter(context: Context, val callback: Callback) :
     DiffRecyclerAdapter<BookChapter, ItemChapterListBinding>(context) {
 
@@ -47,15 +52,14 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
                 newItem: BookChapter
             ): Boolean {
                 return oldItem.bookUrl == newItem.bookUrl
-                        && oldItem.url == newItem.url
-                        && oldItem.isVip == newItem.isVip
-                        && oldItem.isPay == newItem.isPay
-                        && oldItem.title == newItem.title
-                        && oldItem.tag == newItem.tag
-                        && oldItem.wordCount == newItem.wordCount
-                        && oldItem.isVolume == newItem.isVolume
+                    && oldItem.url == newItem.url
+                    && oldItem.isVip == newItem.isVip
+                    && oldItem.isPay == newItem.isPay
+                    && oldItem.title == newItem.title
+                    && oldItem.tag == newItem.tag
+                    && oldItem.wordCount == newItem.wordCount
+                    && oldItem.isVolume == newItem.isVolume
             }
-
         }
 
     private var upDisplayTileJob: Coroutine<*>? = null
@@ -125,51 +129,41 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
     ) {
         binding.run {
             val isDur = callback.durChapterIndex() == item.index
-            val cached = callback.isLocalBook
-                    || item.isVolume
-                    || cacheFileNames.contains(item.getFileName())
-            if (payloads.isEmpty()) {
-                if (isDur) {
-                    tvChapterName.setTextColor(context.accentColor)
-                } else {
-                    tvChapterName.setTextColor(context.getCompatColor(R.color.primaryText))
-                }
-                tvChapterName.text = getDisplayTitle(item)
-                if (item.isVolume) {
-                    //卷名，如第一卷 突出显示
-                    tvChapterItem.setBackgroundColor(context.getCompatColor(R.color.btn_bg_press))
-                } else {
-                    //普通章节 保持不变
-                    tvChapterItem.background =
-                        ThemeUtils.resolveDrawable(context, android.R.attr.selectableItemBackground)
-                }
+            val rawTitle = getDisplayTitle(item)
 
-                //卷名不显示 去掉了 !item.isVolume，让卷名也显示
+            ivLocked.gone()
+            ivChecked.gone()
+
+            if (item.isVolume) {
+                // 分卷标题：纯黑底色 + 纯白粗体文字（1-bit 反转线性条）
+                tvChapterItem.setBackgroundColor(Color.BLACK)
+                tvChapterName.setTextColor(Color.WHITE)
+                tvChapterName.typeface = Typeface.DEFAULT_BOLD
+                tvChapterName.text = "◆ $rawTitle"
+                tvTag.gone()
+                tvWordCount.gone()
+            } else {
+                // 普通章节：纯白底色 + 底部 1dp 线性黑线
+                tvChapterItem.setBackgroundResource(R.drawable.bg_eink_border_bottom)
+                tvChapterName.setTextColor(Color.BLACK)
+                tvChapterName.typeface = if (isDur) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+                tvChapterName.text = if (isDur) "【当前】$rawTitle" else rawTitle
+
                 if (!item.tag.isNullOrEmpty()) {
-                    //更新时间规则
+                    tvTag.setTextColor(Color.BLACK)
                     tvTag.text = item.tag
                     tvTag.visible()
                 } else {
                     tvTag.gone()
                 }
-                if (AppConfig.tocCountWords && !item.wordCount.isNullOrEmpty() && !item.isVolume) {
-                    //章节字数
+
+                if (AppConfig.tocCountWords && !item.wordCount.isNullOrEmpty()) {
+                    tvWordCount.setTextColor(Color.BLACK)
                     tvWordCount.text = item.wordCount
                     tvWordCount.visible()
                 } else {
                     tvWordCount.gone()
                 }
-
-                if (item.isVip && !item.isPay) {
-                    ivLocked.visible()
-                } else {
-                    ivLocked.gone()
-                }
-
-                upHasCache(binding, isDur, cached)
-            } else {
-                tvChapterName.text = getDisplayTitle(item)
-                upHasCache(binding, isDur, cached)
             }
         }
     }
@@ -188,16 +182,6 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
         }
     }
 
-    private fun upHasCache(binding: ItemChapterListBinding, isDur: Boolean, cached: Boolean) =
-        binding.apply {
-            ivChecked.setImageResource(R.drawable.ic_outline_cloud_24)
-            ivChecked.visible(!cached)
-            if (isDur) {
-                ivChecked.setImageResource(R.drawable.ic_check)
-                ivChecked.visible()
-            }
-        }
-
     interface Callback {
         val scope: CoroutineScope
         val book: Book?
@@ -206,5 +190,4 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
         fun durChapterIndex(): Int
         fun onListChanged()
     }
-
 }

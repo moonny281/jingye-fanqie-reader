@@ -1,38 +1,45 @@
 package io.legado.app.eink
 
+import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
-import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.Toast
+import io.legado.app.R
 import io.legado.app.constant.EventBus
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ReadTipConfig
+import io.legado.app.ui.book.read.page.ContentTextView
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
+import io.legado.app.utils.activity
 import io.legado.app.utils.postEvent
 import splitties.init.appCtx
 import kotlin.math.roundToInt
 
 /**
- * 墨水屏深度重构核心控制器：
- * 1. 局部刷新清残影（Partial Refresh Anti-Ghosting，无全屏黑闪，仅针对正文区域做微白场擦除与区域重绘）
- * 2. 全局全刷清残影（Full Refresh Anti-Ghosting，黑白反转深层复位墨水粒子）
- * 3. 阅读进度/页眉页脚一键开关（关闭后释放 100% 屏幕垂直高度给正文）
- * 4. 自适应屏幕分辨率排版计算器（根据屏幕物理像素宽高、DPI 与长宽比动态分配最佳正文显示面积）
+ * 墨水屏深度去残影核心控制器 (v0.4.3)：
+ * 1. 画布级内联双相消残影脉冲（直接在 ContentTextView 与 DecorView 顶层覆层执行黑/白波形饱和驱动，彻底解决普通 View 叠加被跳帧导致残影残留的问题）
+ * 2. 翻页每页自动执行「白场微擦除脉冲（White-Blanking Pulse）」，切断上一页黑字像素残留
+ * 3. 周期性 + 弹窗/菜单关闭自动执行「黑->白双相波形复位全刷（Black-White Waveform Reset）」，彻底消除灰阶残影与弹窗边框残影
+ * 4. 阅读进度/页眉页脚一键开关与分辨率自适应阅读面积分配
  */
 object EinkRefreshHelper {
     private const val PREF_NAME = "eink_refresh_prefs"
-    private const val KEY_CLEAN_EVERY_N = "clean_every_n_pages"
-    private const val KEY_PARTIAL_EVERY_N = "partial_clean_every_n_pages"
+    private const val KEY_CLEAN_EVERY_N = "clean_every_n_pages_v043"
+    private const val KEY_PARTIAL_EVERY_N = "partial_clean_every_n_pages_v043"
     private const val KEY_EPD_MODE = "epd_display_mode"
     private const val KEY_SHOW_PROGRESS_BAR = "show_read_progress_bar_v042"
     private const val KEY_ADAPTIVE_RESOLUTION = "adaptive_screen_resolution_v042"
+    private const val OVERLAY_TAG = "eink_top_flash_overlay_v043"
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private var turnCounter = 0
@@ -51,23 +58,52 @@ object EinkRefreshHelper {
         val footerPadBottomDp: Int
     )
 
+    /**
+     * 专用于墨水屏波形复位的顶层覆层视图（强制 Z 轴置顶，直接绘制纯黑/纯白帧）
+     */
+    private class EinkWaveformOverlayView(context: Context) : View(context) {
+        private val paint = Paint().apply {
+            isAntiAlias = false
+            style = Paint.Style.FILL
+        }
+        var phaseColor: Int = Color.TRANSPARENT
+            set(value) {
+                field = value
+                invalidate()
+            }
+
+        init {
+            isClickable = false
+            isFocusable = false
+            translationZ = 9999f
+            elevation = 9999f
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            if (phaseColor != Color.TRANSPARENT) {
+                paint.color = phaseColor
+                canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+            }
+        }
+    }
+
     private val prefs
         get() = appCtx.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
 
     /**
-     * 每 N 页自动执行一次全局全刷清残影（0 表示关闭自动全刷）
+     * 每 N 页自动执行一次全局黑白反转深层清残影（默认每 8 页全刷一次，设为 0 关闭自动全刷）
      */
     var cleanEveryNPages: Int
-        get() = prefs.getInt(KEY_CLEAN_EVERY_N, 15)
+        get() = prefs.getInt(KEY_CLEAN_EVERY_N, 8)
         set(value) {
             prefs.edit().putInt(KEY_CLEAN_EVERY_N, value.coerceIn(0, 100)).apply()
         }
 
     /**
-     * 每 N 页自动执行一次无黑闪局部清残影微擦除（0 表示仅基础重绘，1 表示每页局刷，3 表示每 3 页局刷微擦除）
+     * 每 N 页自动执行一次无黑闪局部白场微擦除（默认 1 = 每翻 1 页均执行白场微擦除，彻底切断残影累积）
      */
     var partialCleanEveryNPages: Int
-        get() = prefs.getInt(KEY_PARTIAL_EVERY_N, 3)
+        get() = prefs.getInt(KEY_PARTIAL_EVERY_N, 1)
         set(value) {
             prefs.edit().putInt(KEY_PARTIAL_EVERY_N, value.coerceIn(0, 50)).apply()
         }
@@ -98,9 +134,6 @@ object EinkRefreshHelper {
             prefs.edit().putBoolean(KEY_ADAPTIVE_RESOLUTION, value).apply()
         }
 
-    /**
-     * 根据设备实际屏幕分辨率（像素宽高、密度、纵横比）自适应分配最佳正文中边距与状态栏边距，最大化阅读显示面积
-     */
     fun computeAdaptiveMargins(widthPx: Int, heightPx: Int, density: Float): AdaptiveMarginsDp {
         val safeDensity = if (density <= 0f) 2.75f else density
         val widthDp = widthPx / safeDensity
@@ -108,15 +141,13 @@ object EinkRefreshHelper {
         val aspectRatio = if (widthPx > 0) heightPx.toFloat() / widthPx.toFloat() else 1.77f
         val showBar = showReadProgressBar
 
-        // 根据屏幕横向宽度自适应分配左右留白：窄屏手机墨水屏采用紧凑窄边距，平板墨水屏采用适度呼吸边距
         val horizDp = when {
-            widthDp <= 360f || aspectRatio >= 1.95f -> 10 // 20:9 海信阅读手机等紧凑窄屏，最大化单行字数
-            widthDp <= 440f || aspectRatio >= 1.70f -> 12 // 常规 6~6.7 寸墨水屏
-            widthDp <= 600f -> 15                         // 7~7.8 寸墨水屏阅读器
-            else -> (widthDp * 0.028f).roundToInt().coerceIn(16, 26) // 10.3 寸以上大屏墨水屏
+            widthDp <= 360f || aspectRatio >= 1.95f -> 10
+            widthDp <= 440f || aspectRatio >= 1.70f -> 12
+            widthDp <= 600f -> 15
+            else -> (widthDp * 0.028f).roundToInt().coerceIn(16, 26)
         }
 
-        // 根据纵向高度与是否开启底部进度栏自适应分配上下边距：关闭进度栏时上下仅留 4dp 极窄安全边
         val topDp = when {
             !showBar -> if (heightDp <= 720f) 4 else 6
             heightDp <= 680f -> 3
@@ -142,9 +173,6 @@ object EinkRefreshHelper {
         )
     }
 
-    /**
-     * 一键切换阅读进度与页眉页脚显示状态，并立即触发全页重新排版以释放或恢复垂直阅读面积
-     */
     fun toggleReadProgressBar(context: Context? = null): Boolean {
         val nextState = !showReadProgressBar
         showReadProgressBar = nextState
@@ -154,9 +182,9 @@ object EinkRefreshHelper {
         postEvent(EventBus.UP_CONFIG, arrayListOf(0, 2, 5, 6, 8, 10))
         context?.let {
             val msg = if (nextState) {
-                "已开启底部精简阅读进度栏"
+                "已开启底部线性阅读进度栏"
             } else {
-                "已关闭阅读进度栏（已释放 100% 全屏阅读面积）"
+                "已关闭阅读进度栏（释放 100% 全屏阅读面积）"
             }
             Toast.makeText(it, msg, Toast.LENGTH_SHORT).show()
         }
@@ -165,17 +193,16 @@ object EinkRefreshHelper {
 
     fun applyProgressBarStateToConfig(showProgress: Boolean) {
         ReadBookConfig.configList.forEach { cfg ->
-            // 默认隐藏顶部页眉，避免顶部与底部双重占用垂直阅读面积
             cfg.headerMode = 2
             cfg.showHeaderLine = false
             cfg.footerMode = if (showProgress) 0 else 1
-            cfg.showFooterLine = false
+            cfg.showFooterLine = showProgress
         }
         ReadBookConfig.durConfig.apply {
             headerMode = 2
             showHeaderLine = false
             footerMode = if (showProgress) 0 else 1
-            showFooterLine = false
+            showFooterLine = showProgress
         }
         ReadTipConfig.headerMode = 2
         ReadTipConfig.footerMode = if (showProgress) 0 else 1
@@ -183,9 +210,38 @@ object EinkRefreshHelper {
     }
 
     /**
-     * 翻页时调用的双级墨水屏刷新调度器：
-     * - 达到全刷阈值时执行全局黑白反转全刷
-     * - 未达到全刷阈值时执行区域 EPD 局部刷新 + 周期性无黑闪局部白场清残影
+     * 获取或挂载当前窗口 DecorView 顶层的墨水屏波形覆层
+     */
+    private fun getOrAttachOverlay(targetView: View): EinkWaveformOverlayView? {
+        val decor = (targetView.activity?.window?.decorView as? ViewGroup)
+            ?: (targetView.rootView as? ViewGroup)
+            ?: return null
+        val existing = decor.findViewWithTag<EinkWaveformOverlayView>(OVERLAY_TAG)
+        if (existing != null) {
+            existing.bringToFront()
+            return existing
+        }
+        val overlay = EinkWaveformOverlayView(targetView.context).apply {
+            tag = OVERLAY_TAG
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            visibility = View.GONE
+        }
+        return try {
+            decor.addView(overlay)
+            overlay.bringToFront()
+            overlay
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    /**
+     * 翻页时调用的双级墨水屏去残影调度器：
+     * - 达到全刷阈值（默认每 8 页）时执行双相黑->白深度全刷
+     * - 其余每一页执行画布内联白场擦除（White-Blanking Pulse），彻底防止旧字迹残留
      */
     fun onPageTurned(targetView: View, contentRect: Rect? = null) {
         val fullThreshold = cleanEveryNPages
@@ -194,7 +250,7 @@ object EinkRefreshHelper {
             if (turnCounter >= fullThreshold) {
                 turnCounter = 0
                 partialTurnCounter = 0
-                triggerFullRefresh(targetView)
+                triggerFullRefresh(targetView, showToast = false)
                 return
             }
         }
@@ -209,106 +265,156 @@ object EinkRefreshHelper {
             }
         }
 
-        // 基础每页区域 EPD 局刷
         EpdSettings.applyPartialRefresh(targetView, contentRect)
     }
 
     /**
-     * 执行墨水屏【局部刷新清残影】（无全屏黑闪）：
-     * 仅针对阅读正文区域执行一次 35ms 纯白微擦除 + 局部 EPD 区域重绘，瞬间消除文字边缘灰阶残影且不晃眼。
+     * 执行墨水屏【局部刷新清残影】（无黑闪白场脉冲）：
+     * 若目标为 ContentTextView，直接在画布层执行 60ms 纯白帧擦除 + 真实文字重绘；
+     * 同时驱动顶层白场覆层与硬件区域 EPD 刷新，确保 E-Ink 控制器完整扫描一帧纯白波形后再渲染新字。
      */
     fun triggerPartialRefresh(
         targetView: View,
         dirtyRect: Rect? = null,
         showToast: Boolean = false
     ) {
-        val rect = dirtyRect ?: Rect(
-            ChapterProvider.paddingLeft.coerceAtLeast(0),
-            ChapterProvider.paddingTop.coerceAtLeast(0),
-            ChapterProvider.visibleRight.takeIf { it > 0 } ?: targetView.width,
-            ChapterProvider.visibleBottom.takeIf { it > 0 } ?: targetView.height
-        )
-        EpdSettings.applyPartialRefresh(targetView, rect)
+        val rect = dirtyRect ?: Rect(0, 0, targetView.width, targetView.height)
+        val contentView = targetView as? ContentTextView
 
-        val root = targetView.rootView as? ViewGroup
-        if (root != null && rect.width() > 0 && rect.height() > 0) {
-            val loc = IntArray(2)
-            targetView.getLocationInWindow(loc)
-            val scrubOverlay = View(targetView.context).apply {
-                layoutParams = FrameLayout.LayoutParams(rect.width(), rect.height()).apply {
-                    gravity = Gravity.TOP or Gravity.START
-                    leftMargin = loc[0] + rect.left
-                    topMargin = loc[1] + rect.top
-                }
-                setBackgroundColor(Color.WHITE)
-                isClickable = false
-                isFocusable = false
-            }
-            try {
-                root.addView(scrubOverlay)
-                EpdSettings.applyPartialRefresh(scrubOverlay)
-                mainHandler.postDelayed({
-                    try {
-                        root.removeView(scrubOverlay)
-                        EpdSettings.applyPartialRefresh(targetView, rect)
-                    } catch (_: Throwable) {
-                        targetView.postInvalidate()
-                    }
-                }, 38L)
-            } catch (_: Throwable) {
-                targetView.postInvalidate()
-            }
+        if (contentView != null) {
+            // 第一阶段：画布级 100% 纯白帧擦除（60ms，刚好跨越墨水屏 1 帧完整电泳扫描周期）
+            contentView.einkFlashPhase = 2
+            contentView.invalidate()
+            EpdSettings.applyPartialRefresh(contentView, rect)
+
+            mainHandler.postDelayed({
+                // 第二阶段：恢复绘制 1-bit 纯黑正文
+                contentView.einkFlashPhase = 0
+                contentView.invalidate()
+                EpdSettings.applyPartialRefresh(contentView, rect)
+            }, 60L)
         } else {
-            targetView.postInvalidate()
+            val overlay = getOrAttachOverlay(targetView)
+            if (overlay != null) {
+                overlay.visibility = View.VISIBLE
+                overlay.bringToFront()
+                overlay.phaseColor = Color.WHITE
+                EpdSettings.applyPartialRefresh(overlay, rect)
+                mainHandler.postDelayed({
+                    overlay.phaseColor = Color.TRANSPARENT
+                    overlay.visibility = View.GONE
+                    EpdSettings.applyPartialRefresh(targetView, rect)
+                    targetView.invalidate()
+                }, 65L)
+            } else {
+                EpdSettings.applyPartialRefresh(targetView, rect)
+                targetView.invalidate()
+            }
         }
 
         if (showToast) {
-            Toast.makeText(targetView.context, "已执行正文区域局部刷新清残影", Toast.LENGTH_SHORT).show()
+            Toast.makeText(targetView.context, "已执行墨水屏局部白场清残影", Toast.LENGTH_SHORT).show()
         }
     }
 
     /**
-     * 执行墨水屏【全局全刷清残影】：调用系统 EPD 全刷接口并配合极短黑白反转闪烁彻底消除全屏墨水粒子残影。
+     * 执行墨水屏【全局全刷清残影】（双相黑->白深层波形复位）：
+     * 第一相（0~105ms）：全屏 100% 纯黑 (#000000)，将全部黑色微胶囊推至顶层；
+     * 第二相（105~210ms）：全屏 100% 纯白 (#FFFFFF)，将全部白色微胶囊推至顶层，彻底抹除一切灰阶残影；
+     * 第三相（210ms）：隐藏覆层并触发全树重绘与硬件 GC16 全刷。
      */
     fun triggerFullRefresh(targetView: View, showToast: Boolean = false) {
+        val contentView = targetView as? ContentTextView
+        contentView?.let {
+            it.einkFlashPhase = 1
+            it.invalidate()
+        }
         EpdSettings.applyRefresh(targetView, forceFull = true)
-        val root = targetView.rootView as? ViewGroup ?: run {
-            targetView.invalidate()
-            return
-        }
-        val overlay = View(targetView.context).apply {
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-            setBackgroundColor(Color.BLACK)
-            isClickable = false
-            isFocusable = false
-        }
-        try {
-            root.addView(overlay)
+
+        val overlay = getOrAttachOverlay(targetView)
+        if (overlay != null) {
+            overlay.visibility = View.VISIBLE
+            overlay.bringToFront()
+            overlay.phaseColor = Color.BLACK
+            EpdSettings.applyRefresh(overlay, forceFull = true)
+
             mainHandler.postDelayed({
-                overlay.setBackgroundColor(Color.WHITE)
-                overlay.invalidate()
-            }, 85L)
-            mainHandler.postDelayed({
-                try {
-                    root.removeView(overlay)
-                    EpdSettings.applyRefresh(targetView, forceFull = true)
-                    targetView.invalidate()
-                } catch (_: Throwable) {
+                contentView?.let {
+                    it.einkFlashPhase = 2
+                    it.invalidate()
                 }
-            }, 170L)
-        } catch (_: Throwable) {
-            targetView.invalidate()
+                overlay.phaseColor = Color.WHITE
+                EpdSettings.applyRefresh(overlay, forceFull = true)
+            }, 105L)
+
+            mainHandler.postDelayed({
+                contentView?.let {
+                    it.einkFlashPhase = 0
+                    it.invalidate()
+                }
+                overlay.phaseColor = Color.TRANSPARENT
+                overlay.visibility = View.GONE
+                EpdSettings.applyRefresh(targetView, forceFull = true)
+                invalidateHierarchy(targetView.rootView ?: targetView)
+            }, 210L)
+        } else {
+            mainHandler.postDelayed({
+                contentView?.let {
+                    it.einkFlashPhase = 0
+                    it.invalidate()
+                }
+                targetView.invalidate()
+            }, 120L)
         }
+
         if (showToast) {
-            Toast.makeText(targetView.context, "已执行墨水屏全局全刷清残影", Toast.LENGTH_SHORT).show()
+            Toast.makeText(targetView.context, "已执行墨水屏全局黑白双相清残影", Toast.LENGTH_SHORT).show()
         }
     }
 
     /**
-     * 原生内嵌墨水屏综合控制面板（支持局部刷新清残影、全局全刷、阅读进度开关、自适应屏幕分辨率排版与全刷频率调节）
+     * 当菜单、弹窗（Dialog / PopupMenu）或底部栏收起时自动调用：
+     * 立即执行一次快速白场+重绘擦除，消除弹窗边框与菜单文字在阅读页/书架上留下的残影。
+     */
+    fun scrubAfterOverlayDismiss(targetView: View?) {
+        val v = targetView ?: return
+        mainHandler.post {
+            triggerPartialRefresh(v, showToast = false)
+        }
+    }
+
+    /**
+     * 递归重绘整个视图树，确保所有线性边框与文字干净刷新
+     */
+    fun invalidateHierarchy(view: View) {
+        view.invalidate()
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) {
+                invalidateHierarchy(view.getChildAt(i))
+            }
+        }
+    }
+
+    /**
+     * 将任意原生 AlertDialog 改造为微信读书墨水屏纯黑白线性弹窗（去灰阶遮罩、去动画、关闭时自动清残影）
+     */
+    fun applyEinkDialogStyle(dialog: AlertDialog, hostView: View? = null) {
+        dialog.window?.let { win ->
+            win.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            val attr = win.attributes
+            attr.dimAmount = 0f
+            attr.windowAnimations = 0
+            win.attributes = attr
+            win.setBackgroundDrawableResource(R.drawable.bg_eink_border_dialog)
+        }
+        dialog.setOnDismissListener {
+            val target = hostView ?: (dialog.context as? Activity)?.window?.decorView
+            scrubAfterOverlayDismiss(target)
+        }
+    }
+
+    /**
+     * 原生内嵌墨水屏综合控制面板（纯黑白线性风格）
      */
     fun showEinkSettingsDialog(
         context: Context,
@@ -316,7 +422,7 @@ object EinkRefreshHelper {
         onStateChanged: (() -> Unit)? = null
     ) {
         val dm = context.resources.displayMetrics
-        val progressState = if (showReadProgressBar) "开启（底部精简进度）" else "已关闭（100%全屏正文）"
+        val progressState = if (showReadProgressBar) "开启（底部线性进度）" else "已关闭（100%全屏正文）"
         val adaptiveState = if (adaptiveScreenResolution) {
             "开启（已适配 ${dm.widthPixels}×${dm.heightPixels}）"
         } else {
@@ -325,26 +431,26 @@ object EinkRefreshHelper {
         val curPartial = partialCleanEveryNPages
         val partialDesc = when (curPartial) {
             0 -> "仅基础局刷"
-            1 -> "每页局刷清残影"
-            else -> "每 $curPartial 页局刷清残影"
+            1 -> "每页白场清残影（推荐）"
+            else -> "每 $curPartial 页白场清残影"
         }
         val curFull = cleanEveryNPages
         val fullDesc = if (curFull <= 0) "已关闭自动全刷" else "每 $curFull 页自动全刷"
 
         val options = arrayOf(
-            "⚡ 立即局部刷新清残影（无黑闪·仅刷正文区）",
-            "⬛ 立即全局全刷清残影（黑白反转深层消残影）",
-            "📖 阅读进度栏开关：$progressState",
-            "📐 自适应屏幕分辨率分配阅读面积：$adaptiveState",
-            "🔄 翻页局部清残影：切换（当前：$partialDesc）",
-            "⏱ 每 10 页自动全局全刷",
-            "⏱ 每 15 页自动全局全刷（推荐）",
-            "⏱ 每 25 页自动全局全刷（省电）",
-            "⏱ 关闭翻页自动全局全刷（仅保留局刷/手动）"
+            "[ 局刷清残影 ] 立即白场擦除正文区残影（无黑闪）",
+            "[ 全刷清残影 ] 立即全局黑白双相深层消残影",
+            "[ 阅读进度栏 ] $progressState",
+            "[ 自适应分辨率 ] $adaptiveState",
+            "[ 翻页局刷频率 ] 切换（当前：$partialDesc）",
+            "[ 自动全刷频率 ] 每 5 页自动全局全刷（强力无残影）",
+            "[ 自动全刷频率 ] 每 8 页自动全局全刷（默认推荐）",
+            "[ 自动全刷频率 ] 每 15 页自动全局全刷（省电模式）",
+            "[ 自动全刷频率 ] 关闭翻页自动全局全刷"
         )
 
-        AlertDialog.Builder(context)
-            .setTitle("墨水屏刷新与阅读面积 ($fullDesc · $partialDesc)")
+        val dlg = AlertDialog.Builder(context)
+            .setTitle("墨水屏去残影与显示设置 ($fullDesc · $partialDesc)")
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> targetView?.let { triggerPartialRefresh(it, showToast = true) }
@@ -368,42 +474,44 @@ object EinkRefreshHelper {
                     }
                     4 -> {
                         partialCleanEveryNPages = when (partialCleanEveryNPages) {
-                            3 -> 1
-                            1 -> 5
-                            5 -> 0
-                            else -> 3
+                            1 -> 2
+                            2 -> 3
+                            3 -> 0
+                            else -> 1
                         }
                         partialTurnCounter = 0
                         val pMsg = when (partialCleanEveryNPages) {
-                            0 -> "已设为仅基础重绘（关闭周期局刷微擦除）"
-                            1 -> "已设为每翻 1 页自动局部刷新清残影"
-                            else -> "已设为每翻 $partialCleanEveryNPages 页自动局部刷新清残影"
+                            0 -> "已设为仅基础重绘"
+                            1 -> "已设为每翻 1 页自动白场擦除清残影"
+                            else -> "已设为每翻 $partialCleanEveryNPages 页自动白场擦除清残影"
                         }
                         Toast.makeText(context, pMsg, Toast.LENGTH_SHORT).show()
                     }
                     5 -> {
-                        cleanEveryNPages = 10
+                        cleanEveryNPages = 5
                         turnCounter = 0
-                        Toast.makeText(context, "已设为每 10 页自动全局全刷清残影", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "已设为每 5 页自动全局全刷清残影", Toast.LENGTH_SHORT).show()
                     }
                     6 -> {
+                        cleanEveryNPages = 8
+                        turnCounter = 0
+                        Toast.makeText(context, "已设为每 8 页自动全局全刷清残影", Toast.LENGTH_SHORT).show()
+                    }
+                    7 -> {
                         cleanEveryNPages = 15
                         turnCounter = 0
                         Toast.makeText(context, "已设为每 15 页自动全局全刷清残影", Toast.LENGTH_SHORT).show()
                     }
-                    7 -> {
-                        cleanEveryNPages = 25
-                        turnCounter = 0
-                        Toast.makeText(context, "已设为每 25 页自动全局全刷清残影", Toast.LENGTH_SHORT).show()
-                    }
                     8 -> {
                         cleanEveryNPages = 0
                         turnCounter = 0
-                        Toast.makeText(context, "已关闭自动全局全刷，仅保留局部刷新", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "已关闭自动全局全刷，仅保留每页白场清残影", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
             .setNegativeButton("关闭", null)
-            .show()
+            .create()
+        applyEinkDialogStyle(dlg, targetView)
+        dlg.show()
     }
 }

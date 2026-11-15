@@ -6,37 +6,33 @@
     android:background="@drawable/bg_eink_card"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:padding="10dp">
+    android:paddingHorizontal="12dp"
+    android:paddingVertical="10dp">
 
-    <!-- 书籍封面 + 文字首字回退 -->
-    <FrameLayout
-        android:layout_width="62dp"
-        android:layout_height="84dp"
-        android:background="@drawable/bg_eink_cover_border"
-        android:padding="1dp">
+    <!-- 0.4.3 微信读书墨水屏风格纯黑白线性序号框（彻底移除图片封面） -->
+    <TextView
+        android:id="@+id/tvSearchThumb"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:background="@drawable/bg_eink_button_outline"
+        android:gravity="center"
+        android:singleLine="true"
+        android:text="01"
+        android:textColor="#FF000000"
+        android:textSize="13sp"
+        android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/tvSearchThumb"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center"
-            android:padding="4dp"
-            android:textColor="#FF000000"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-
-        <ImageView
-            android:id="@+id/ivSearchCover"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:contentDescription="封面"
-            android:scaleType="centerCrop" />
-    </FrameLayout>
+    <ImageView
+        android:id="@+id/ivSearchCover"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:contentDescription="封面"
+        android:visibility="gone" />
 
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="12dp"
+        android:layout_marginStart="10dp"
         android:layout_weight="1"
         android:orientation="vertical">
 
@@ -78,7 +74,7 @@
                 android:background="@drawable/bg_eink_button_outline"
                 android:gravity="center"
                 android:paddingHorizontal="8dp"
-                android:text="全本离线"
+                android:text="详情/离线"
                 android:textColor="#FF000000"
                 android:textSize="11sp"
                 android:textStyle="bold" />
@@ -91,7 +87,7 @@
             android:layout_marginTop="4dp"
             android:ellipsize="end"
             android:singleLine="true"
-            android:textColor="#FF222222"
+            android:textColor="#FF000000"
             android:textSize="12sp" />
 
         <TextView
@@ -102,7 +98,7 @@
             android:ellipsize="end"
             android:lineSpacingMultiplier="1.15"
             android:maxLines="2"
-            android:textColor="#FF333333"
+            android:textColor="#FF000000"
             android:textSize="12sp" />
     </LinearLayout>
 

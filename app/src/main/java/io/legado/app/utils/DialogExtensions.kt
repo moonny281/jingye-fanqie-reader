@@ -1,11 +1,7 @@
 package io.legado.app.utils
 
-import android.app.Activity
 import android.app.Dialog
-import android.os.Build
-import android.view.View
-import android.view.WindowInsets
-import android.view.WindowInsetsController
+import android.graphics.Color
 import android.view.WindowManager
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.WindowCompat
@@ -13,30 +9,29 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 import androidx.core.view.forEach
 import androidx.fragment.app.DialogFragment
+import io.legado.app.R
 import io.legado.app.lib.theme.Selector
-import io.legado.app.lib.theme.ThemeStore
-import io.legado.app.lib.theme.accentColor
-import io.legado.app.lib.theme.filletBackground
 import splitties.systemservices.windowManager
 
 fun AlertDialog.applyTint(): AlertDialog {
-    window?.setBackgroundDrawable(context.filletBackground)
+    window?.run {
+        clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+        val attr = attributes
+        attr.dimAmount = 0f
+        attr.windowAnimations = 0
+        attributes = attr
+        setBackgroundDrawableResource(R.drawable.bg_eink_border_dialog)
+    }
     val colorStateList = Selector.colorBuild()
-        .setDefaultColor(ThemeStore.accentColor(context))
-        .setPressedColor(ColorUtils.darkenColor(ThemeStore.accentColor(context)))
+        .setDefaultColor(Color.BLACK)
+        .setPressedColor(Color.BLACK)
         .create()
-    if (getButton(AlertDialog.BUTTON_NEGATIVE) != null) {
-        getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(colorStateList)
-    }
-    if (getButton(AlertDialog.BUTTON_POSITIVE) != null) {
-        getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(colorStateList)
-    }
-    if (getButton(AlertDialog.BUTTON_NEUTRAL) != null) {
-        getButton(AlertDialog.BUTTON_NEUTRAL).setTextColor(colorStateList)
-    }
+    getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(colorStateList)
+    getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(colorStateList)
+    getButton(AlertDialog.BUTTON_NEUTRAL)?.setTextColor(colorStateList)
     window?.decorView?.post {
         listView?.forEach {
-            it.applyTint(context.accentColor)
+            it.applyTint(Color.BLACK)
         }
     }
     return this

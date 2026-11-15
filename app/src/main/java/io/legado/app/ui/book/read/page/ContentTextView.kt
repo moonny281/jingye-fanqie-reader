@@ -43,10 +43,19 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
     var selectAble = AppConfig.textSelectAble
     val selectedPaint by lazy {
         Paint().apply {
-            color = context.getCompatColor(R.color.btn_bg_press_2)
-            style = Paint.Style.FILL
+            isAntiAlias = false
+            color = android.graphics.Color.BLACK
+            style = Paint.Style.STROKE
+            strokeWidth = 2f
         }
     }
+    /**
+     * 墨水屏画布级双相去残影脉冲状态：
+     * 0 = 正常绘制纯白背景与纯黑正文
+     * 1 = 全幅纯黑 (#000000) 饱和驱动相
+     * 2 = 全幅纯白 (#FFFFFF) 白场擦除相
+     */
+    var einkFlashPhase: Int = 0
     private var callBack: CallBack
     private val visibleRect = ChapterProvider.visibleRect
     val selectStart = TextPos(0, -1, -1)
@@ -101,6 +110,17 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        when (einkFlashPhase) {
+            1 -> {
+                canvas.drawColor(android.graphics.Color.BLACK)
+                return
+            }
+            2 -> {
+                canvas.drawColor(android.graphics.Color.WHITE)
+                return
+            }
+        }
+        canvas.drawColor(android.graphics.Color.WHITE)
         autoPager?.onDraw(canvas)
         if (longScreenshot) {
             canvas.translate(0f, scrollY.toFloat())

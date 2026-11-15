@@ -20,6 +20,7 @@ import androidx.viewbinding.ViewBinding
 import io.legado.app.R
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.Theme
+import io.legado.app.eink.EinkRefreshHelper
 import io.legado.app.ui.widget.TitleBar
 import io.legado.app.utils.applyBackgroundTint
 import io.legado.app.utils.applyOpenTint
@@ -90,6 +91,14 @@ abstract class BaseActivity<VB : ViewBinding>(
         overridePendingTransition(0, 0)
     }
 
+    override fun onResume() {
+        super.onResume()
+        // 页面切换或从弹窗/子界面返回时，自动执行一次墨水屏白场擦除，消除上一界面的残影
+        window?.decorView?.post {
+            EinkRefreshHelper.scrubAfterOverlayDismiss(binding.root)
+        }
+    }
+
     override fun startActivity(intent: Intent?) {
         super.startActivity(intent)
         overridePendingTransition(0, 0)
@@ -151,7 +160,8 @@ abstract class BaseActivity<VB : ViewBinding>(
     }
 
     open fun upBackgroundImage() {
-        // 原生墨水屏锁定纯白画布，不加载任何背景图
+        // 0.4.3 纯黑白线性墨水屏模式不加载任何背景图片
+        binding.root.setBackgroundColor(Color.WHITE)
     }
 
     open fun setupSystemBar() {

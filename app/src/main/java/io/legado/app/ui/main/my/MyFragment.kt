@@ -2,8 +2,6 @@ package io.legado.app.ui.main.my
 
 import android.content.SharedPreferences
 import android.os.Bundle
-import android.view.Menu
-import android.view.MenuItem
 import android.view.View
 import androidx.preference.Preference
 import io.legado.app.R
@@ -11,9 +9,8 @@ import io.legado.app.base.BaseFragment
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
 import io.legado.app.databinding.FragmentMyConfigBinding
-import io.legado.app.help.config.ThemeConfig
+import io.legado.app.eink.EinkRefreshHelper
 import io.legado.app.lib.dialogs.selector
-import io.legado.app.lib.prefs.NameListPreference
 import io.legado.app.lib.prefs.SwitchPreference
 import io.legado.app.lib.prefs.fragment.PreferenceFragment
 import io.legado.app.lib.theme.primaryColor
@@ -36,7 +33,6 @@ import io.legado.app.utils.openUrl
 import io.legado.app.utils.putPrefBoolean
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setEdgeEffectColor
-import io.legado.app.utils.showHelp
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 
@@ -61,18 +57,8 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
             .replace(R.id.pre_fragment, preferenceFragment, fragmentTag).commit()
     }
 
-    override fun onCompatCreateOptionsMenu(menu: Menu) {
-        menuInflater.inflate(R.menu.main_my, menu)
-    }
-
-    override fun onCompatOptionsItemSelected(item: MenuItem) {
-        when (item.itemId) {
-            R.id.menu_help -> showHelp("appHelp")
-        }
-    }
-
     /**
-     * 配置
+     * 配置（已锁定原生墨水屏模式，移除主题切换与顶部帮助弹窗）
      */
     class MyPreferenceFragment : PreferenceFragment(),
         SharedPreferences.OnSharedPreferenceChangeListener {
@@ -102,17 +88,13 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
                     }
                 }
             }
-            findPreference<NameListPreference>(PreferKey.themeMode)?.let {
-                it.setOnPreferenceChangeListener { _, _ ->
-                    view?.post { ThemeConfig.applyDayNight(requireContext()) }
-                    true
-                }
-            }
         }
 
         override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
             super.onViewCreated(view, savedInstanceState)
             listView.setEdgeEffectColor(primaryColor)
+            listView.itemAnimator = null
+            listView.overScrollMode = View.OVER_SCROLL_NEVER
         }
 
         override fun onResume() {
@@ -149,16 +131,15 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
                 "dictRuleManage" -> startActivity<DictRuleActivity>()
                 "txtTocRuleManage" -> startActivity<TxtTocRuleActivity>()
                 "bookmark" -> startActivity<AllBookmarkActivity>()
+                "eink_refresh_setting" -> {
+                    EinkRefreshHelper.showEinkSettingsDialog(requireContext(), activity?.window?.decorView)
+                }
                 "setting" -> startActivity<ConfigActivity> {
                     putExtra("configTag", ConfigTag.OTHER_CONFIG)
                 }
 
                 "web_dav_setting" -> startActivity<ConfigActivity> {
                     putExtra("configTag", ConfigTag.BACKUP_CONFIG)
-                }
-
-                "theme_setting" -> startActivity<ConfigActivity> {
-                    putExtra("configTag", ConfigTag.THEME_CONFIG)
                 }
 
                 "fileManage" -> startActivity<FileManageActivity>()
@@ -168,7 +149,6 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
             }
             return super.onPreferenceTreeClick(preference)
         }
-
 
     }
 }

@@ -8,16 +8,15 @@ import androidx.lifecycle.Lifecycle
 import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.data.entities.Book
 import io.legado.app.databinding.ItemBookshelfList2Binding
-import io.legado.app.help.book.isLocal
 import io.legado.app.fanqie.FanqieUiHelper
+import io.legado.app.help.book.isLocal
 import io.legado.app.help.config.AppConfig
+import io.legado.app.utils.gone
 import io.legado.app.utils.invisible
 import io.legado.app.utils.toTimeAgo
+import io.legado.app.utils.visible
 import splitties.views.onLongClick
 
-/**
-紧凑列表布局
-*/
 class BooksAdapterList2(
     context: Context,
     private val fragment: Fragment,
@@ -35,12 +34,16 @@ class BooksAdapterList2(
         item: Book,
         payloads: MutableList<Any>
     ) = binding.run {
+        ivCover.gone()
+        ivAuthor.gone()
+        ivLast.gone()
+        vwForeground.gone()
+
         if (payloads.isEmpty()) {
             tvName.text = item.name
-            tvAuthor.text = item.author
-            tvRead.text = item.durChapterTitle
-            tvLast.text = item.latestChapterTitle
-            ivCover.load(item, false)
+            tvAuthor.text = item.author.ifBlank { "未知" }
+            tvRead.text = "读至：${item.durChapterTitle?.takeIf { it.isNotBlank() } ?: "未读"}"
+            tvLast.text = "最新：${item.latestChapterTitle?.takeIf { it.isNotBlank() } ?: "无"}"
             upRefresh(binding, item)
             upLastUpdateTime(binding, item)
         } else {
@@ -49,16 +52,9 @@ class BooksAdapterList2(
                 bundle.keySet().forEach {
                     when (it) {
                         "name" -> tvName.text = item.name
-                        "author" -> tvAuthor.text = item.author
-                        "dur" -> tvRead.text = item.durChapterTitle
-                        "last" -> tvLast.text = item.latestChapterTitle
-                        "cover" -> ivCover.load(
-                            item,
-                            false,
-                            fragment,
-                            lifecycle
-                        )
-
+                        "author" -> tvAuthor.text = item.author.ifBlank { "未知" }
+                        "dur" -> tvRead.text = "读至：${item.durChapterTitle?.takeIf { s -> s.isNotBlank() } ?: "未读"}"
+                        "last" -> tvLast.text = "最新：${item.latestChapterTitle?.takeIf { s -> s.isNotBlank() } ?: "无"}"
                         "refresh" -> upRefresh(binding, item)
                         "lastUpdateTime" -> upLastUpdateTime(binding, item)
                     }

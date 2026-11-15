@@ -17,6 +17,7 @@ import io.legado.app.exception.EmptyFileException
 import io.legado.app.exception.NoBooksDirException
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.exception.TocEmptyException
+import io.legado.app.fanqie.FanqieLegadoBridge
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
@@ -136,7 +137,7 @@ object LocalBook {
             }
 
             else -> {
-                TextFile.getChapterList(book)
+                FanqieLegadoBridge.loadNativeBookChapters(book) ?: TextFile.getChapterList(book)
             }
         }
         if (chapters.isEmpty()) {
@@ -165,7 +166,7 @@ object LocalBook {
                     replaceBook = replaceBook
                 )
         book.totalChapterNum = list.size
-        book.latestChapterTime = System.currentTimeMillis()
+        book.latestChapterTime = maxOf(System.currentTimeMillis(), getLastModified(book).getOrDefault(0L) + 1000L)
         return list
     }
 

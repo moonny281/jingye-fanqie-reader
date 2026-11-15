@@ -1,6 +1,5 @@
 package io.legado.app.fanqie
 
-import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 import splitties.init.appCtx
@@ -10,17 +9,46 @@ data class CachedChapterEntry(
     val key: String,
     val index: Int,
     val title: String,
-    val formattedText: String
-)
+    val formattedText: String,
+    val volumeIndex: Int = 0,
+    val volumeName: String = "",
+    val paragraphs: List<String> = emptyList(),
+    val wordCount: Int = 0
+) {
+    /**
+     * 若旧版缓存仅保存了 formattedText，自动从中拆出干净的正文段落列表，保证导出 EPUB/TXT 时兼容旧断点。
+     */
+    fun resolvedParagraphs(): List<String> {
+        if (paragraphs.isNotEmpty()) return paragraphs
+        val lines = formattedText.lines()
+        val result = ArrayList<String>()
+        for ((idx, rawLine) in lines.withIndex()) {
+            val trimmed = rawLine.trim()
+            if (trimmed.isEmpty()) continue
+            if (idx == 0 && trimmed.startsWith("【") && trimmed.endsWith("】")) continue
+            result.add(trimmed.removePrefix("　　").trim())
+        }
+        return result
+    }
+
+    fun resolvedWordCount(): Int {
+        if (wordCount > 0) return wordCount
+        return resolvedParagraphs().sumOf { it.length }
+    }
+}
 
 object FanqieChapterCacheStore {
     private val cacheDir: File
         get() = File(appCtx.filesDir, "fanqie_chapter_cache").apply { mkdirs() }
 
-    private fun fileFor(fanqieBookId: String): File {
-        val safeId = fanqieBookId.filter { it.isLetterOrDigit() || it == '_' || it == '-' }.ifEmpty { "unknown" }
-        return File(cacheDir, "${safeId}.json")
-    }
+    private fun safeId(fanqieBookId: String): String =
+        fanqieBookId.filter { it.isLetterOrDigit() || it == '_' || it == '-' }.ifEmpty { "unknown" }
+
+    private fun fileFor(fanqieBookId: String): File =
+        File(cacheDir, "${safeId(fanqieBookId)}.json")
+
+    private fun metaFileFor(fanqieBookId: String): File =
+        File(cacheDir, "${safeId(fanqieBookId)}.meta.json")
 
     @Synchronized
     fun loadCachedMap(fanqieBookId: String): LinkedHashMap<String, CachedChapterEntry> {
@@ -36,8 +64,29 @@ object FanqieChapterCacheStore {
                 val idx = o.optInt("index", i + 1)
                 val title = o.optString("title")
                 val text = o.optString("text")
-                if (key.isNotBlank() && text.isNotBlank()) {
-                    out[key] = CachedChapterEntry(key, idx, title, text)
+                val volIdx = o.optInt("volume_index", 0)
+                val volName = o.optString("volume_name", "")
+                val wc = o.optInt("word_count", 0)
+                val pArr = o.optJSONArray("paragraphs")
+                val paras = ArrayList<String>()
+                if (pArr != null) {
+                    for (p in 0 until pArr.length()) {
+                        val line = pArr.optString(p)
+                        if (line.isNotBlank()) paras.add(line)
+                    }
+                }
+                if (key.isNotBlank() && (text.isNotBlank() || paras.isNotEmpty())) {
+                    val effectiveText = if (text.isNotBlank()) text else FanqieCrawler.formatChapter(title, paras)
+                    out[key] = CachedChapterEntry(
+                        key = key,
+                        index = idx,
+                        title = title,
+                        formattedText = effectiveText,
+                        volumeIndex = volIdx,
+                        volumeName = volName,
+                        paragraphs = paras,
+                        wordCount = wc
+                    )
                 }
             }
             out
@@ -52,18 +101,148 @@ object FanqieChapterCacheStore {
         try {
             val arr = JSONArray()
             for (entry in map.values.sortedBy { it.index }) {
+                val pArr = JSONArray()
+                entry.resolvedParagraphs().forEach { pArr.put(it) }
                 arr.put(
                     JSONObject()
                         .put("key", entry.key)
                         .put("index", entry.index)
                         .put("title", entry.title)
                         .put("text", entry.formattedText)
+                        .put("volume_index", entry.volumeIndex)
+                        .put("volume_name", entry.volumeName)
+                        .put("word_count", entry.resolvedWordCount())
+                        .put("paragraphs", pArr)
                 )
             }
             val f = fileFor(fanqieBookId)
             f.parentFile?.mkdirs()
-            f.writeText(arr.toString(), Charsets.UTF_8)
+            val tmp = File(f.parentFile, "${f.name}.tmp")
+            tmp.writeText(arr.toString(), Charsets.UTF_8)
+            if (f.exists()) f.delete()
+            tmp.renameTo(f)
         } catch (_: Exception) {
+        }
+    }
+
+    @Synchronized
+    fun saveMetadata(meta: FanqieMetadata) {
+        if (meta.bookId.isBlank()) return
+        try {
+            val titlesArr = JSONArray()
+            meta.chapterTitles.forEach { titlesArr.put(it) }
+
+            val volumesArr = JSONArray()
+            meta.volumes.forEach { v ->
+                volumesArr.put(
+                    JSONObject()
+                        .put("index", v.index)
+                        .put("name", v.name)
+                        .put("chapter_count", v.chapterCount)
+                )
+            }
+
+            val chaptersArr = JSONArray()
+            meta.structuredChapters.forEach { ch ->
+                chaptersArr.put(
+                    JSONObject()
+                        .put("index", ch.index)
+                        .put("item_id", ch.itemId ?: "")
+                        .put("title", ch.title)
+                        .put("locked", ch.locked)
+                        .put("volume_index", ch.volumeIndex)
+                        .put("volume_name", ch.volumeName)
+                        .put("word_count", ch.wordCount)
+                        .put("first_pass_time", ch.firstPassTime)
+                )
+            }
+
+            val obj = JSONObject()
+                .put("book_id", meta.bookId)
+                .put("title", meta.title)
+                .put("author", meta.author)
+                .put("score", meta.score)
+                .put("cover_url", meta.coverUrl)
+                .put("intro", meta.intro)
+                .put("word_count", meta.wordCount)
+                .put("chapter_count", meta.chapterCount)
+                .put("serial_status", meta.serialStatus)
+                .put("available_chapters", meta.availableChapters)
+                .put("pc_available", meta.pcAvailable)
+                .put("latest_chapter_title", meta.latestChapterTitle)
+                .put("chapter_titles", titlesArr)
+                .put("volumes", volumesArr)
+                .put("structured_chapters", chaptersArr)
+                .put("updated_at", System.currentTimeMillis())
+
+            val f = metaFileFor(meta.bookId)
+            f.parentFile?.mkdirs()
+            f.writeText(obj.toString(), Charsets.UTF_8)
+        } catch (_: Exception) {
+        }
+    }
+
+    @Synchronized
+    fun loadMetadata(fanqieBookId: String): FanqieMetadata? {
+        if (fanqieBookId.isBlank()) return null
+        val f = metaFileFor(fanqieBookId)
+        if (!f.isFile) return null
+        return try {
+            val obj = JSONObject(f.readText(Charsets.UTF_8))
+            val titlesArr = obj.optJSONArray("chapter_titles")
+            val titles = ArrayList<String>()
+            if (titlesArr != null) {
+                for (i in 0 until titlesArr.length()) titles.add(titlesArr.optString(i))
+            }
+            val volumesArr = obj.optJSONArray("volumes")
+            val volumes = ArrayList<FanqieVolume>()
+            if (volumesArr != null) {
+                for (i in 0 until volumesArr.length()) {
+                    val v = volumesArr.optJSONObject(i) ?: continue
+                    val name = v.optString("name").trim()
+                    if (name.isNotEmpty()) {
+                        volumes.add(FanqieVolume(v.optInt("index", i), name, v.optInt("chapter_count", 0)))
+                    }
+                }
+            }
+            val chArr = obj.optJSONArray("structured_chapters")
+            val structuredChapters = ArrayList<FanqieChapterItem>()
+            if (chArr != null) {
+                for (i in 0 until chArr.length()) {
+                    val c = chArr.optJSONObject(i) ?: continue
+                    structuredChapters.add(
+                        FanqieChapterItem(
+                            index = c.optInt("index", i + 1),
+                            itemId = c.optString("item_id").ifBlank { null },
+                            title = c.optString("title", "第${i + 1}章"),
+                            locked = c.optBoolean("locked", false),
+                            volumeIndex = c.optInt("volume_index", 0),
+                            volumeName = c.optString("volume_name", ""),
+                            wordCount = c.optInt("word_count", 0),
+                            firstPassTime = c.optLong("first_pass_time", 0L)
+                        )
+                    )
+                }
+            }
+            FanqieMetadata(
+                bookId = obj.optString("book_id", fanqieBookId),
+                title = obj.optString("title", "未知书名"),
+                author = obj.optString("author", "未知作者"),
+                score = obj.optString("score", "暂无"),
+                coverUrl = obj.optString("cover_url", ""),
+                intro = obj.optString("intro", ""),
+                wordCount = obj.optInt("word_count", 0),
+                chapterCount = obj.optInt("chapter_count", titles.size),
+                serialStatus = obj.optString("serial_status", "未知"),
+                availableChapters = obj.optInt("available_chapters", titles.size),
+                pcAvailable = obj.optBoolean("pc_available", true),
+                chapterTitles = titles,
+                latestChapterTitle = obj.optString("latest_chapter_title", ""),
+                volumes = volumes,
+                structuredChapters = structuredChapters
+            )
+        } catch (_: Exception) {
+            null
         }
     }
 
@@ -75,6 +254,7 @@ object FanqieChapterCacheStore {
         if (fanqieBookId.isBlank()) return
         try {
             fileFor(fanqieBookId).delete()
+            metaFileFor(fanqieBookId).delete()
         } catch (_: Exception) {
         }
     }

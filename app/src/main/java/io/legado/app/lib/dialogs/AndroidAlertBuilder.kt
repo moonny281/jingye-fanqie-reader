@@ -1,17 +1,20 @@
 package io.legado.app.lib.dialogs
 
+import android.app.Activity
 import android.content.Context
 import android.content.DialogInterface
 import android.graphics.drawable.Drawable
 import android.view.KeyEvent
 import android.view.View
+import android.view.WindowManager
 import androidx.appcompat.app.AlertDialog
 import io.legado.app.R
-import io.legado.app.help.config.AppConfig
+import io.legado.app.eink.EinkRefreshHelper
 import io.legado.app.utils.applyTint
 
 internal class AndroidAlertBuilder(override val ctx: Context) : AlertBuilder<AlertDialog> {
     private val builder = AlertDialog.Builder(ctx)
+    private var userDismissHandler: ((DialogInterface) -> Unit)? = null
 
     override fun setTitle(title: CharSequence) {
         builder.setTitle(title)
@@ -30,11 +33,11 @@ internal class AndroidAlertBuilder(override val ctx: Context) : AlertBuilder<Ale
     }
 
     override fun setIcon(icon: Drawable) {
-        builder.setIcon(icon)
+        // 墨水屏纯黑白线性弹窗不显示彩色/位图图标
     }
 
     override fun setIcon(iconResource: Int) {
-        builder.setIcon(iconResource)
+        // 墨水屏纯黑白线性弹窗不显示彩色/位图图标
     }
 
     override fun setCustomTitle(customTitle: View) {
@@ -100,7 +103,7 @@ internal class AndroidAlertBuilder(override val ctx: Context) : AlertBuilder<Ale
     }
 
     override fun onDismiss(handler: (dialog: DialogInterface) -> Unit) {
-        builder.setOnDismissListener(handler)
+        userDismissHandler = handler
     }
 
     override fun items(
@@ -141,31 +144,33 @@ internal class AndroidAlertBuilder(override val ctx: Context) : AlertBuilder<Ale
         }
     }
 
+    private fun styleEinkAlert(dialog: AlertDialog) {
+        dialog.window?.run {
+            clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            val attr = attributes
+            attr.dimAmount = 0f
+            attr.windowAnimations = 0
+            attributes = attr
+            setBackgroundDrawableResource(R.drawable.bg_eink_border_dialog)
+        }
+        dialog.setOnDismissListener { d ->
+            userDismissHandler?.invoke(d)
+            val hostDecor = (ctx as? Activity)?.window?.decorView
+            EinkRefreshHelper.scrubAfterOverlayDismiss(hostDecor)
+        }
+    }
+
     override fun build(): AlertDialog {
         val dialog = builder.create()
-        if (AppConfig.isEInkMode) {
-            dialog.window?.run {
-                val attr = attributes
-                attr.dimAmount = 0f
-                attr.windowAnimations = 0
-                attributes = attr
-                setBackgroundDrawableResource(R.drawable.bg_eink_border_dialog)
-            }
-        }
+        styleEinkAlert(dialog)
         return dialog
     }
 
     override fun show(): AlertDialog {
-        val dialog = builder.show().applyTint()
-        if (AppConfig.isEInkMode) {
-            dialog.window?.run {
-                val attr = attributes
-                attr.dimAmount = 0f
-                attr.windowAnimations = 0
-                attributes = attr
-                setBackgroundDrawableResource(R.drawable.bg_eink_border_dialog)
-            }
-        }
+        val dialog = builder.create()
+        styleEinkAlert(dialog)
+        dialog.show()
+        dialog.applyTint()
         return dialog
     }
 }

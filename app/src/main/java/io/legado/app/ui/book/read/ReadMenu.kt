@@ -166,6 +166,7 @@ class ReadMenu @JvmOverloads constructor(
             canShowMenu = false
             onMenuOutEnd?.invoke()
             callBack.upSystemUiVisibility()
+            EinkRefreshHelper.scrubAfterOverlayDismiss(activity?.window?.decorView ?: this@ReadMenu)
         } else {
             onMenuOutEnd?.invoke()
         }

@@ -23,7 +23,7 @@ def readProjectVersion = {
         def txt = vf.text.trim()
         if (txt) return txt.replaceFirst(/^[vV]/, "")
     }
-    return "0.4.2"
+    return "0.4.3"
 }
 def version = readProjectVersion()
 def gitCommits = {

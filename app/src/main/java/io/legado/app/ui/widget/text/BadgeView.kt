@@ -2,8 +2,7 @@ package io.legado.app.ui.widget.text
 
 import android.content.Context
 import android.graphics.Color
-import android.graphics.drawable.ShapeDrawable
-import android.graphics.drawable.shapes.RoundRectShape
+import android.graphics.Typeface
 import android.text.TextUtils
 import android.util.AttributeSet
 import android.util.TypedValue
@@ -14,15 +13,12 @@ import android.widget.FrameLayout
 import android.widget.FrameLayout.LayoutParams
 import androidx.appcompat.widget.AppCompatTextView
 import io.legado.app.R
-import io.legado.app.lib.theme.accentColor
-import io.legado.app.utils.ColorUtils
-import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.invisible
 import io.legado.app.utils.visible
 
-
 /**
- * Created by milad heydari on 5/6/2016.
+ * 墨水屏纯黑白线性角标组件 (v0.4.3)：
+ * 去除彩色/灰阶圆角底色，采用 1-bit 纯黑白线性方框（高亮时黑底白字，普通时白底黑框黑字）。
  */
 @Suppress("MemberVisibilityCanBePrivate", "unused")
 class BadgeView @JvmOverloads constructor(
@@ -35,25 +31,15 @@ class BadgeView @JvmOverloads constructor(
             field = hideOnNull
             text = text
         }
-    private var radius: Float = 0.toFloat()
-    private var flatangle: Boolean
 
     val badgeCount: Int?
         get() {
-            if (text == null) {
-                return null
-            }
-            val text = text.toString()
-            return kotlin.runCatching {
-                Integer.parseInt(text)
-            }.getOrNull()
+            if (text == null) return null
+            return kotlin.runCatching { Integer.parseInt(text.toString()) }.getOrNull()
         }
 
     var badgeGravity: Int
-        get() {
-            val params = layoutParams as LayoutParams
-            return params.gravity
-        }
+        get() = (layoutParams as LayoutParams).gravity
         set(gravity) {
             val params = layoutParams as LayoutParams
             params.gravity = gravity
@@ -72,71 +58,34 @@ class BadgeView @JvmOverloads constructor(
         }
 
     init {
-        val typedArray = context.obtainStyledAttributes(attrs, R.styleable.BadgeView)
-        val radios =
-            typedArray.getDimensionPixelOffset(R.styleable.BadgeView_radius, 8)
-        flatangle =
-            typedArray.getBoolean(R.styleable.BadgeView_up_flat_angle, false)
-        typedArray.recycle()
-
         if (layoutParams !is LayoutParams) {
-            val layoutParams = LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.CENTER
+            setLayoutParams(
+                LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.CENTER
+                )
             )
-            setLayoutParams(layoutParams)
         }
-
-        //setTypeface(Typeface.DEFAULT_BOLD);
+        typeface = Typeface.DEFAULT_BOLD
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
-        setPadding(dip2Px(5f), dip2Px(1f), dip2Px(5f), dip2Px(1f))
-        radius = radios.toFloat()
-
-        // set default background
-        setBackground(radius, context.accentColor)
-
+        setPadding(dip2Px(6f), dip2Px(1f), dip2Px(6f), dip2Px(1f))
         gravity = Gravity.CENTER
-
-        // default values
         isHideOnNull = true
+        setHighlight(false)
         setBadgeCount(0)
-        minWidth = dip2Px(16f)
-        minHeight = dip2Px(16f)
+        minWidth = dip2Px(18f)
+        minHeight = dip2Px(18f)
     }
 
     override fun setBackgroundColor(color: Int) {
-        val background = background
-        if (background is ShapeDrawable && background.paint.color == color) {
-            return
-        }
-        setBackground(radius, color)
+        setHighlight(color == Color.BLACK)
     }
 
     fun setBackground(dipRadius: Float, badgeColor: Int) {
-        val radius = dip2Px(dipRadius).toFloat()
-        val radiusArray =
-            floatArrayOf(radius, radius, radius, radius, radius, radius, radius, radius)
-        if (flatangle) {
-            radiusArray.fill(0f, 0, 3)
-        }
-
-        val roundRect = RoundRectShape(radiusArray, null, null)
-        val bgDrawable = ShapeDrawable(roundRect)
-        bgDrawable.paint.color = badgeColor
-        background = bgDrawable
-        setTextColor(
-            if (ColorUtils.isColorLight(badgeColor)) {
-                Color.BLACK
-            } else {
-                Color.WHITE
-            }
-        )
+        setHighlight(badgeColor == Color.BLACK)
     }
 
-    /**
-     * @see android.widget.TextView.setText
-     */
     override fun setText(text: CharSequence, type: BufferType) {
         if (isHideOnNull && TextUtils.isEmpty(text)) {
             invisible()
@@ -152,9 +101,11 @@ class BadgeView @JvmOverloads constructor(
 
     fun setHighlight(highlight: Boolean) {
         if (highlight) {
-            setBackgroundColor(context.accentColor)
+            setBackgroundResource(R.drawable.bg_eink_button_solid)
+            setTextColor(Color.WHITE)
         } else {
-            setBackgroundColor(context.getCompatColor(R.color.darker_gray))
+            setBackgroundResource(R.drawable.bg_eink_button_outline)
+            setTextColor(Color.BLACK)
         }
     }
 
@@ -189,47 +140,30 @@ class BadgeView @JvmOverloads constructor(
         incrementBadgeCount(-decrement)
     }
 
-    /**
-     * Attach the BadgeView to the target view
-     * @param target the view to attach the BadgeView
-     */
     fun setTargetView(target: View?) {
         if (parent != null) {
             (parent as ViewGroup).removeView(this)
         }
-
-        if (target == null) {
-            return
-        }
-
+        if (target == null) return
         if (target.parent is FrameLayout) {
             (target.parent as FrameLayout).addView(this)
-
         } else if (target.parent is ViewGroup) {
-            // use a new FrameLayout container for adding badge
             val parentContainer = target.parent as ViewGroup
             val groupIndex = parentContainer.indexOfChild(target)
             parentContainer.removeView(target)
-
             val badgeContainer = FrameLayout(context)
             val parentLayoutParams = target.layoutParams
-
             badgeContainer.layoutParams = parentLayoutParams
             target.layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
             )
-
             parentContainer.addView(badgeContainer, groupIndex, parentLayoutParams)
             badgeContainer.addView(target)
-
             badgeContainer.addView(this)
         }
-
     }
 
-    /**
-     * converts dip to px
-     */
     private fun dip2Px(dip: Float): Int {
         return (dip * context.resources.displayMetrics.density + 0.5f).toInt()
     }

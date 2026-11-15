@@ -6,10 +6,10 @@
     android:background="#FFFFFFFF"
     android:orientation="vertical">
 
-    <!-- 墨水屏高对比顶栏 -->
+    <!-- 微信读书墨水屏纯黑白线性顶栏 -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="52dp"
+        android:layout_height="50dp"
         android:background="@drawable/bg_eink_border_bottom"
         android:gravity="center_vertical"
         android:orientation="horizontal"
@@ -18,7 +18,7 @@
         <Button
             android:id="@+id/btnBack"
             android:layout_width="wrap_content"
-            android:layout_height="34dp"
+            android:layout_height="32dp"
             android:background="@drawable/selector_eink_button"
             android:minWidth="0dp"
             android:minHeight="0dp"
@@ -36,9 +36,24 @@
             android:layout_weight="1"
             android:ellipsize="end"
             android:singleLine="true"
-            android:text="番茄书城 · 全本搜书与秒开阅读"
+            android:text="番茄书城 · 纯净墨水屏版"
             android:textColor="#FF000000"
             android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnEinkClean"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/selector_eink_button"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:paddingHorizontal="8dp"
+            android:stateListAnimator="@null"
+            android:text="清残影"
+            android:textColor="#FF000000"
+            android:textSize="12sp"
             android:textStyle="bold" />
 
         <Button
@@ -69,7 +84,7 @@
             android:textSize="12sp" />
     </LinearLayout>
 
-    <!-- 隐藏式远端引擎面板（默认隐藏，避免工程调试感） -->
+    <!-- 隐藏式远端引擎面板 -->
     <LinearLayout
         android:id="@+id/configContainer"
         android:layout_width="match_parent"
@@ -83,7 +98,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="下载引擎模式（默认留空直接使用内置本地引擎，无需部署服务器）"
-            android:textColor="#FF222222"
+            android:textColor="#FF000000"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -104,7 +119,7 @@
                 android:paddingHorizontal="10dp"
                 android:singleLine="true"
                 android:textColor="#FF000000"
-                android:textColorHint="#FF777777"
+                android:textColorHint="#FF000000"
                 android:textSize="12sp" />
 
             <Button
@@ -123,7 +138,7 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- 微信读书墨水屏风格一体式搜索框 + 分类快捷胶囊栏 -->
+    <!-- 微信读书墨水屏风格纯黑白线性搜索框 + 分类胶囊排 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -135,7 +150,7 @@
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="42dp"
+            android:layout_height="40dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -151,7 +166,7 @@
                 android:paddingHorizontal="12dp"
                 android:singleLine="true"
                 android:textColor="#FF000000"
-                android:textColorHint="#FF666666"
+                android:textColorHint="#FF000000"
                 android:textSize="14sp" />
 
             <Button
@@ -182,11 +197,11 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- 热门分类一键探索胶囊排 -->
         <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
+            android:overScrollMode="never"
             android:scrollbars="none">
 
             <LinearLayout
@@ -199,8 +214,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="6dp"
-                    android:text="热门分类："
-                    android:textColor="#FF333333"
+                    android:text="分类："
+                    android:textColor="#FF000000"
                     android:textSize="12sp"
                     android:textStyle="bold" />
 
@@ -209,71 +224,77 @@
                     android:layout_width="wrap_content"
                     android:layout_height="28dp"
                     android:layout_marginEnd="6dp"
-                    android:background="@drawable/bg_eink_pill_outline"
+                    android:background="@drawable/bg_eink_button_outline"
                     android:gravity="center"
-                    android:paddingHorizontal="12dp"
+                    android:paddingHorizontal="10dp"
                     android:text="十日终焉"
                     android:textColor="#FF000000"
-                    android:textSize="12sp" />
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/chipCat2"
                     android:layout_width="wrap_content"
                     android:layout_height="28dp"
                     android:layout_marginEnd="6dp"
-                    android:background="@drawable/bg_eink_pill_outline"
+                    android:background="@drawable/bg_eink_button_outline"
                     android:gravity="center"
-                    android:paddingHorizontal="12dp"
+                    android:paddingHorizontal="10dp"
                     android:text="玄幻仙侠"
                     android:textColor="#FF000000"
-                    android:textSize="12sp" />
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/chipCat3"
                     android:layout_width="wrap_content"
                     android:layout_height="28dp"
                     android:layout_marginEnd="6dp"
-                    android:background="@drawable/bg_eink_pill_outline"
+                    android:background="@drawable/bg_eink_button_outline"
                     android:gravity="center"
-                    android:paddingHorizontal="12dp"
+                    android:paddingHorizontal="10dp"
                     android:text="历史古代"
                     android:textColor="#FF000000"
-                    android:textSize="12sp" />
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/chipCat4"
                     android:layout_width="wrap_content"
                     android:layout_height="28dp"
                     android:layout_marginEnd="6dp"
-                    android:background="@drawable/bg_eink_pill_outline"
+                    android:background="@drawable/bg_eink_button_outline"
                     android:gravity="center"
-                    android:paddingHorizontal="12dp"
+                    android:paddingHorizontal="10dp"
                     android:text="悬疑脑洞"
                     android:textColor="#FF000000"
-                    android:textSize="12sp" />
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/chipCat5"
                     android:layout_width="wrap_content"
                     android:layout_height="28dp"
                     android:layout_marginEnd="6dp"
-                    android:background="@drawable/bg_eink_pill_outline"
+                    android:background="@drawable/bg_eink_button_outline"
                     android:gravity="center"
-                    android:paddingHorizontal="12dp"
+                    android:paddingHorizontal="10dp"
                     android:text="科幻末世"
                     android:textColor="#FF000000"
-                    android:textSize="12sp" />
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/chipCat6"
                     android:layout_width="wrap_content"
                     android:layout_height="28dp"
-                    android:background="@drawable/bg_eink_pill_outline"
+                    android:background="@drawable/bg_eink_button_outline"
                     android:gravity="center"
-                    android:paddingHorizontal="12dp"
+                    android:paddingHorizontal="10dp"
                     android:text="都市高武"
                     android:textColor="#FF000000"
-                    android:textSize="12sp" />
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
             </LinearLayout>
         </HorizontalScrollView>
 
@@ -282,12 +303,12 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="点击任意搜索结果可直接「立即阅读」（秒开边看边下），或启动「全本后台离线」"
-            android:textColor="#FF222222"
+            android:text="纯黑白线性无图模式：点击搜索结果可立即阅读、全本后台离线或导出含目录 TXT/EPUB"
+            android:textColor="#FF000000"
             android:textSize="12sp" />
     </LinearLayout>
 
-    <!-- 书籍详情与流式阅读/后台断点下载卡片 -->
+    <!-- 书籍详情与流式阅读/后台断点下载/原生目录导出纯黑白线性卡片（移除封面图片） -->
     <LinearLayout
         android:id="@+id/bookInfoCard"
         android:layout_width="match_parent"
@@ -298,94 +319,80 @@
         android:padding="14dp"
         android:visibility="gone">
 
+        <ImageView
+            android:id="@+id/ivDetailCover"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:contentDescription="封面"
+            android:visibility="gone" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <ImageView
-                android:id="@+id/ivDetailCover"
-                android:layout_width="76dp"
-                android:layout_height="104dp"
-                android:background="@drawable/bg_eink_cover_border"
-                android:contentDescription="封面"
-                android:padding="1dp"
-                android:scaleType="centerCrop"
-                android:src="@drawable/image_cover_default" />
-
-            <LinearLayout
+            <TextView
+                android:id="@+id/tvBookTitle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
                 android:layout_weight="1"
-                android:orientation="vertical">
+                android:textColor="#FF000000"
+                android:textSize="18sp"
+                android:textStyle="bold" />
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/tvBookTitle"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:textColor="#FF000000"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
-
-                    <Button
-                        android:id="@+id/btnBackToSearch"
-                        android:layout_width="wrap_content"
-                        android:layout_height="28dp"
-                        android:background="@drawable/selector_eink_button"
-                        android:minWidth="0dp"
-                        android:minHeight="0dp"
-                        android:paddingHorizontal="8dp"
-                        android:stateListAnimator="@null"
-                        android:text="返回列表"
-                        android:textColor="#FF000000"
-                        android:textSize="11sp"
-                        android:visibility="gone" />
-                </LinearLayout>
-
-                <TextView
-                    android:id="@+id/tvBookAuthor"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:textColor="#FF222222"
-                    android:textSize="13sp" />
-
-                <TextView
-                    android:id="@+id/tvBookLatestChapter"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:textColor="#FF000000"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvBookCheckpointInfo"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:textColor="#FF333333"
-                    android:textSize="12sp" />
-            </LinearLayout>
+            <Button
+                android:id="@+id/btnBackToSearch"
+                android:layout_width="wrap_content"
+                android:layout_height="28dp"
+                android:background="@drawable/selector_eink_button"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:paddingHorizontal="10dp"
+                android:stateListAnimator="@null"
+                android:text="返回列表"
+                android:textColor="#FF000000"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvBookAuthor"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textColor="#FF000000"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/tvBookLatestChapter"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textColor="#FF000000"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvBookCheckpointInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textColor="#FF000000"
+            android:textSize="12sp" />
 
         <TextView
             android:id="@+id/tvBookIntro"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
+            android:background="@drawable/bg_eink_border_top"
             android:ellipsize="end"
             android:lineSpacingMultiplier="1.25"
             android:maxLines="4"
-            android:textColor="#FF111111"
+            android:paddingTop="8dp"
+            android:textColor="#FF000000"
             android:textSize="13sp" />
 
         <ProgressBar
@@ -399,7 +406,7 @@
             android:progressTint="#FF000000"
             android:visibility="gone" />
 
-        <!-- 原生无缝操作栏：立即阅读（秒开） + 全本后台离线 + 暂停 -->
+        <!-- 原生无缝操作栏：立即阅读（秒开） + 全本后台离线 + 导出小说 + 暂停 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -409,20 +416,20 @@
             <Button
                 android:id="@+id/btnOpenDownloadedBook"
                 android:layout_width="0dp"
-                android:layout_height="42dp"
-                android:layout_marginEnd="8dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="6dp"
                 android:layout_weight="1.15"
                 android:background="@drawable/bg_eink_button_solid"
                 android:stateListAnimator="@null"
                 android:text="立即阅读（秒开）"
                 android:textColor="#FFFFFFFF"
-                android:textSize="14sp"
+                android:textSize="13sp"
                 android:textStyle="bold" />
 
             <Button
                 android:id="@+id/btnDownloadBook"
                 android:layout_width="0dp"
-                android:layout_height="42dp"
+                android:layout_height="40dp"
                 android:layout_weight="1"
                 android:background="@drawable/selector_eink_button"
                 android:stateListAnimator="@null"
@@ -432,14 +439,29 @@
                 android:textStyle="bold" />
 
             <Button
-                android:id="@+id/btnPauseDownload"
+                android:id="@+id/btnExportBook"
                 android:layout_width="wrap_content"
-                android:layout_height="42dp"
-                android:layout_marginStart="8dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="6dp"
                 android:background="@drawable/selector_eink_button"
+                android:minWidth="0dp"
                 android:paddingHorizontal="12dp"
                 android:stateListAnimator="@null"
-                android:text="暂停存断点"
+                android:text="导出小说"
+                android:textColor="#FF000000"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btnPauseDownload"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/selector_eink_button"
+                android:minWidth="0dp"
+                android:paddingHorizontal="10dp"
+                android:stateListAnimator="@null"
+                android:text="暂停"
                 android:textColor="#FF000000"
                 android:textSize="12sp"
                 android:visibility="gone" />
@@ -474,6 +496,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
+        android:background="#FFFFFFFF"
         android:clipToPadding="false"
         android:overScrollMode="never"
         android:paddingHorizontal="12dp"

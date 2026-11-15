@@ -23,6 +23,7 @@ import io.legado.app.constant.AppConst.appInfo
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
 import io.legado.app.databinding.ActivityMainBinding
+import io.legado.app.eink.EinkRefreshHelper
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.LifecycleHelp
 import io.legado.app.help.book.BookHelp

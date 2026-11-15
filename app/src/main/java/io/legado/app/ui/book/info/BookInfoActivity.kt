@@ -721,12 +721,11 @@ class BookInfoActivity :
     }
 
     private fun showCover(book: Book) {
-        binding.ivCover.load(book, false) {
-            if (!AppConfig.isEInkMode) {
-                BookCover.loadBlur(this, book.getDisplayCover(), false, book.origin)
-                    .into(binding.bgBook)
-            }
-        }
+        // 0.4.3 微信读书墨水屏纯黑白线性无图模式：不加载书籍封面图片与高斯模糊背景图
+        binding.bgBook.gone()
+        binding.arcView?.gone()
+        binding.ivCoverC.gone()
+        binding.ivCover.gone()
     }
 
     private fun upLoading(isLoading: Boolean, chapterList: List<BookChapter>? = null) {

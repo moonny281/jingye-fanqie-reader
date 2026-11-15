@@ -9,8 +9,8 @@ import io.legado.app.data.entities.BookGroup
 import io.legado.app.databinding.ItemBookshelfList2Binding
 import io.legado.app.databinding.ItemBookshelfListBinding
 import io.legado.app.databinding.ItemBookshelfListGroupBinding
-import io.legado.app.help.book.isLocal
 import io.legado.app.fanqie.FanqieUiHelper
+import io.legado.app.help.book.isLocal
 import io.legado.app.help.config.AppConfig
 import io.legado.app.utils.gone
 import io.legado.app.utils.invisible
@@ -25,10 +25,12 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
         return when (viewType) {
             1 -> GroupViewHolder(ItemBookshelfListGroupBinding.inflate(inflater, parent, false))
             else -> {
-                if (AppConfig.bookshelfLayout == 0) { BookViewHolder(ItemBookshelfListBinding.inflate(inflater, parent, false)) }
-                else { BookViewHolder2(ItemBookshelfList2Binding.inflate(inflater, parent, false)) }
+                if (AppConfig.bookshelfLayout == 0) {
+                    BookViewHolder(ItemBookshelfListBinding.inflate(inflater, parent, false))
+                } else {
+                    BookViewHolder2(ItemBookshelfList2Binding.inflate(inflater, parent, false))
+                }
             }
-
         }
     }
 
@@ -42,12 +44,10 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                 holder.registerListener(it)
                 holder.onBind(it, position, payloads)
             }
-
             is BookViewHolder2 -> (getItem(position) as? Book)?.let {
                 holder.registerListener(it)
                 holder.onBind(it, position, payloads)
             }
-
             is GroupViewHolder -> (getItem(position) as? BookGroup)?.let {
                 holder.registerListener(it)
                 holder.onBind(it, position, payloads)
@@ -59,15 +59,16 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
         RecyclerView.ViewHolder(binding.root) {
 
         fun onBind(item: Book, position: Int) = binding.run {
+            ivCover.gone()
+            ivAuthor.gone()
+            ivLast.gone()
+            ivRead.gone()
+            vwForeground.gone()
             tvName.text = item.name
-            tvAuthor.text = item.author
-            tvRead.text = item.durChapterTitle
-            tvLast.text = item.latestChapterTitle
-            ivCover.load(item, false)
+            tvAuthor.text = "作者：${item.author.ifBlank { "未知" }}"
+            tvRead.text = "读至：${item.durChapterTitle?.takeIf { it.isNotBlank() } ?: "尚未开始阅读"}"
+            tvLast.text = "最新：${item.latestChapterTitle?.takeIf { it.isNotBlank() } ?: "无"}"
             flHasNew.visible()
-            ivAuthor.visible()
-            ivLast.visible()
-            ivRead.visible()
             upRefresh(this, item)
         }
 
@@ -80,14 +81,9 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                     bundle.keySet().forEach {
                         when (it) {
                             "name" -> tvName.text = item.name
-                            "author" -> tvAuthor.text = item.author
-                            "dur" -> tvRead.text = item.durChapterTitle
-                            "last" -> tvLast.text = item.latestChapterTitle
-                            "cover" -> ivCover.load(
-                                item,
-                                false
-                            )
-
+                            "author" -> tvAuthor.text = "作者：${item.author.ifBlank { "未知" }}"
+                            "dur" -> tvRead.text = "读至：${item.durChapterTitle?.takeIf { s -> s.isNotBlank() } ?: "尚未开始阅读"}"
+                            "last" -> tvLast.text = "最新：${item.latestChapterTitle?.takeIf { s -> s.isNotBlank() } ?: "无"}"
                             "refresh" -> upRefresh(this, item)
                         }
                     }
@@ -119,24 +115,21 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                 }
             }
         }
-
     }
 
-    /**
-    紧凑列表布局
-     */
     inner class BookViewHolder2(val binding: ItemBookshelfList2Binding) :
         RecyclerView.ViewHolder(binding.root) {
 
         fun onBind(item: Book, position: Int) = binding.run {
+            ivCover.gone()
+            ivAuthor.gone()
+            ivLast.gone()
+            vwForeground.gone()
             tvName.text = item.name
-            tvAuthor.text = item.author
-            tvRead.text = item.durChapterTitle
-            tvLast.text = item.latestChapterTitle
-            ivCover.load(item, false)
+            tvAuthor.text = item.author.ifBlank { "未知" }
+            tvRead.text = "读至：${item.durChapterTitle?.takeIf { it.isNotBlank() } ?: "未读"}"
+            tvLast.text = "最新：${item.latestChapterTitle?.takeIf { it.isNotBlank() } ?: "无"}"
             flHasNew.visible()
-            ivAuthor.visible()
-            ivLast.visible()
             upRefresh(this, item)
         }
 
@@ -149,14 +142,9 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                     bundle.keySet().forEach {
                         when (it) {
                             "name" -> tvName.text = item.name
-                            "author" -> tvAuthor.text = item.author
-                            "dur" -> tvRead.text = item.durChapterTitle
-                            "last" -> tvLast.text = item.latestChapterTitle
-                            "cover" -> ivCover.load(
-                                item,
-                                false
-                            )
-
+                            "author" -> tvAuthor.text = item.author.ifBlank { "未知" }
+                            "dur" -> tvRead.text = "读至：${item.durChapterTitle?.takeIf { s -> s.isNotBlank() } ?: "未读"}"
+                            "last" -> tvLast.text = "最新：${item.latestChapterTitle?.takeIf { s -> s.isNotBlank() } ?: "无"}"
                             "refresh" -> upRefresh(this, item)
                         }
                     }
@@ -188,15 +176,14 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                 }
             }
         }
-
     }
 
     inner class GroupViewHolder(val binding: ItemBookshelfListGroupBinding) :
         RecyclerView.ViewHolder(binding.root) {
 
         fun onBind(item: BookGroup, position: Int) = binding.run {
-            tvName.text = item.groupName
-            ivCover.load(item.cover)
+            ivCover.gone()
+            tvName.text = "【分组】${item.groupName}"
             flHasNew.gone()
             ivAuthor.gone()
             ivLast.gone()
@@ -214,8 +201,7 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                     val bundle = payloads[i] as Bundle
                     bundle.keySet().forEach {
                         when (it) {
-                            "groupName" -> tvName.text = item.groupName
-                            "cover" -> ivCover.load(item.cover)
+                            "groupName" -> tvName.text = "【分组】${item.groupName}"
                         }
                     }
                 }
@@ -230,7 +216,5 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                 callBack.onItemLongClick(item)
             }
         }
-
     }
-
 }

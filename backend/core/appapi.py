@@ -482,36 +482,89 @@ def _clean_fragment(fragment: str) -> str:
     return text.strip()
 
 
-def parse_chapter_xhtml(xhtml: str) -> Tuple[str, List[str]]:
-    """解析 APP 下发的章节 XHTML，返回 ``(章节标题, 段落列表)``。
+_TITLE_CMP_RE = re.compile(r"[\s\W_【】〖〗〘〙《》「」『』、，。！？：；“”‘’（）()\[\]—\-·]+", re.UNICODE)
 
-    正文结构形如::
 
-        <article><h1 class="chapterTitle1"><blk>第101章 标题</blk></h1>
-        <p idx="0" p_idx="40000"><blk>段落文本</blk></p>…</article>
+def _is_dup_title(line: str, ref_title: str) -> bool:
+    if not line or not ref_title:
+        return False
+    l_s, r_s = line.strip(), ref_title.strip()
+    if l_s.lower() == r_s.lower():
+        return True
+    if len(l_s) > len(r_s) + 16:
+        return False
+    l_n = _TITLE_CMP_RE.sub("", l_s).lower()
+    r_n = _TITLE_CMP_RE.sub("", r_s).lower()
+    return bool(l_n and l_n == r_n)
 
-    正文为明文（无字体混淆），只需去标签 / 反转义。
-    """
+
+def parse_chapter_xhtml(xhtml: str, expected_title: str = "") -> Tuple[str, List[str]]:
+    """深度解析 APP 下发的章节 XHTML，完整保留原生排版结构并剔除重复标题。"""
     if not xhtml:
         return "", []
-    xhtml = _STYLE_RE.sub("", xhtml)
 
-    title = ""
-    match = _H1_RE.search(xhtml)
-    if match:
-        title = _clean_fragment(match.group(1))
+    h1_m = _H1_RE.search(xhtml)
+    extracted_title = _clean_fragment(h1_m.group(1)) if h1_m else ""
+    ref_title = expected_title or extracted_title
+
+    author_notes: List[str] = []
+
+    def _collect_author_say(m: re.Match) -> str:
+        inner = re.sub(r"<br\s*/?>", "\n", m.group(1), flags=re.I)
+        for line in inner.splitlines():
+            c = _clean_fragment(line)
+            if c and c not in ("作家的话", "作者有话说", "作者的话"):
+                author_notes.append(c)
+        return ""
+
+    working = re.sub(
+        r'<div\b[^>]*class\s*=\s*["\'][^"\']*(?:author-say|author-words|writer-say)[^"\']*["\'][^>]*>(.*?)</div>',
+        _collect_author_say,
+        xhtml,
+        flags=re.I | re.S,
+    )
+    working = _STYLE_RE.sub("", working)
+    working = re.sub(r"<(script|head)\b[^>]*>.*?</\1>", "", working, flags=re.I | re.S)
+    working = _H1_RE.sub("", working)
+    working = re.sub(r"<hr\b[^>]*>", "<p>* * *</p>", working, flags=re.I)
+    working = re.sub(
+        r"<h[2-4]\b[^>]*>(.*?)</h[2-4]>",
+        lambda m: f"<p>〖{_clean_fragment(m.group(1))}〗</p>" if _clean_fragment(m.group(1)) else "",
+        working,
+        flags=re.I | re.S,
+    )
 
     paragraphs: List[str] = []
-    for raw in _P_RE.findall(xhtml):
-        text = _clean_fragment(raw)
-        if text:
-            paragraphs.append(text)
-    if not paragraphs:  # 兜底：没有 <p> 时按 <blk> 收集
-        for raw in _BLK_RE.findall(xhtml):
+    p_matches = _P_RE.findall(working)
+    if p_matches:
+        for raw in p_matches:
+            with_nl = re.sub(r"<br\s*/?>", "\n", raw, flags=re.I)
+            sub_lines = [_clean_fragment(s) for s in with_nl.splitlines() if _clean_fragment(s)]
+            if not sub_lines:
+                if paragraphs and paragraphs[-1] != "* * *":
+                    paragraphs.append("* * *")
+            else:
+                paragraphs.extend(sub_lines)
+    else:
+        for raw in _BLK_RE.findall(working):
             text = _clean_fragment(raw)
-            if text and text != title:
+            if text:
                 paragraphs.append(text)
-    return title, paragraphs
+
+    while paragraphs and paragraphs[0] == "* * *":
+        paragraphs.pop(0)
+    while paragraphs and paragraphs[-1] == "* * *":
+        paragraphs.pop()
+    if paragraphs and (_is_dup_title(paragraphs[0], ref_title) or _is_dup_title(paragraphs[0], extracted_title)):
+        paragraphs.pop(0)
+    while paragraphs and paragraphs[0] == "* * *":
+        paragraphs.pop(0)
+
+    if author_notes:
+        paragraphs.append("—— 作家的话 ——")
+        paragraphs.extend(author_notes)
+
+    return extracted_title, paragraphs
 
 
 # --------------------------------------------------------------------------- #

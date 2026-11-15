@@ -1,5 +1,14 @@
 package io.legado.app.fanqie
 
+/**
+ * 原生分卷信息（对应番茄目录接口中的 volumeNameList / chapterListWithVolume）
+ */
+data class FanqieVolume(
+    val index: Int,
+    val name: String,
+    val chapterCount: Int = 0
+)
+
 data class FanqieSearchItem(
     val bookId: String,
     val title: String,
@@ -12,7 +21,8 @@ data class FanqieSearchItem(
     val coverUrl: String = ""
 ) {
     fun formattedWordCount(): String = when {
-        wordCount >= 10000 -> String.format("%.1f万字", wordCount / 10000.0)
+        wordCount >= 100_000_000 -> String.format("%.2f亿字", wordCount / 100_000_000.0)
+        wordCount >= 10_000 -> String.format("%.1f万字", wordCount / 10_000.0)
         wordCount > 0 -> "${wordCount}字"
         else -> ""
     }
@@ -42,26 +52,50 @@ data class FanqieMetadata(
     val availableChapters: Int,
     val pcAvailable: Boolean,
     val chapterTitles: List<String> = emptyList(),
-    val latestChapterTitle: String = ""
+    val latestChapterTitle: String = "",
+    val volumes: List<FanqieVolume> = emptyList(),
+    val structuredChapters: List<FanqieChapterItem> = emptyList()
 ) {
     fun formattedWordCount(): String = when {
-        wordCount >= 10000 -> String.format("%.1f 万字", wordCount / 10000.0)
+        wordCount >= 100_000_000 -> String.format("%.2f 亿字", wordCount / 100_000_000.0)
+        wordCount >= 10_000 -> String.format("%.1f 万字", wordCount / 10_000.0)
         wordCount > 0 -> "$wordCount 字"
         else -> "未知字数"
     }
 
     fun effectiveLatestChapter(): String =
-        latestChapterTitle.ifBlank { chapterTitles.lastOrNull().orEmpty() }
+        latestChapterTitle.ifBlank {
+            structuredChapters.lastOrNull()?.title?.ifBlank { null }
+                ?: chapterTitles.lastOrNull().orEmpty()
+        }
 }
 
 data class FanqieChapterItem(
     val index: Int,
     val itemId: String?,
     val title: String,
-    val locked: Boolean
+    val locked: Boolean = false,
+    val volumeIndex: Int = 0,
+    val volumeName: String = "",
+    val wordCount: Int = 0,
+    val firstPassTime: Long = 0L
 ) {
     fun cacheKey(): String = if (!itemId.isNullOrBlank()) itemId else "idx_$index"
 }
+
+/**
+ * 合成 TXT 时的精确 UTF-8 字节偏移目录项（用于直通构建 Legado BookChapter 及 .toc.json）
+ */
+data class FanqieBuiltTocItem(
+    val index: Int,
+    val title: String,
+    val isVolume: Boolean,
+    val startByte: Long,
+    val endByte: Long,
+    val wordCount: Int = 0,
+    val volumeName: String = "",
+    val itemId: String? = null
+)
 
 data class FanqieProgress(
     val bookId: String,
@@ -92,4 +126,4 @@ data class BookUpdateCheckResult(
     fun hasPendingDownload(): Boolean = newChaptersCount > 0 || isPartialResume
 }
 
-class FanqieException(message: String, cause: Throwable? = null) : Exception(message, cause)
+open class FanqieException(message: String, cause: Throwable? = null) : Exception(message, cause)

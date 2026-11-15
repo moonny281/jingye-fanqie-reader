@@ -1,31 +1,5 @@
 # -*- coding: utf-8 -*-
-"""章节抓取调度器。
-
-数据通道
---------
-1. **APP 正文通道**（主力，可下全书）
-   ``reading.snssdk.com/reading/reader/batch_full/v``
-   注册匿名设备 + 请求签名 + AES 解密后直接拿到**明文 XHTML 正文**，
-   App 独占书、会员/SVIP 章节都能取到全文，无需登录。详见 :mod:`core.appapi`。
-
-2. **落地页极速通道**（免登录）
-   ``GET https://api.fqnovel.com/novel_ug/share/landing_page``
-   返回书名 / 作者 / 评分 / 封面 / 简介 / 章节数，以及**前 10 章明文正文**。
-   这部分完全不含字体混淆，是 APP 通道不可用时的兜底。
-
-3. **PC 目录通道**
-   ``GET https://fanqienovel.com/api/reader/directory/detail?bookId=...``
-   返回全书 itemId 与章节标题（App 独占书也能拿到目录）。
-
-4. **PC 阅读器通道**（兜底）
-   ``GET https://fanqienovel.com/reader/{item_id}``
-   服务端直出正文 HTML，段落位于 ``.muye-reader-content p``，但正文被
-   ``awesome-font`` 私有区编码混淆，需交给 :mod:`core.decryptor` 解密。
-
-APP 通道不可用时（设备注册失败 / 网络受限）自动回退网页通道；
-网页通道对未登录用户只放前 10 章，此时 ``download_book`` 会明确返回
-失败章节与原因，不会静默丢章。
-"""
+"""章节抓取调度器（支持原生分卷目录还原与结构化排版导出）。"""
 
 from __future__ import annotations
 
@@ -60,6 +34,7 @@ except ImportError:  # 兼容 `python core/crawler.py` 直接运行自测
 
 LANDING_API = "https://api.fqnovel.com/novel_ug/share/landing_page"
 DIRECTORY_API = "https://fanqienovel.com/api/reader/directory/detail"
+APP_DIRECTORY_API = "https://api.fqnovel.com/reading/bookapi/directory/all_items/v/"
 READER_PAGE = "https://fanqienovel.com/reader/{item_id}"
 PC_PAGE = "https://fanqienovel.com/page/{book_id}"
 
@@ -81,6 +56,7 @@ _ILLEGAL_FILENAME_RE = re.compile(r'[\\/:*?"<>|\r\n\t]+')
 _TAG_RE = re.compile(r"<[^>]+>")
 _P_RE = re.compile(r"<p(?:\s[^>]*)?>(.*?)</p>", re.IGNORECASE | re.DOTALL)
 _WS_RE = re.compile(r"[ \t\r\f\v\u00a0]+")
+_ZERO_WIDTH_RE = re.compile(r"[\u200b\u200c\u200d\u2060\ufeff]")
 
 ProgressCallback = Callable[[int, int, str], None]
 
@@ -97,7 +73,6 @@ class CaptchaError(CrawlerError):
     """触发了番茄的风控验证码中间页，需要冷却后再试。"""
 
 
-# 验证码中间页特征（响应体里同时出现多个才判定，避免误伤正常页面）
 _CAPTCHA_BYTES = (
     "验证码中间页".encode("utf-8"),
     b"middle_page_loading",
@@ -117,7 +92,7 @@ def _is_captcha_page(content: bytes) -> bool:
 
 
 # --------------------------------------------------------------------------- #
-# HTML 工具
+# HTML 工具与原生排版还原
 # --------------------------------------------------------------------------- #
 
 def _strip_tags(fragment: str) -> str:
@@ -126,31 +101,49 @@ def _strip_tags(fragment: str) -> str:
     return html_lib.unescape(fragment)
 
 
-def clean_paragraphs(html_fragment: str) -> list[str]:
-    """把正文 HTML 片段拆成干净的段落列表（去标签 / 去空段 / 去零宽字符）。"""
+def normalize_chapter_title(raw_title: str, fallback_index: int) -> str:
+    cleaned = _ZERO_WIDTH_RE.sub("", raw_title or "")
+    cleaned = _WS_RE.sub(" ", cleaned.replace("\r", " ").replace("\n", " ")).strip()
+    return cleaned or f"第{fallback_index}章"
+
+
+def normalize_volume_title(raw_volume: str, volume_index: int) -> str:
+    cleaned = _ZERO_WIDTH_RE.sub("", raw_volume or "")
+    cleaned = _WS_RE.sub(" ", cleaned.replace("\r", " ").replace("\n", " ")).strip()
+    if not cleaned:
+        return ""
+    if cleaned.startswith("第") and any(u in cleaned for u in ("卷", "部", "集", "篇")):
+        return cleaned
+    return f"第{volume_index + 1}卷 {cleaned}"
+
+
+def clean_paragraphs(html_fragment: str, expected_title: str = "") -> list[str]:
+    """把正文 HTML 片段拆成干净的结构化段落列表（保留场景分割、副标题、引文与作者有话说）。"""
     if not html_fragment:
         return []
+    _, structured = parse_chapter_xhtml(html_fragment, expected_title=expected_title)
+    if structured:
+        return structured
+
     paragraphs: list[str] = []
     for raw in _P_RE.findall(html_fragment):
-        text = _strip_tags(raw)
-        text = text.replace("\u200b", "").replace("\ufeff", "")
-        text = text.replace("\u3000", " ").strip()
-        text = _WS_RE.sub(" ", text).strip()
-        if text:
-            paragraphs.append(text)
+        for line in _strip_tags(raw).splitlines():
+            text = _ZERO_WIDTH_RE.sub("", line).replace("\u3000", " ").strip()
+            text = _WS_RE.sub(" ", text).strip()
+            if text:
+                paragraphs.append(text)
     if paragraphs:
         return paragraphs
 
-    # 没有 <p> 标签时的兜底：按换行切分
     plain = _strip_tags(html_fragment)
     for line in plain.splitlines():
-        line = line.replace("\u3000", " ").strip()
+        line = _ZERO_WIDTH_RE.sub("", line).replace("\u3000", " ").strip()
         if line:
             paragraphs.append(line)
     return paragraphs
 
 
-def extract_reader_paragraphs(page_html: str) -> list[str]:
+def extract_reader_paragraphs(page_html: str, expected_title: str = "") -> list[str]:
     """从 PC reader 页面 HTML 中提取正文段落。"""
     if not page_html:
         return []
@@ -162,11 +155,10 @@ def extract_reader_paragraphs(page_html: str) -> list[str]:
         return []
 
     segment = page_html[index:index + 600_000]
-    # 正文容器结构：<div class="muye-reader-content noselect"><div><p>..</p>..</div></div>
     end = segment.find("</div></div>")
     if end > 0:
         segment = segment[:end + len("</div>")]
-    return clean_paragraphs(segment)
+    return clean_paragraphs(segment, expected_title=expected_title)
 
 
 # --------------------------------------------------------------------------- #
@@ -174,7 +166,7 @@ def extract_reader_paragraphs(page_html: str) -> list[str]:
 # --------------------------------------------------------------------------- #
 
 class FanqieCrawler:
-    """番茄小说抓取调度器（线程不安全，每个下载任务用一个实例即可）。"""
+    """番茄小说抓取调度器（支持原生分卷目录抓取与精排导出）。"""
 
     def __init__(self, timeout: int = 20, retries: int = 3, delay: float = 0.3,
                  use_app_api: bool = True, app_api_interval: float = 6.0,
@@ -182,7 +174,6 @@ class FanqieCrawler:
         self.timeout = timeout
         self.retries = max(1, retries)
         self.delay = max(0.0, delay)
-        # APP 正文接口：可下载全书（含 App 独占 / 会员章节），失败时回退网页通道
         self.use_app_api = bool(use_app_api)
         self.app_api_interval = max(0.0, float(app_api_interval))
         self._app_api: Optional[FanqieAppApi] = app_api
@@ -195,15 +186,12 @@ class FanqieCrawler:
             "Accept": ("text/html,application/xhtml+xml,application/xml;q=0.9,"
                        "image/avif,image/webp,*/*;q=0.8"),
         })
-        # 可选：用户自己的番茄登录 Cookie（环境变量 FANQIE_COOKIE），
-        # 登录后可解锁会员章节的全文试读范围，未登录时只影响 VIP 章节。
         cookie = (os.environ.get("FANQIE_COOKIE") or "").strip()
         if cookie:
             self.session.headers["Cookie"] = cookie
         self._book_cache: dict[str, dict] = {}
         self._pc_available_cache: dict[str, bool] = {}
 
-    # ---------------------------------------------------------------- 基础请求
     def _request(self, method: str, url: str, *, mobile: bool = False,
                  **kwargs) -> requests.Response:
         headers = dict(kwargs.pop("headers", {}) or {})
@@ -238,15 +226,12 @@ class FanqieCrawler:
             raise CrawlerError("接口返回了非 JSON 数据，可能触发了风控") from None
 
     def _get_app_api(self) -> FanqieAppApi:
-        """惰性创建 APP 正文客户端（首次调用会注册匿名设备）。"""
         if self._app_api is None:
             self._app_api = FanqieAppApi(timeout=max(20, self.timeout),
                                          interval=self.app_api_interval)
         return self._app_api
 
-    # ---------------------------------------------------------------- 元数据
     def _fetch_landing_data(self, book_id: str) -> dict:
-        """请求落地页接口，返回 book_data（含前 10 章明文）。"""
         if book_id in self._book_cache:
             return self._book_cache[book_id]
         params = {
@@ -268,7 +253,6 @@ class FanqieCrawler:
         return book_data
 
     def check_pc_available(self, book_id: str) -> bool:
-        """PC 端是否有阅读页（App 独占书返回 False）。"""
         if book_id in self._pc_available_cache:
             return self._pc_available_cache[book_id]
         available = False
@@ -282,7 +266,6 @@ class FanqieCrawler:
         return available
 
     def fetch_metadata(self, book_id: str) -> dict:
-        """获取书籍元数据（解析接口用）。"""
         book_data = self._fetch_landing_data(book_id)
         author = book_data.get("author") or {}
         try:
@@ -296,9 +279,11 @@ class FanqieCrawler:
         creation_status = book_data.get("creation_status")
         serial_status = {0: "已完结", 1: "连载中"}.get(creation_status, "未知状态")
         first_chapters = book_data.get("first_chapters_content") or []
-        # 启用 APP 接口时可下载全书；否则只有落地页前 10 章
+        chapters = self.fetch_chapter_list(book_id)
+        chapter_count = max(chapter_count, len(chapters))
         available_chapters = chapter_count if (self.use_app_api and chapter_count) \
             else len(first_chapters)
+        chapter_titles = [c["title"] for c in chapters] if chapters else list(book_data.get("item_names") or [])
         return {
             "book_id": book_id,
             "title": book_data.get("title") or "未知书名",
@@ -311,60 +296,102 @@ class FanqieCrawler:
             "serial_status": serial_status,
             "available_chapters": available_chapters,
             "pc_available": self.check_pc_available(book_id),
-            "chapter_titles": list(book_data.get("item_names") or []),
+            "chapter_titles": chapter_titles,
             "category_tags": list(book_data.get("category_tags") or []),
             "reading_count_text": book_data.get("reading_count_text") or "",
         }
 
-    # ---------------------------------------------------------------- 目录
     def fetch_chapter_list(self, book_id: str) -> list[dict]:
-        """获取全书章节列表，元素：``{index, item_id, title, locked}``。"""
+        """获取全书原生分卷与章节列表，元素：``{index, item_id, title, locked, volume_index, volume_name, word_count}``。"""
         try:
-            payload = self._get_json(DIRECTORY_API,
-                                     params={"bookId": book_id})
+            payload = self._get_json(DIRECTORY_API, params={"bookId": book_id})
         except CrawlerError:
             payload = {}
 
         data = payload.get("data") or {}
+        vol_names = data.get("volumeNameList") or []
         chapters: list[dict] = []
-        for volume in data.get("chapterListWithVolume") or []:
+        for v_idx, volume in enumerate(data.get("chapterListWithVolume") or []):
+            vol_name = (vol_names[v_idx] if v_idx < len(vol_names) else "") or ""
+            vol_name = str(vol_name).strip()
             for item in volume or []:
-                item_id = str(item.get("itemId") or "")
+                item_id = str(item.get("itemId") or item.get("item_id") or "")
                 if not item_id:
                     continue
+                item_vol = str(item.get("volume_name") or "").strip() or vol_name
+                c_idx = len(chapters) + 1
                 chapters.append({
-                    "index": len(chapters) + 1,
+                    "index": c_idx,
                     "item_id": item_id,
-                    "title": (item.get("title") or "").strip(),
+                    "title": normalize_chapter_title(item.get("title") or "", c_idx),
                     "locked": bool(item.get("isChapterLock")
                                    or item.get("needPay")
                                    or item.get("isPaidPublication")),
+                    "volume_index": v_idx,
+                    "volume_name": item_vol,
+                    "word_count": int(item.get("chapterWordNumber") or item.get("wordCount") or 0),
                 })
 
-        # 目录接口偶发只给 allItemIds 时兜底
+        # APP 原生目录接口兜底
+        if not chapters:
+            try:
+                app_dir = self._get_json(
+                    APP_DIRECTORY_API,
+                    mobile=True,
+                    params={"book_id": book_id, "need_version": "true", "aid": 1967},
+                )
+                item_list = (app_dir.get("data") or {}).get("item_data_list") or []
+                vol_map: dict[str, int] = {}
+                for item in item_list:
+                    item_id = str(item.get("item_id") or item.get("itemId") or "")
+                    if not item_id:
+                        continue
+                    v_name = str(item.get("volume_name") or "").strip()
+                    v_idx = vol_map.setdefault(v_name, len(vol_map)) if v_name else 0
+                    c_idx = len(chapters) + 1
+                    chapters.append({
+                        "index": c_idx,
+                        "item_id": item_id,
+                        "title": normalize_chapter_title(item.get("title") or "", c_idx),
+                        "locked": False,
+                        "volume_index": v_idx,
+                        "volume_name": v_name,
+                        "word_count": int(item.get("chapter_word_number") or 0),
+                    })
+            except Exception:
+                pass
+
         if not chapters:
             all_ids = data.get("allItemIds") or []
             landing = self._book_cache.get(book_id) or {}
             titles = landing.get("item_names") or []
             for i, item_id in enumerate(all_ids):
+                raw_t = titles[i] if i < len(titles) else f"第{i + 1}章"
                 chapters.append({
                     "index": i + 1,
                     "item_id": str(item_id),
-                    "title": titles[i] if i < len(titles) else f"第{i + 1}章",
+                    "title": normalize_chapter_title(raw_t, i + 1),
                     "locked": False,
+                    "volume_index": 0,
+                    "volume_name": "",
+                    "word_count": 0,
                 })
 
         if not chapters:
-            # 目录彻底失败：至少让落地页前 10 章可下载
             landing = self._fetch_landing_data(book_id)
             for i, title in enumerate(landing.get("item_names") or []):
-                chapters.append({"index": i + 1, "item_id": None,
-                                 "title": title, "locked": False})
+                chapters.append({
+                    "index": i + 1,
+                    "item_id": None,
+                    "title": normalize_chapter_title(title, i + 1),
+                    "locked": False,
+                    "volume_index": 0,
+                    "volume_name": "",
+                    "word_count": 0,
+                })
         return chapters
 
-    # ---------------------------------------------------------------- 正文
-    def fetch_chapter_text(self, item_id: str) -> str:
-        """抓取单章并解密，返回以 ``\\n`` 连接的段落文本。"""
+    def fetch_chapter_text(self, item_id: str, expected_title: str = "") -> str:
         if not item_id:
             raise ChapterUnavailable("缺少章节 item_id")
         url = READER_PAGE.format(item_id=item_id)
@@ -374,13 +401,12 @@ class FanqieCrawler:
         if response.status_code != 200:
             raise CrawlerError(f"章节页返回 {response.status_code}")
 
-        # 会员 / SVIP 章节：页面只给几段试读并提示下载 App / 登录，免登录拿不到全文
         if ("muye-to-vip" in response.text
                 or "扫码下载APP免费读" in response.text
                 or "会员登录后" in response.text):
             raise ChapterUnavailable("会员/付费章节，免登录模式无法获取全文")
 
-        paragraphs = extract_reader_paragraphs(response.text)
+        paragraphs = extract_reader_paragraphs(response.text, expected_title=expected_title)
         if not paragraphs:
             if "no-content" in response.text:
                 raise ChapterUnavailable("PC 端暂无正文（App 独占）")
@@ -393,54 +419,43 @@ class FanqieCrawler:
                 f"字体映射未覆盖 {len(leftover)} 个字符，可能是字体已更新")
         return plain
 
-    # ---------------------------------------------------------------- 下载
     def download_book(self, book_id: str,
                       progress_callback: Optional[ProgressCallback] = None,
                       output_dir: Optional[str | os.PathLike] = None) -> dict:
-        """下载整本书并导出 TXT。
-
-        Args:
-            book_id: 番茄 book_id。
-            progress_callback: ``callback(current, total, chapter_title)``，
-                每完成一章回调一次（失败章节也会回调，便于前端展示进度）。
-            output_dir: 导出目录，默认项目根目录 ``downloads/``。
-
-        Returns:
-            dict: ``{success, filename, path, title, total, downloaded, failed,
-            failed_chapters, pc_available, app_api_used, app_api_error, message}``
-        """
         metadata = self.fetch_metadata(book_id)
         title = metadata["title"]
         book_data = self._fetch_landing_data(book_id)
         landing_html = book_data.get("first_chapters_content") or []
-        landing_chapters = [clean_paragraphs(fragment) for fragment in landing_html]
+        chapters = self.fetch_chapter_list(book_id)
+        landing_chapters = [
+            clean_paragraphs(fragment, expected_title=(chapters[i]["title"] if i < len(chapters) else ""))
+            for i, fragment in enumerate(landing_html)
+        ]
         landing_available = len(landing_chapters)
 
-        chapters = self.fetch_chapter_list(book_id)
         total = max(len(chapters), landing_available, metadata["chapter_count"], 1)
         if len(chapters) < total:
-            # 目录不全时用落地页章节标题补齐（正文仍按落地页处理）
             titles = book_data.get("item_names") or []
             for i in range(len(chapters), total):
+                raw_t = titles[i] if i < len(titles) else f"第{i + 1}章"
                 chapters.append({
                     "index": i + 1,
                     "item_id": None,
-                    "title": titles[i] if i < len(titles) else f"第{i + 1}章",
+                    "title": normalize_chapter_title(raw_t, i + 1),
                     "locked": False,
+                    "volume_index": 0,
+                    "volume_name": "",
+                    "word_count": 0,
                 })
 
         pc_available = metadata["pc_available"]
-        landing_available = len(landing_chapters)
 
         if progress_callback:
             try:
-                progress_callback(0, total, "正在准备下载…")
+                progress_callback(0, total, "正在准备原生分卷目录与排版…")
             except Exception:
                 pass
 
-        # ------------------------------------------------------------------
-        # 通道一：APP 接口（可下全书，含 App 独占 / 会员章节）
-        # ------------------------------------------------------------------
         app_paragraphs: dict[str, list[str]] = {}
         app_titles: dict[str, str] = {}
         app_emitted: set[str] = set()
@@ -459,7 +474,9 @@ class FanqieCrawler:
                             chapter = chapter_by_id.get(item_id)
                             if not chapter or item_id not in got:
                                 continue
-                            title_text, paragraphs = parse_chapter_xhtml(got[item_id])
+                            title_text, paragraphs = parse_chapter_xhtml(
+                                got[item_id], expected_title=chapter.get("title") or ""
+                            )
                             if not paragraphs:
                                 continue
                             app_paragraphs[item_id] = paragraphs
@@ -477,7 +494,10 @@ class FanqieCrawler:
                     for item_id, xhtml in raw.items():
                         if item_id in app_paragraphs:
                             continue
-                        title_text, paragraphs = parse_chapter_xhtml(xhtml)
+                        ch_obj = chapter_by_id.get(item_id) or {}
+                        title_text, paragraphs = parse_chapter_xhtml(
+                            xhtml, expected_title=ch_obj.get("title") or ""
+                        )
                         if paragraphs:
                             app_paragraphs[item_id] = paragraphs
                             if title_text:
@@ -486,13 +506,10 @@ class FanqieCrawler:
                 except AppApiError as exc:
                     app_error = str(exc)
                     self._app_api_error = app_error
-                except Exception as exc:  # 兜底：任何异常都不阻断网页通道
+                except Exception as exc:
                     app_error = f"{type(exc).__name__}: {exc}"
                     self._app_api_error = app_error
 
-        # ------------------------------------------------------------------
-        # 通道二：网页通道（落地页前 10 章明文 + PC reader）
-        # ------------------------------------------------------------------
         app_only_skipped = False
         pc_404_streak = 0
         vip_gate_streak = 0
@@ -500,32 +517,29 @@ class FanqieCrawler:
         captcha_hits = 0
         captcha_stopped = False
 
-        output: list[str] = []
+        downloaded_entries: list[dict] = []
         failed: list[dict] = []
         downloaded = 0
         locked_failed = 0
 
         for chapter in chapters:
             index = chapter["index"]
-            chapter_title = chapter["title"] or f"第{index}章"
+            chapter_title = normalize_chapter_title(chapter.get("title") or "", index)
             item_id = chapter.get("item_id")
             paragraphs: list[str] = []
             error: Optional[str] = None
 
             if item_id and item_id in app_paragraphs:
-                # APP 接口已拿到正文（明文，无需字体解密）
                 paragraphs = app_paragraphs[item_id]
-                if app_titles.get(item_id):
-                    chapter_title = app_titles[item_id]
+                if not chapter.get("title") and app_titles.get(item_id):
+                    chapter_title = normalize_chapter_title(app_titles[item_id], index)
             elif index <= landing_available and landing_chapters[index - 1]:
-                # 落地页明文通道（前 10 章）
                 paragraphs = landing_chapters[index - 1]
             elif captcha_stopped:
                 error = "触发番茄风控验证码，已跳过（请稍后重试）"
             elif app_only_skipped:
                 error = "该书为 App 独占，PC 端无正文"
             elif vip_gate_detected and chapter.get("locked"):
-                # 已确认整本书的 VIP 章节被拦截：剩余锁定章节直接标记，不再空跑
                 error = "会员/付费章节，免登录模式无法获取全文"
                 locked_failed += 1
             elif item_id:
@@ -534,7 +548,7 @@ class FanqieCrawler:
                     if pc_404_streak >= 2:
                         app_only_skipped = True
                 try:
-                    text = self.fetch_chapter_text(item_id)
+                    text = self.fetch_chapter_text(item_id, expected_title=chapter_title)
                     paragraphs = [line for line in text.split("\n") if line.strip()]
                     pc_404_streak = 0
                     vip_gate_streak = 0
@@ -556,7 +570,7 @@ class FanqieCrawler:
                         error = "触发番茄风控验证码，已停止下载，请稍后重试"
                     else:
                         error = str(exc)
-                        time.sleep(8.0)  # 冷却后下一章再试
+                        time.sleep(8.0)
                 except CrawlerError as exc:
                     error = str(exc)
                 time.sleep(self.delay + random.uniform(0, 0.06))
@@ -565,7 +579,13 @@ class FanqieCrawler:
 
             if paragraphs:
                 downloaded += 1
-                output.append(self._format_chapter(chapter_title, paragraphs))
+                downloaded_entries.append({
+                    "index": index,
+                    "title": chapter_title,
+                    "volume_index": int(chapter.get("volume_index") or 0),
+                    "volume_name": str(chapter.get("volume_name") or "").strip(),
+                    "paragraphs": paragraphs,
+                })
             else:
                 failed.append({"index": index, "title": chapter_title,
                                "reason": error or "内容为空"})
@@ -581,8 +601,9 @@ class FanqieCrawler:
         target_dir.mkdir(parents=True, exist_ok=True)
         path = target_dir / filename
 
-        content = self._format_book(metadata, output, downloaded, total,
-                                    landing_available, failed)
+        content = self._format_book_structured(
+            metadata, downloaded_entries, downloaded, total, failed
+        )
         path.write_text(content, encoding="utf-8-sig", newline="\n")
 
         if captcha_stopped:
@@ -596,7 +617,7 @@ class FanqieCrawler:
                 message = "没有抓到任何章节正文，请稍后重试或换一本书"
             success = False
         elif downloaded >= total:
-            message = f"下载完成，共 {downloaded} 章"
+            message = f"下载完成，共 {downloaded} 章（含原生分卷目录与排版）"
             success = True
         elif app_used:
             message = (f"已导出 {downloaded}/{total} 章，"
@@ -643,10 +664,10 @@ class FanqieCrawler:
                            if para.strip())
         return f"【{title}】\n\n{body}\n\n"
 
-    @staticmethod
-    def _format_book(metadata: dict, chapters: list[str], downloaded: int,
-                     total: int, landing_available: int,
-                     failed: list[dict]) -> str:
+    @classmethod
+    def _format_book_structured(cls, metadata: dict, entries: list[dict],
+                                downloaded: int, total: int,
+                                failed: list[dict]) -> str:
         word_count = metadata.get("word_count") or 0
         if word_count >= 100_000_000:
             word_text = f"{word_count / 100_000_000:.2f} 亿字"
@@ -672,10 +693,42 @@ class FanqieCrawler:
         ]
         intro = (metadata.get("intro") or "").strip()
         if intro:
-            lines.extend(["【内容简介】", intro, "", "-" * 46, ""])
-        lines.extend(chapters)
+            lines.extend(["〖内容简介〗", intro, "", "-" * 46, ""])
+
+        distinct_vols = {
+            e.get("volume_name", "").strip()
+            for e in entries
+            if e.get("volume_name", "").strip()
+        }
+        has_vols = len(distinct_vols) > 1 or any(
+            v not in ("", "正文", "默认卷", "第一卷") for v in distinct_vols
+        )
+
+        if entries:
+            lines.append("〖原生目录索引〗")
+            last_vol = ""
+            for e in entries:
+                v_raw = (e.get("volume_name") or "").strip()
+                v_idx = int(e.get("volume_index") or 0)
+                if has_vols and v_raw and v_raw != last_vol:
+                    last_vol = v_raw
+                    lines.append("")
+                    lines.append(f"◆ {normalize_volume_title(v_raw, v_idx)}")
+                lines.append(f"  · {e['title']}")
+            lines.extend(["", "=" * 46, ""])
+
+        cur_vol = ""
+        for e in entries:
+            v_raw = (e.get("volume_name") or "").strip()
+            v_idx = int(e.get("volume_index") or 0)
+            norm_vol = normalize_volume_title(v_raw, v_idx) if v_raw else ""
+            if has_vols and norm_vol and norm_vol != cur_vol:
+                cur_vol = norm_vol
+                lines.append(f"【{norm_vol}】")
+            lines.append(cls._format_chapter(e["title"], e["paragraphs"]))
+
         lines.append("=" * 46)
-        lines.append("由 fanqie-novel-downloader 导出")
+        lines.append("全书导出完毕")
         lines.append("=" * 46)
         return "\n".join(lines)
 
@@ -686,14 +739,9 @@ class FanqieCrawler:
         return cleaned
 
 
-# --------------------------------------------------------------------------- #
-# 便捷函数
-# --------------------------------------------------------------------------- #
-
 def download_book(book_id: str,
                   progress_callback: Optional[ProgressCallback] = None,
                   output_dir: Optional[str | os.PathLike] = None) -> dict:
-    """模块级快捷入口，内部自建 :class:`FanqieCrawler`。"""
     return FanqieCrawler().download_book(
         book_id, progress_callback=progress_callback, output_dir=output_dir)
 
@@ -701,85 +749,5 @@ def download_book(book_id: str,
 def download_by_input(text: str,
                       progress_callback: Optional[ProgressCallback] = None,
                       output_dir: Optional[str | os.PathLike] = None) -> dict:
-    """从分享文案 / 链接一步到位下载。"""
     book_id = resolve_book_id(text)
     return download_book(book_id, progress_callback, output_dir)
-
-
-# --------------------------------------------------------------------------- #
-# 自测：python core/crawler.py
-# --------------------------------------------------------------------------- #
-
-def _self_test() -> int:
-    book_id = sys.argv[1] if len(sys.argv) > 1 else "7527891257914297368"
-    crawler = FanqieCrawler()
-    try:
-        metadata = crawler.fetch_metadata(book_id)
-    except (CrawlerError, ParseError) as exc:
-        print(f"[FAIL] 元数据获取失败：{exc}")
-        return 1
-
-    print("书名：", metadata["title"])
-    print("作者：", metadata["author"])
-    print("评分：", metadata["score"])
-    print("字数：", metadata["word_count"])
-    print("章节数：", metadata["chapter_count"])
-    print("PC 可读：", metadata["pc_available"])
-    print("可下载章节：", metadata["available_chapters"])
-    print("-" * 60)
-
-    book_data = crawler._fetch_landing_data(book_id)
-    fragments = book_data.get("first_chapters_content") or []
-    if not fragments:
-        print("[FAIL] 落地页没有返回前 10 章正文")
-        return 1
-
-    total_pua = 0
-    for i, fragment in enumerate(fragments[:10]):
-        paragraphs = clean_paragraphs(fragment)
-        text = decrypt_text("\n".join(paragraphs))
-        leftover = remaining_pua(text)
-        total_pua += len(leftover)
-        head = text.replace("\n", " ")[:60]
-        print(f"第 {i + 1} 章：{len(paragraphs)} 段 | {head}…")
-        if leftover:
-            print(f"  [WARN] 仍有 PUA 字符：{[hex(ord(c)) for c in leftover[:5]]}")
-
-    if total_pua:
-        print(f"[FAIL] 解密后仍有 {total_pua} 个 PUA 字符")
-        return 1
-    print("-" * 60)
-    print("[OK] 前 10 章明文获取与字体解密正常，无 PUA 残留")
-
-    # APP 正文通道：抽 3 章验证（App 独占 / 会员章节也走这里）
-    try:
-        api = crawler._get_app_api()
-        api.ensure_ready()
-        print(f"[OK] APP 匿名设备就绪：{api.device['device_id']}，"
-              f"密钥版本 {api.key_version}")
-        chapters = crawler.fetch_chapter_list(book_id)
-        ids = [c["item_id"] for c in chapters[:3] if c.get("item_id")]
-        raw = api.fetch_chapters(ids, book_id) if ids else {}
-        if not raw:
-            print("[FAIL] APP 接口没有返回正文")
-            return 1
-        app_pua = 0
-        for item_id in ids:
-            title_text, paragraphs = parse_chapter_xhtml(raw.get(item_id, ""))
-            text = "\n".join(paragraphs)
-            app_pua += len(remaining_pua(text))
-            print(f"  APP 第 {chapters[ids.index(item_id)]['index']} 章："
-                  f"{title_text} | {len(paragraphs)} 段")
-        if app_pua:
-            print(f"[FAIL] APP 正文仍有 {app_pua} 个 PUA 字符")
-            return 1
-        print("[OK] APP 接口正文获取与解密正常（可下全书）")
-    except AppApiError as exc:
-        print(f"[WARN] APP 接口不可用，将回退网页通道：{exc}")
-    print("-" * 60)
-    print("[OK] 自测通过")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(_self_test())

@@ -1,19 +1,17 @@
 package io.legado.app.ui.book.read.page.entities.column
 
 import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.RectF
 import androidx.annotation.Keep
-import io.legado.app.model.ImageProvider
-import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.page.ContentTextView
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.book.read.page.entities.TextLine.Companion.emptyTextLine
 import io.legado.app.utils.dpToPx
-import io.legado.app.utils.toastOnUi
-import splitties.init.appCtx
 
 /**
- * 图片列
+ * 墨水屏纯黑白线性插图占位列（v0.4.3 不加载灰阶位图图片，绘制干净的线性方框避免位图抖动残影）
  */
 @Keep
 data class ImageColumn(
@@ -24,34 +22,20 @@ data class ImageColumn(
 ) : BaseColumn {
 
     override var textLine: TextLine = emptyTextLine
+
     override fun draw(view: ContentTextView, canvas: Canvas) {
-        val book = ReadBook.book ?: return
-
         val height = textLine.height
-
-        val bitmap = ImageProvider.getImage(
-            book,
-            src,
-            (end - start).toInt(),
-            height.toInt()
-        )
-
-        val rectF = if (textLine.isImage) {
-            RectF(start, 0f, end, height)
-        } else {
-            /*以宽度为基准保持图片的原始比例叠加，当div为负数时，允许高度比字符更高*/
-            val h = (end - start) / bitmap.width * bitmap.height
-            val div = (height - h) / 2
-            RectF(start, div, end, height - div)
+        val rectF = RectF(start + 2f, 2f, end - 2f, (height - 2f).coerceAtLeast(4f))
+        val strokePaint = Paint().apply {
+            isAntiAlias = false
+            color = Color.BLACK
+            style = Paint.Style.STROKE
+            strokeWidth = 2f
         }
-        kotlin.runCatching {
-            canvas.drawBitmap(bitmap, null, rectF, view.imagePaint)
-        }.onFailure { e ->
-            appCtx.toastOnUi(e.localizedMessage)
-        }
+        canvas.drawRect(rectF, strokePaint)
     }
+
     override fun isTouch(x: Float): Boolean {
         return x > start && x < end + 20.dpToPx()
     }
-
 }

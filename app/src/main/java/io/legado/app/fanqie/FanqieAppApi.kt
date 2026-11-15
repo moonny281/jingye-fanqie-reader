@@ -23,6 +23,7 @@ class FanqieAppApi(
 ) {
     companion object {
         private const val APP_BASE = "https://reading.snssdk.com/reading"
+        private const val FQNOVEL_API_BASE = "https://api.fqnovel.com/reading"
         private const val APP_UA = "com.dragon.read"
         private const val REGISTER_URL = "https://i.snssdk.com/service/2/device_register/?tt_data=a"
 
@@ -38,40 +39,212 @@ class FanqieAppApi(
         )
 
         private val CHAPTER_TAG_RE = Regex("<[^>]+>")
-        private val P_RE = Regex("<p(?:\\s[^>]*)?>(.*?)</p>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
-        private val BLK_RE = Regex("<blk(?:\\s[^>]*)?>(.*?)</blk>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
-        private val H1_RE = Regex("<h1[^>]*>(.*?)</h1>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
-        private val STYLE_RE = Regex("<style[^>]*>.*?</style>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+        private val BR_RE = Regex("<br\\s*/?>", RegexOption.IGNORE_CASE)
+        private val HR_RE = Regex("<hr\\b[^>]*>", RegexOption.IGNORE_CASE)
+        private val LINE_DIV_RE = Regex(
+            "<(?:div|p)\\b[^>]*class\\s*=\\s*[\"'][^\"']*(?:line|divider|split|scene-break)[^\"']*[\"'][^>]*>.*?</(?:div|p)>",
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
+        )
+        private val H1_RE = Regex("<h1\\b[^>]*>(.*?)</h1>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+        private val TITLE_TAG_RE = Regex("<title\\b[^>]*>(.*?)</title>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+        private val H2_H3_RE = Regex("<h([2-4])\\b[^>]*>(.*?)</h\\1>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+        private val BLOCKQUOTE_RE = Regex("<blockquote\\b[^>]*>(.*?)</blockquote>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+        private val AUTHOR_SAY_RE = Regex(
+            "<div\\b[^>]*class\\s*=\\s*[\"'][^\"']*(?:author-say|author-words|writer-say|author_say)[^\"']*[\"'][^>]*>(.*?)</div>",
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
+        )
+        private val IMG_ALT_RE = Regex("<img\\b[^>]*alt\\s*=\\s*[\"']([^\"']+)[\"'][^>]*>", RegexOption.IGNORE_CASE)
+        private val P_OR_BLK_RE = Regex("<(p|blk)(\\s[^>]*)?>(.*?)</\\1>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+        private val STYLE_SCRIPT_RE = Regex("<(style|script|head)\\b[^>]*>.*?</\\1>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+        private val ZERO_WIDTH_RE = Regex("[\\u200b\\u200c\\u200d\\u2060\\ufeff]")
         private val WS_RE = Regex("[ \\t\\r\\f\\u000B\\u00a0]+")
+        private val NORMALIZE_TITLE_CMP_RE = Regex("[\\s\\p{Punct}【】〖〗〘〙《》「」『』、，。！？：；“”‘’（）()\\[\\]—\\-_·]+")
 
-        private fun cleanFragment(fragment: String): String {
+        const val SCENE_BREAK_MARKER = "* * *"
+
+        fun cleanInlineText(fragment: String): String {
             val noTags = CHAPTER_TAG_RE.replace(fragment, "")
-            val unescaped = Html.fromHtml(noTags, Html.FROM_HTML_MODE_LEGACY).toString()
-            return unescaped
-                .replace("\u200b", "")
-                .replace("\ufeff", "")
+            val unescaped = try {
+                Html.fromHtml(noTags, Html.FROM_HTML_MODE_LEGACY).toString()
+            } catch (_: Throwable) {
+                noTags
+                    .replace("&nbsp;", " ")
+                    .replace("&lt;", "<")
+                    .replace("&gt;", ">")
+                    .replace("&amp;", "&")
+                    .replace("&quot;", "\"")
+                    .replace("&#39;", "'")
+            }
+            return ZERO_WIDTH_RE.replace(unescaped, "")
                 .replace("\u3000", " ")
                 .replace(WS_RE, " ")
                 .trim()
         }
 
-        fun parseChapterXhtml(xhtml: String): Pair<String, List<String>> {
-            if (xhtml.isBlank()) return "" to emptyList()
-            val cleaned = STYLE_RE.replace(xhtml, "")
-            val title = H1_RE.find(cleaned)?.groupValues?.getOrNull(1)?.let { cleanFragment(it) } ?: ""
+        /**
+         * 判断段落是否与章节标题重复（例如正文第一段再次写了「第1章 惊蛰」或「第一章 惊蛰」）
+         */
+        fun isDuplicateTitleLine(paragraph: String, chapterTitle: String): Boolean {
+            if (paragraph.isBlank() || chapterTitle.isBlank()) return false
+            val pTrim = paragraph.trim()
+            val tTrim = chapterTitle.trim()
+            if (pTrim.equals(tTrim, ignoreCase = true)) return true
+            if (pTrim.length > tTrim.length + 16) return false
+            val pNorm = NORMALIZE_TITLE_CMP_RE.replace(pTrim, "").lowercase()
+            val tNorm = NORMALIZE_TITLE_CMP_RE.replace(tTrim, "").lowercase()
+            if (pNorm.isNotEmpty() && pNorm == tNorm) return true
+            // 兼容目录标题为「第1章 惊蛰」而正文首行仅写「惊蛰」或「1. 惊蛰」的情况
+            val tSuffix = tTrim.replace(Regex("^第[0-9零一二三四五六七八九十百千万〇两]+[章节回卷集部篇]\\s*"), "")
+                .replace(Regex("^\\d+[.、\\s]+"), "")
+                .trim()
+            if (tSuffix.length >= 2 && pTrim == tSuffix) return true
+            return false
+        }
 
-            val paragraphs = ArrayList<String>()
-            for (m in P_RE.findAll(cleaned)) {
-                val text = cleanFragment(m.groupValues[1])
-                if (text.isNotEmpty()) paragraphs.add(text)
+        /**
+         * 深度解析番茄原生 XHTML 章节内容，完整保留原生排版结构：
+         * 1. 提取原生标题（<h1> 或 <title>），并自动剔除正文首段重复标题；
+         * 2. 识别小节副标题（<h2>/<h3>）、引文/系统面板（<blockquote>）、场景分割线（<hr>/空段）；
+         * 3. 保留段落内 <br/> 换行（诗词、书信、系统属性面板、聊天记录不粘连）；
+         * 4. 提取章末「作家的话 / 作者有话说」并独立排版。
+         */
+        fun parseChapterXhtml(xhtml: String, expectedTitle: String = ""): Pair<String, List<String>> {
+            if (xhtml.isBlank()) return "" to emptyList()
+
+            // 先从 <h1...> 或 <title> 提取原生章节名
+            val h1Title = H1_RE.find(xhtml)?.groupValues?.getOrNull(1)?.let { cleanInlineText(it) }.orEmpty()
+            val headTitle = TITLE_TAG_RE.find(xhtml)?.groupValues?.getOrNull(1)?.let { cleanInlineText(it) }.orEmpty()
+            val extractedTitle = h1Title.ifBlank { headTitle }
+            val refTitle = expectedTitle.ifBlank { extractedTitle }
+
+            // 提取章末「作家的话」独立区块
+            val authorNotes = ArrayList<String>()
+            val withoutAuthorDiv = AUTHOR_SAY_RE.replace(xhtml) { m ->
+                val rawNote = m.groupValues[1]
+                val lines = BR_RE.replace(rawNote, "\n")
+                    .let { P_OR_BLK_RE.replace(it) { pm -> pm.groupValues[3] + "\n" } }
+                    .lines()
+                    .map { cleanInlineText(it) }
+                    .filter { it.isNotEmpty() }
+                authorNotes.addAll(lines)
+                ""
             }
-            if (paragraphs.isEmpty()) {
-                for (m in BLK_RE.findAll(cleaned)) {
-                    val text = cleanFragment(m.groupValues[1])
-                    if (text.isNotEmpty() && text != title) paragraphs.add(text)
+
+            // 移除 <style>/<script>/<head> 及已提取的 <h1>
+            var working = STYLE_SCRIPT_RE.replace(withoutAuthorDiv, "")
+            working = H1_RE.replace(working, "")
+
+            // 将结构化排版标签转换为带语义标记的 <p> 节点，便于按顺序流式还原
+            working = HR_RE.replace(working, "<p>__FQ_SCENE_BREAK__</p>")
+            working = LINE_DIV_RE.replace(working, "<p>__FQ_SCENE_BREAK__</p>")
+            working = H2_H3_RE.replace(working) { m ->
+                val sub = cleanInlineText(m.groupValues[2])
+                if (sub.isNotEmpty()) "<p>〖$sub〗</p>" else ""
+            }
+            working = BLOCKQUOTE_RE.replace(working) { m ->
+                val inner = BR_RE.replace(m.groupValues[1], "\n")
+                    .let { P_OR_BLK_RE.replace(it) { pm -> pm.groupValues[3] + "\n" } }
+                    .lines()
+                    .map { cleanInlineText(it) }
+                    .filter { it.isNotEmpty() }
+                if (inner.isEmpty()) ""
+                else inner.joinToString("") { "<p>「$it」</p>" }
+            }
+            working = IMG_ALT_RE.replace(working) { m ->
+                val alt = cleanInlineText(m.groupValues[1])
+                if (alt.isNotEmpty() && alt != "插图" && alt != "image") "<p>[插图：$alt]</p>" else ""
+            }
+
+            val rawParagraphs = ArrayList<String>()
+            val matches = P_OR_BLK_RE.findAll(working).toList()
+            if (matches.isNotEmpty()) {
+                for (m in matches) {
+                    val attrs = m.groupValues[2]
+                    val innerHtml = m.groupValues[3]
+                    if (innerHtml.contains("__FQ_SCENE_BREAK__")) {
+                        rawParagraphs.add(SCENE_BREAK_MARKER)
+                        continue
+                    }
+                    // 检查是否为作者说或副标题属性段落
+                    val isAuthorSayAttr = attrs.contains("author", ignoreCase = true)
+                    val isTitleAttr = attrs.contains("chapter-title", ignoreCase = true) ||
+                        attrs.contains("title", ignoreCase = true)
+
+                    // 保留段落内部 <br/> 多行结构（如系统面板、书信、诗句）
+                    val subLines = BR_RE.replace(innerHtml, "\n")
+                        .split('\n')
+                        .map { cleanInlineText(it) }
+                        .filter { it.isNotEmpty() }
+
+                    if (subLines.isEmpty()) {
+                        // 原生空段落 `<p><br/></p>` 或 `<p>&nbsp;</p>` 代表场景切换空行
+                        if (rawParagraphs.isNotEmpty() && rawParagraphs.last() != SCENE_BREAK_MARKER) {
+                            rawParagraphs.add(SCENE_BREAK_MARKER)
+                        }
+                    } else if (isAuthorSayAttr) {
+                        authorNotes.addAll(subLines)
+                    } else {
+                        for ((idx, line) in subLines.withIndex()) {
+                            if (isTitleAttr && idx == 0 && rawParagraphs.isEmpty() &&
+                                (isDuplicateTitleLine(line, refTitle) || isDuplicateTitleLine(line, extractedTitle))
+                            ) {
+                                continue
+                            }
+                            rawParagraphs.add(line)
+                        }
+                    }
+                }
+            } else {
+                // 无 <p>/<blk> 时的纯文本换行兜底
+                val plainLines = BR_RE.replace(working, "\n")
+                    .lines()
+                    .map { cleanInlineText(it) }
+                    .filter { it.isNotEmpty() }
+                rawParagraphs.addAll(plainLines)
+            }
+
+            // 去除首尾多余的场景分割符，以及正文首段与章节标题重复的行
+            while (rawParagraphs.isNotEmpty() && rawParagraphs.first() == SCENE_BREAK_MARKER) {
+                rawParagraphs.removeAt(0)
+            }
+            while (rawParagraphs.isNotEmpty() && rawParagraphs.last() == SCENE_BREAK_MARKER) {
+                rawParagraphs.removeAt(rawParagraphs.lastIndex)
+            }
+            if (rawParagraphs.isNotEmpty()) {
+                val firstLine = rawParagraphs.first()
+                if (isDuplicateTitleLine(firstLine, refTitle) || isDuplicateTitleLine(firstLine, extractedTitle)) {
+                    rawParagraphs.removeAt(0)
                 }
             }
-            return title to paragraphs
+            while (rawParagraphs.isNotEmpty() && rawParagraphs.first() == SCENE_BREAK_MARKER) {
+                rawParagraphs.removeAt(0)
+            }
+
+            // 合并连续的 SCENE_BREAK_MARKER，避免出现多个连续星号行
+            val normalized = ArrayList<String>(rawParagraphs.size + authorNotes.size + 2)
+            for (p in rawParagraphs) {
+                if (p == SCENE_BREAK_MARKER) {
+                    if (normalized.isNotEmpty() && normalized.last() != SCENE_BREAK_MARKER) {
+                        normalized.add(SCENE_BREAK_MARKER)
+                    }
+                } else {
+                    normalized.add(p)
+                }
+            }
+            if (normalized.lastOrNull() == SCENE_BREAK_MARKER) {
+                normalized.removeAt(normalized.lastIndex)
+            }
+
+            // 附加章末「作家的话」
+            if (authorNotes.isNotEmpty()) {
+                val cleanNotes = authorNotes.filterNot { it == "作家的话" || it == "作者有话说" || it == "作者的话" }
+                if (cleanNotes.isNotEmpty()) {
+                    normalized.add("—— 作家的话 ——")
+                    normalized.addAll(cleanNotes)
+                }
+            }
+
+            return extractedTitle to normalized
         }
     }
 
@@ -368,6 +541,91 @@ class FanqieAppApi(
                 slept += step
             }
         }
+    }
+
+    /**
+     * APP 原生完整目录接口兜底：
+     * 请求 /reading/bookapi/directory/all_items/v/ 获取含分卷名、章节字数、item_id 的完整原生目录。
+     */
+    fun fetchAppDirectory(bookId: String): Pair<List<FanqieVolume>, List<FanqieChapterItem>> {
+        val queryExtra = mapOf(
+            "book_id" to bookId,
+            "need_version" to "true",
+            "aid" to FanqieCrypto.AID
+        )
+        val urls = ArrayList<Pair<String, Map<String, String>>>()
+        try {
+            ensureReady()
+            val dev = device
+            if (dev != null) {
+                val signedUrl = "$APP_BASE/bookapi/directory/all_items/v/?${buildQuery(dev, queryExtra)}"
+                urls.add(signedUrl to FanqieCrypto.signRequest(signedUrl))
+            }
+        } catch (_: Exception) {
+        }
+        val publicUrl = "$FQNOVEL_API_BASE/bookapi/directory/all_items/v/?book_id=${URLEncoder.encode(bookId, "UTF-8")}&need_version=true&aid=1967"
+        urls.add(publicUrl to emptyMap())
+
+        for ((url, extraHeaders) in urls) {
+            try {
+                val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = timeoutMs
+                    readTimeout = timeoutMs
+                    requestMethod = "GET"
+                    setRequestProperty("User-Agent", APP_UA)
+                    setRequestProperty("Accept", "application/json")
+                    extraHeaders.forEach { (k, v) -> setRequestProperty(k, v) }
+                }
+                val code = conn.responseCode
+                val text = if (code == 200) conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() } else ""
+                conn.disconnect()
+                if (text.isBlank()) continue
+                val root = JSONObject(text)
+                val data = root.optJSONObject("data") ?: continue
+                val itemList = data.optJSONArray("item_data_list") ?: continue
+                if (itemList.length() == 0) continue
+
+                val chapters = ArrayList<FanqieChapterItem>(itemList.length())
+                val volumeCounter = LinkedHashMap<String, Int>()
+                val volumeIndexMap = LinkedHashMap<String, Int>()
+
+                for (i in 0 until itemList.length()) {
+                    val item = itemList.optJSONObject(i) ?: continue
+                    val itemId = item.optString("item_id").ifBlank { item.optString("itemId") }
+                    if (itemId.isBlank()) continue
+                    val rawTitle = item.optString("title").trim()
+                    val volName = item.optString("volume_name", "").trim()
+                    val volIdx = if (volName.isNotEmpty()) {
+                        volumeIndexMap.getOrPut(volName) { volumeIndexMap.size }
+                    } else 0
+                    if (volName.isNotEmpty()) {
+                        volumeCounter[volName] = (volumeCounter[volName] ?: 0) + 1
+                    }
+                    val wordCnt = item.optInt("chapter_word_number", item.optInt("word_count", 0))
+                    val passTime = item.optLong("first_pass_time", 0L)
+                    chapters.add(
+                        FanqieChapterItem(
+                            index = chapters.size + 1,
+                            itemId = itemId,
+                            title = rawTitle.ifBlank { "第${chapters.size + 1}章" },
+                            locked = false,
+                            volumeIndex = volIdx,
+                            volumeName = volName,
+                            wordCount = wordCnt,
+                            firstPassTime = passTime
+                        )
+                    )
+                }
+                if (chapters.isNotEmpty()) {
+                    val volumes = volumeCounter.entries.mapIndexed { idx, (name, count) ->
+                        FanqieVolume(index = idx, name = name, chapterCount = count)
+                    }
+                    return volumes to chapters
+                }
+            } catch (_: Exception) {
+            }
+        }
+        return emptyList<FanqieVolume>() to emptyList()
     }
 
     private fun fetchBatch(

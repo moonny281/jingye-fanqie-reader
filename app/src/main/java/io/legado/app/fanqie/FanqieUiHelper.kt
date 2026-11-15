@@ -56,7 +56,7 @@ object FanqieUiHelper {
             else -> {
                 tvFanqieAction.setBackgroundResource(R.drawable.bg_eink_button_outline)
                 tvFanqieAction.setTextColor(0xFF000000.toInt())
-                tvFanqieAction.text = "检测更新"
+                tvFanqieAction.text = "目录/导出"
             }
         }
 
@@ -95,6 +95,27 @@ object FanqieUiHelper {
             return
         }
 
+        val actions = arrayOf(
+            "1. 检测远端新章节更新",
+            "2. 导出标准 EPUB（含原生树状目录 + 封面 + 精排）",
+            "3. 导出精排 TXT（含原生分卷目录索引 + 精排正文）",
+            "4. 重新抓取并修复本书原生分卷目录"
+        )
+        AlertDialog.Builder(context)
+            .setTitle("《${item.name}》番茄管理与导出")
+            .setItems(actions) { _, which ->
+                when (which) {
+                    0 -> checkSingleBookUpdate(context, item)
+                    1 -> exportShelfBook(context, tagInfo.fanqieBookId, item.name, isEpub = true)
+                    2 -> exportShelfBook(context, tagInfo.fanqieBookId, item.name, isEpub = false)
+                    3 -> rebuildShelfBookToc(context, tagInfo.fanqieBookId, item.name)
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun checkSingleBookUpdate(context: Context, item: Book) {
         Toast.makeText(context, "正在检测《${item.name}》最新章节…", Toast.LENGTH_SHORT).show()
         scope.launch {
             try {
@@ -128,6 +149,44 @@ object FanqieUiHelper {
                 }
             } catch (e: Exception) {
                 Toast.makeText(context, "检测失败：${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun exportShelfBook(context: Context, fanqieBookId: String, bookTitle: String, isEpub: Boolean) {
+        val fmt = if (isEpub) "EPUB" else "精排 TXT"
+        Toast.makeText(context, "正在抓取原生目录并打包导出《$bookTitle》($fmt)…", Toast.LENGTH_SHORT).show()
+        scope.launch {
+            try {
+                val (fileName, bytes) = if (isEpub) {
+                    FanqieBookExporter.buildExportEpubBytes(fanqieBookId)
+                } else {
+                    FanqieBookExporter.buildExportTxtBytes(fanqieBookId)
+                }
+                val mime = if (isEpub) "application/epub+zip" else "text/plain"
+                val savedPath = withContext(Dispatchers.IO) {
+                    FanqieBookExporter.saveToPublicDownloads(context, fileName, mime, bytes)
+                }
+                Toast.makeText(context, "导出成功！已保存至：$savedPath", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "导出失败：${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun rebuildShelfBookToc(context: Context, fanqieBookId: String, bookTitle: String) {
+        Toast.makeText(context, "正在重新抓取《$bookTitle》原生分卷目录并同步排版…", Toast.LENGTH_SHORT).show()
+        scope.launch {
+            try {
+                val (meta, chapters, _) = FanqieBookExporter.prepareBookData(fanqieBookId)
+                val volInfo = if (meta.volumes.isNotEmpty()) "${meta.volumes.size} 个分卷、" else ""
+                Toast.makeText(
+                    context,
+                    "《${meta.title}》原生目录修复完成（${volInfo}共 ${chapters.size} 章）！",
+                    Toast.LENGTH_LONG
+                ).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "修复目录失败：${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }

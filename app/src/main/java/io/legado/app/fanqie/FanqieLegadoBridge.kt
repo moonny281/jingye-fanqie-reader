@@ -5,12 +5,17 @@ import io.legado.app.constant.BookType
 import io.legado.app.constant.EventBus
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.BookChapter
 import io.legado.app.model.ReadBook
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.localBook.TextFile
+import io.legado.app.utils.MD5Utils
+import io.legado.app.utils.StringUtils
 import io.legado.app.utils.postEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 import splitties.init.appCtx
 import java.io.File
 
@@ -28,12 +33,12 @@ object FanqieLegadoBridge {
     private val deviceCacheFile: File
         get() = File(appCtx.filesDir, ".fanqie_device.json")
 
-    private val booksDir: File
+    val booksDir: File
         get() = File(appCtx.filesDir, "fanqie_books").apply { mkdirs() }
 
     private val remoteClient = FanqieRemoteClient()
 
-    private fun newLocalCrawler() = FanqieCrawler(
+    fun newLocalCrawler() = FanqieCrawler(
         cacheFile = deviceCacheFile,
         appApiIntervalSec = FanqiePrefs.appApiIntervalSec
     )
@@ -74,6 +79,100 @@ object FanqieLegadoBridge {
         return parseTag(b)?.downloadedChapters ?: b.totalChapterNum
     }
 
+    private fun tocFileForTxt(txtFile: File): File =
+        File(txtFile.parentFile, "${txtFile.nameWithoutExtension}.toc.json")
+
+    /**
+     * 将精确字节偏移目录表保存为伴生 .toc.json 文件，供 LocalBook.getChapterList 毫秒级直通加载。
+     */
+    private fun saveCompanionTocJson(txtFile: File, builtToc: List<FanqieBuiltTocItem>) {
+        if (builtToc.isEmpty()) return
+        try {
+            val arr = JSONArray()
+            for (item in builtToc) {
+                arr.put(
+                    JSONObject()
+                        .put("index", item.index)
+                        .put("title", item.title)
+                        .put("is_volume", item.isVolume)
+                        .put("start", item.startByte)
+                        .put("end", item.endByte)
+                        .put("word_count", item.wordCount)
+                        .put("volume_name", item.volumeName)
+                        .put("item_id", item.itemId ?: "")
+                )
+            }
+            val tocFile = tocFileForTxt(txtFile)
+            val tmp = File(tocFile.parentFile, "${tocFile.name}.tmp")
+            tmp.writeText(arr.toString(), Charsets.UTF_8)
+            if (tocFile.exists()) tocFile.delete()
+            tmp.renameTo(tocFile)
+        } catch (_: Exception) {
+        }
+    }
+
+    /**
+     * 将 FanqieBuiltTocItem 列表转换为 Legado 原生 BookChapter 列表。
+     */
+    fun toBookChapters(book: Book, builtToc: List<FanqieBuiltTocItem>): ArrayList<BookChapter> {
+        val list = ArrayList<BookChapter>(builtToc.size)
+        for ((idx, item) in builtToc.withIndex()) {
+            val ch = BookChapter(
+                url = item.itemId?.takeIf { it.isNotBlank() }
+                    ?: MD5Utils.md5Encode16("${book.originName}_${idx}_${item.title}"),
+                title = item.title.ifBlank { "第${idx + 1}章" },
+                isVolume = item.isVolume,
+                baseUrl = book.bookUrl,
+                bookUrl = book.bookUrl,
+                index = idx,
+                start = item.startByte,
+                end = item.endByte,
+                wordCount = if (item.wordCount > 0) StringUtils.wordCountFormat(item.wordCount) else null,
+                tag = item.volumeName.ifBlank { null }
+            )
+            list.add(ch)
+        }
+        return list
+    }
+
+    /**
+     * 供 LocalBook.getChapterList 调用：若书籍拥有番茄伴生 .toc.json，直接加载原生分卷与章节目录（无需正则扫描）。
+     */
+    fun loadNativeBookChapters(book: Book): ArrayList<BookChapter>? {
+        return try {
+            val uri = Uri.parse(book.bookUrl)
+            val path = uri.path ?: return null
+            val txtFile = File(path)
+            if (!txtFile.isFile) return null
+            val tocFile = tocFileForTxt(txtFile)
+            if (!tocFile.isFile) return null
+            val fileLen = txtFile.length()
+            val arr = JSONArray(tocFile.readText(Charsets.UTF_8))
+            if (arr.length() == 0) return null
+            val items = ArrayList<FanqieBuiltTocItem>(arr.length())
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                val startB = o.optLong("start", 0L).coerceIn(0L, fileLen)
+                val endB = o.optLong("end", startB).coerceIn(startB, fileLen)
+                items.add(
+                    FanqieBuiltTocItem(
+                        index = o.optInt("index", i),
+                        title = o.optString("title", "第${i + 1}章"),
+                        isVolume = o.optBoolean("is_volume", false),
+                        startByte = startB,
+                        endByte = endB,
+                        wordCount = o.optInt("word_count", 0),
+                        volumeName = o.optString("volume_name", ""),
+                        itemId = o.optString("item_id", "").ifBlank { null }
+                    )
+                )
+            }
+            if (items.isEmpty()) null else toBookChapters(book, items)
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
     suspend fun searchBooks(keyword: String): List<FanqieSearchItem> = withContext(Dispatchers.IO) {
         newLocalCrawler().searchBooks(keyword)
     }
@@ -89,7 +188,7 @@ object FanqieLegadoBridge {
 
     /**
      * 立即阅读（秒开流式阅读）：
-     * 若书架已存在该书则直接打开；若尚未下载，则秒级拉取前 8 章写入书架并立即打开阅读器，后续章节交由后台静默续下。
+     * 若书架已存在该书且目录完整则直接打开；若尚未下载或目录为空，则拉取首章批次并构建原生目录直通写入书架。
      */
     suspend fun quickStartRead(
         fanqieBookId: String,
@@ -101,7 +200,10 @@ object FanqieLegadoBridge {
         val cleanId = FanqieParser.resolveBookId(fanqieBookId)
         val existing = findBookByFanqieId(cleanId)
         if (existing != null && appDb.bookChapterDao.getChapterCount(existing.bookUrl) > 0) {
-            return@withContext existing
+            val nativeToc = loadNativeBookChapters(existing)
+            if (!nativeToc.isNullOrEmpty()) {
+                return@withContext existing
+            }
         }
         val crawler = newLocalCrawler()
         val existingCache = FanqieChapterCacheStore.loadCachedMap(cleanId)
@@ -119,7 +221,8 @@ object FanqieLegadoBridge {
             remoteTotalChapters = outcome.remoteTotalChapters,
             latestChapterTitle = outcome.latestChapterTitle,
             isPartial = outcome.isPartial,
-            txtBytes = outcome.txtBytes
+            txtBytes = outcome.txtBytes,
+            builtToc = outcome.builtToc
         )
     }
 
@@ -132,7 +235,7 @@ object FanqieLegadoBridge {
         val crawler = newLocalCrawler()
         val meta = crawler.fetchMetadata(tagInfo.fanqieBookId, forceRefresh = true)
         val cachedCount = FanqieChapterCacheStore.countCached(tagInfo.fanqieBookId)
-        val localCount = maxOf(cachedCount, tagInfo.downloadedChapters, book.totalChapterNum)
+        val localCount = maxOf(cachedCount, tagInfo.downloadedChapters)
         val remoteCount = maxOf(meta.chapterCount, localCount)
         val newChapters = (remoteCount - localCount).coerceAtLeast(0)
         val latestTitle = meta.effectiveLatestChapter()
@@ -163,7 +266,7 @@ object FanqieLegadoBridge {
     }
 
     /**
-     * 将下载或断点保存的 TXT 写入应用专属目录，并注册/更新到 Legado 的 Room 书架数据库与章节表中。
+     * 将下载或断点保存的 TXT 与精确字节偏移目录写入应用专属目录，并注册/更新到 Legado 的 Room 书架与章节表中。
      * 若用户当前正在阅读本书，保持阅读进度并热更新内存中的章节总数，实现无感边看边下。
      */
     @Synchronized
@@ -179,13 +282,17 @@ object FanqieLegadoBridge {
         remoteTotalChapters: Int,
         latestChapterTitle: String,
         isPartial: Boolean,
-        txtBytes: ByteArray
+        txtBytes: ByteArray,
+        builtToc: List<FanqieBuiltTocItem> = emptyList()
     ): Book {
         val cleanTitle = title.trim().ifEmpty { "番茄小说_$fanqieBookId" }
         val cleanAuthor = author.trim().ifEmpty { "未知作者" }
         val txtFile = File(booksDir, "fanqie_${fanqieBookId}.txt")
         txtFile.parentFile?.mkdirs()
         txtFile.writeBytes(txtBytes)
+        if (builtToc.isNotEmpty()) {
+            saveCompanionTocJson(txtFile, builtToc)
+        }
         val fileUriStr = Uri.fromFile(txtFile).toString()
 
         val existing = findBookByFanqieId(fanqieBookId)
@@ -205,6 +312,10 @@ object FanqieLegadoBridge {
                 "共 $downloadedChapters 章"
         }
 
+        // 设定 latestChapterTime 大于文件修改时间，彻底防止 Book.isLocalModified() 误判并重置目录规则
+        val safeLatestTime = maxOf(System.currentTimeMillis(), txtFile.lastModified() + 5000L)
+        val defaultTocRule = "^【([^\\r\\n]+)】$"
+
         // 若当前正在阅读器中打开了这本书，同步保留内存中的实时阅读章节与字偏移
         val activeReadingBook = ReadBook.book?.takeIf {
             it.bookUrl == fileUriStr || (existing != null && it.bookUrl == existing.bookUrl)
@@ -221,7 +332,7 @@ object FanqieLegadoBridge {
                     }
                 }
                 this.bookUrl = fileUriStr
-                this.tocUrl = "^【[^\\r\\n]{1,75}】$"
+                this.tocUrl = defaultTocRule
                 this.origin = BookType.localTag
                 this.originName = "${cleanTitle}.txt"
                 this.name = cleanTitle
@@ -234,18 +345,20 @@ object FanqieLegadoBridge {
                 this.kind = listOf("番茄小说", serialStatus).filter { it.isNotBlank() }.joinToString(",")
                 this.customTag = encodeTag(fanqieBookId, downloadedChapters, effectiveRemote, isPartial)
                 this.latestChapterTitle = displayLatest
-                this.latestChapterTime = txtFile.lastModified()
+                this.latestChapterTime = safeLatestTime
                 this.lastCheckTime = System.currentTimeMillis()
                 this.lastCheckCount = pendingCount
-                this.totalChapterNum = maxOf(downloadedChapters, 1)
-                // 关闭 Legado 原生书源自动轮询，交由番茄引擎独立管理断点与更新
+                this.totalChapterNum = maxOf(builtToc.size, downloadedChapters, 1)
                 this.canUpdate = false
             }
         } else {
             val minOrder = try { appDb.bookDao.minOrder } catch (_: Throwable) { 0 }
+            val firstNonVolTitle = builtToc.firstOrNull { !it.isVolume }?.title
+                ?: builtToc.firstOrNull()?.title
+                ?: "第 1 章"
             Book(
                 bookUrl = fileUriStr,
-                tocUrl = "^【[^\\r\\n]{1,75}】$",
+                tocUrl = defaultTocRule,
                 origin = BookType.localTag,
                 originName = "${cleanTitle}.txt",
                 name = cleanTitle,
@@ -257,11 +370,11 @@ object FanqieLegadoBridge {
                 charset = "UTF-8",
                 type = BookType.text or BookType.local,
                 latestChapterTitle = displayLatest,
-                latestChapterTime = txtFile.lastModified(),
+                latestChapterTime = safeLatestTime,
                 lastCheckTime = System.currentTimeMillis(),
                 lastCheckCount = pendingCount,
-                totalChapterNum = maxOf(downloadedChapters, 1),
-                durChapterTitle = "第 1 章",
+                totalChapterNum = maxOf(builtToc.size, downloadedChapters, 1),
+                durChapterTitle = firstNonVolTitle,
                 durChapterIndex = 0,
                 durChapterPos = 0,
                 durChapterTime = System.currentTimeMillis(),
@@ -273,19 +386,28 @@ object FanqieLegadoBridge {
 
         try {
             TextFile.clear()
-            val chapters = LocalBook.getChapterList(book)
+            val chapters = if (builtToc.isNotEmpty()) {
+                toBookChapters(book, builtToc)
+            } else {
+                loadNativeBookChapters(book) ?: LocalBook.getChapterList(book)
+            }
             book.latestChapterTitle = displayLatest
+            book.latestChapterTime = maxOf(System.currentTimeMillis(), txtFile.lastModified() + 5000L)
             book.lastCheckCount = pendingCount
             book.totalChapterNum = chapters.size.coerceAtLeast(1)
+            if (book.durChapterIndex in chapters.indices) {
+                book.durChapterTitle = chapters[book.durChapterIndex].title
+            }
             appDb.bookChapterDao.delByBook(book.bookUrl)
             appDb.bookChapterDao.insert(*chapters.toTypedArray())
 
-            // 若用户正在阅读该书，无感热更新阅读器内的总章节数
+            // 若用户正在阅读该书，无感热更新阅读器内的总章节数与目录
             if (activeReadingBook != null) {
                 ReadBook.chapterSize = chapters.size
                 ReadBook.book?.totalChapterNum = chapters.size
                 ReadBook.book?.customTag = book.customTag
                 ReadBook.book?.latestChapterTitle = book.latestChapterTitle
+                ReadBook.book?.latestChapterTime = book.latestChapterTime
             }
         } catch (_: Throwable) {
         }
@@ -312,7 +434,7 @@ object FanqieLegadoBridge {
             bookId = fanqieBookId,
             existingCache = existingCache,
             shouldStop = shouldStop,
-            onCheckpoint = { downloadedCount, totalCount, latestTitle, checkpointBytes, updatedCache ->
+            onCheckpoint = { downloadedCount, totalCount, latestTitle, checkpointBytes, checkpointToc, updatedCache ->
                 FanqieChapterCacheStore.saveCachedMap(fanqieBookId, updatedCache)
                 saveOrUpdateLegadoBook(
                     fanqieBookId = fanqieBookId,
@@ -326,7 +448,8 @@ object FanqieLegadoBridge {
                     remoteTotalChapters = totalCount,
                     latestChapterTitle = latestTitle,
                     isPartial = downloadedCount < totalCount,
-                    txtBytes = checkpointBytes
+                    txtBytes = checkpointBytes,
+                    builtToc = checkpointToc
                 )
             },
             onProgress = onProgress
@@ -345,7 +468,8 @@ object FanqieLegadoBridge {
             remoteTotalChapters = outcome.remoteTotalChapters,
             latestChapterTitle = outcome.latestChapterTitle,
             isPartial = outcome.isPartial,
-            txtBytes = outcome.txtBytes
+            txtBytes = outcome.txtBytes,
+            builtToc = outcome.builtToc
         )
     }
 }

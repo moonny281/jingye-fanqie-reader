@@ -16,6 +16,7 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.material.textfield.TextInputLayout
 import io.legado.app.R
 import io.legado.app.constant.AppLog
+import io.legado.app.eink.EinkRefreshHelper
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.setBackgroundKeepPadding
@@ -94,8 +95,11 @@ abstract class BaseDialogFragment(
     }
 
     override fun onDismiss(dialog: DialogInterface) {
+        val hostDecor = activity?.window?.decorView
         super.onDismiss(dialog)
         onDismissListener?.onDismiss(dialog)
+        // 对话框关闭后立即对底层窗口执行一次白场擦除，彻底清除对话框黑框残影
+        EinkRefreshHelper.scrubAfterOverlayDismiss(hostDecor)
     }
 
     fun <T> execute(
