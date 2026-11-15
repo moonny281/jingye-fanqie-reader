@@ -74,7 +74,6 @@ import io.legado.app.ui.book.info.edit.BookInfoEditActivity
 import io.legado.app.ui.book.manga.ReadMangaActivity
 import io.legado.app.fanqie.FanqieUiHelper
 import io.legado.app.ui.book.read.ReadBookActivity
-import io.legado.app.fanqie.FanqieUiHelper
 import io.legado.app.ui.book.read.ReadBookActivity.Companion.RESULT_DELETED
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.model.SourceCallBack

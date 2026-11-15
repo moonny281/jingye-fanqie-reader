@@ -46,7 +46,6 @@ import java.util.Locale
 import java.util.concurrent.TimeUnit
 import androidx.core.content.edit
 import io.legado.app.model.VideoPlay.VIDEO_PREF_NAME
-import kotlinx.coroutines.currentCoroutineContext
 
 /**
  * 备份
