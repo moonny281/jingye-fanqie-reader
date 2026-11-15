@@ -3,6 +3,7 @@ package io.legado.app.ui.book.read.page
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Rect
 import android.graphics.RectF
 import android.os.Build
 import android.util.AttributeSet
@@ -11,8 +12,8 @@ import android.view.ViewConfiguration
 import android.view.WindowInsets
 import android.widget.FrameLayout
 import io.legado.app.R
-import io.legado.app.constant.PageAnim
 import io.legado.app.data.entities.BookProgress
+import io.legado.app.eink.EinkRefreshHelper
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.model.ReadAloud
@@ -20,13 +21,9 @@ import io.legado.app.model.ReadBook
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.ui.book.read.ContentEditDialog
 import io.legado.app.ui.book.read.page.api.DataSource
-import io.legado.app.ui.book.read.page.delegate.CoverPageDelegate
 import io.legado.app.ui.book.read.page.delegate.HorizontalPageDelegate
 import io.legado.app.ui.book.read.page.delegate.NoAnimPageDelegate
 import io.legado.app.ui.book.read.page.delegate.PageDelegate
-import io.legado.app.ui.book.read.page.delegate.ScrollPageDelegate
-import io.legado.app.ui.book.read.page.delegate.SimulationPageDelegate
-import io.legado.app.ui.book.read.page.delegate.SlidePageDelegate
 import io.legado.app.ui.book.read.page.entities.PageDirection
 import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.ui.book.read.page.entities.TextLine
@@ -46,7 +43,7 @@ import java.util.Locale
 import kotlin.math.abs
 
 /**
- * 阅读视图
+ * 阅读视图（原生墨水屏深度重构版：强制无动画翻页 + 双级局部/全局清残影引擎）
  */
 class ReadView(context: Context, attrs: AttributeSet) :
     FrameLayout(context, attrs),
@@ -65,7 +62,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
     val prevPage by lazy { PageView(context) }
     val curPage by lazy { PageView(context) }
     val nextPage by lazy { PageView(context) }
-    val defaultAnimationSpeed = 300
+    val defaultAnimationSpeed = 0
     private var pressDown = false
     private var isMove = false
 
@@ -169,9 +166,6 @@ class ReadView(context: Context, attrs: AttributeSet) :
         return true
     }
 
-    /**
-     * 触摸事件
-     */
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -189,7 +183,6 @@ class ReadView(context: Context, attrs: AttributeSet) :
             }
         }
 
-        //在多点触控时，事件不走ACTION_DOWN分支而产生的特殊事件处理
         if (event.actionMasked == MotionEvent.ACTION_POINTER_DOWN || event.actionMasked == MotionEvent.ACTION_POINTER_UP) {
             pageDelegate?.onTouch(event)
         }
@@ -276,18 +269,12 @@ class ReadView(context: Context, attrs: AttributeSet) :
         }
     }
 
-    /**
-     * 更新状态栏
-     */
     fun upStatusBar() {
         curPage.upStatusBar()
         prevPage.upStatusBar()
         nextPage.upStatusBar()
     }
 
-    /**
-     * 保存开始位置
-     */
     fun setStartPoint(x: Float, y: Float, invalidate: Boolean = true) {
         startX = x
         startY = y
@@ -301,9 +288,6 @@ class ReadView(context: Context, attrs: AttributeSet) :
         }
     }
 
-    /**
-     * 保存当前位置
-     */
     fun setTouchPoint(x: Float, y: Float, invalidate: Boolean = true) {
         lastX = touchX
         lastY = touchY
@@ -317,9 +301,6 @@ class ReadView(context: Context, attrs: AttributeSet) :
         touchY -= offset - offset.toInt()
     }
 
-    /**
-     * 长按选择
-     */
     private fun onLongPress() {
         kotlin.runCatching {
             curPage.longPress(startX, startY) { textPos: TextPos ->
@@ -391,9 +372,6 @@ class ReadView(context: Context, attrs: AttributeSet) :
         }
     }
 
-    /**
-     * 单击
-     */
     private fun onSingleTapUp() {
         when {
             isTextSelected -> Unit
@@ -435,9 +413,6 @@ class ReadView(context: Context, attrs: AttributeSet) :
         }
     }
 
-    /**
-     * 点击
-     */
     private fun click(action: Int) {
         when (action) {
             0 -> {
@@ -445,8 +420,8 @@ class ReadView(context: Context, attrs: AttributeSet) :
                 callBack.showActionMenu()
             }
 
-            1 -> pageDelegate?.nextPageByAnim(defaultAnimationSpeed)
-            2 -> pageDelegate?.prevPageByAnim(defaultAnimationSpeed)
+            1 -> pageDelegate?.nextPageByAnim(0)
+            2 -> pageDelegate?.prevPageByAnim(0)
             3 -> ReadBook.moveToNextChapter(true)
             4 -> ReadBook.moveToPrevChapter(upContent = true, toLast = false)
             5 -> ReadAloud.prevParagraph(context)
@@ -471,9 +446,6 @@ class ReadView(context: Context, attrs: AttributeSet) :
         }
     }
 
-    /**
-     * 选择文本
-     */
     private fun selectText(x: Float, y: Float) {
         curPage.selectText(x, y) { textPos ->
             val compare = initialTextPos.compare(textPos)
@@ -495,9 +467,6 @@ class ReadView(context: Context, attrs: AttributeSet) :
         }
     }
 
-    /**
-     * 销毁事件
-     */
     fun onDestroy() {
         pageDelegate?.onDestroy()
         curPage.cancelSelect()
@@ -505,8 +474,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
     }
 
     /**
-     * 翻页动画完成后事件
-     * @param direction 翻页方向
+     * 翻页完成后事件：执行墨水屏局部/全局清残影联动
      */
     fun fillPage(direction: PageDirection): Boolean {
         val moved = when (direction) {
@@ -520,77 +488,61 @@ class ReadView(context: Context, attrs: AttributeSet) :
 
             else -> false
         }
-        if (moved && AppConfig.isEInkMode) {
-            io.legado.app.eink.EinkRefreshHelper.onPageTurned(this)
+        if (moved) {
+            val contentRect = Rect(
+                ChapterProvider.paddingLeft.coerceAtLeast(0),
+                ChapterProvider.paddingTop.coerceAtLeast(0),
+                ChapterProvider.visibleRight.takeIf { it > 0 } ?: curPage.contentView.width,
+                ChapterProvider.visibleBottom.takeIf { it > 0 } ?: curPage.contentView.height
+            )
+            EinkRefreshHelper.onPageTurned(curPage.contentView, contentRect)
         }
         return moved
     }
 
+    fun triggerPartialRefresh(showToast: Boolean = true) {
+        val contentRect = Rect(
+            ChapterProvider.paddingLeft.coerceAtLeast(0),
+            ChapterProvider.paddingTop.coerceAtLeast(0),
+            ChapterProvider.visibleRight.takeIf { it > 0 } ?: curPage.contentView.width,
+            ChapterProvider.visibleBottom.takeIf { it > 0 } ?: curPage.contentView.height
+        )
+        EinkRefreshHelper.triggerPartialRefresh(curPage.contentView, contentRect, showToast = showToast)
+    }
+
+    fun triggerFullRefresh(showToast: Boolean = true) {
+        EinkRefreshHelper.triggerFullRefresh(this, showToast = showToast)
+    }
+
     /**
-     * 更新翻页动画
+     * 墨水屏强制使用 NoAnimPageDelegate（零动画极速翻页）
      */
     fun upPageAnim(upRecorder: Boolean = false) {
-        isScroll = ReadBook.pageAnim() == 3
+        isScroll = false
         ChapterProvider.upLayout()
-        when (ReadBook.pageAnim()) {
-            PageAnim.coverPageAnim -> if (pageDelegate !is CoverPageDelegate) {
-                pageDelegate = CoverPageDelegate(this)
-            }
-
-            PageAnim.slidePageAnim -> if (pageDelegate !is SlidePageDelegate) {
-                pageDelegate = SlidePageDelegate(this)
-            }
-
-            PageAnim.simulationPageAnim -> if (pageDelegate !is SimulationPageDelegate) {
-                pageDelegate = SimulationPageDelegate(this)
-            }
-
-            PageAnim.scrollPageAnim -> if (pageDelegate !is ScrollPageDelegate) {
-                pageDelegate = ScrollPageDelegate(this)
-            }
-
-            else -> if (pageDelegate !is NoAnimPageDelegate) {
-                pageDelegate = NoAnimPageDelegate(this)
-            }
+        if (pageDelegate !is NoAnimPageDelegate) {
+            pageDelegate = NoAnimPageDelegate(this)
         }
-        (pageDelegate as? ScrollPageDelegate)?.noAnim = AppConfig.noAnimScrollPage
         if (upRecorder) {
             (pageDelegate as? HorizontalPageDelegate)?.upRecorder()
             autoPager.upRecorder()
         }
         pageDelegate?.setViewSize(width, height)
-        if (isScroll) {
-            curPage.setAutoPager(autoPager)
-        } else {
-            curPage.setAutoPager(null)
-        }
-        curPage.setIsScroll(isScroll)
+        curPage.setAutoPager(null)
+        curPage.setIsScroll(false)
     }
 
-    /**
-     * 更新阅读内容
-     * @param relativePosition 相对位置 -1 上一页 0 当前页 1 下一页
-     * @param resetPageOffset 滚动阅读是是否重置位置
-     */
     override fun upContent(relativePosition: Int, resetPageOffset: Boolean) {
         post {
             curPage.setContentDescription(pageFactory.curPage.text)
         }
-        if (isScroll && !isAutoPage) {
-            if (relativePosition == 0) {
+        when (relativePosition) {
+            -1 -> prevPage.setContent(pageFactory.prevPage)
+            1 -> nextPage.setContent(pageFactory.nextPage)
+            else -> {
                 curPage.setContent(pageFactory.curPage, resetPageOffset)
-            } else {
-                curPage.invalidateContentView()
-            }
-        } else {
-            when (relativePosition) {
-                -1 -> prevPage.setContent(pageFactory.prevPage)
-                1 -> nextPage.setContent(pageFactory.nextPage)
-                else -> {
-                    curPage.setContent(pageFactory.curPage, resetPageOffset)
-                    nextPage.setContent(pageFactory.nextPage)
-                    prevPage.setContent(pageFactory.prevPage)
-                }
+                nextPage.setContent(pageFactory.nextPage)
+                prevPage.setContent(pageFactory.prevPage)
             }
         }
         callBack.screenOffTimerStart()
@@ -600,26 +552,17 @@ class ReadView(context: Context, attrs: AttributeSet) :
         curPage.setProgress(pageFactory.curPage)
     }
 
-    /**
-     * 更新滑动距离
-     */
     fun upPageSlopSquare() {
         val pageTouchSlop = AppConfig.pageTouchSlop
         this.pageSlopSquare = if (pageTouchSlop == 0) slopSquare else pageTouchSlop
         pageSlopSquare2 = this.pageSlopSquare * this.pageSlopSquare
     }
 
-    /**
-     * 更新边缘点击阈值
-     */
     fun upPageTouchClick() {
         this.pageTouchClick = AppConfig.pageTouchClick
         setRect9x()
     }
 
-    /**
-     * 更新样式
-     */
     fun upStyle() {
         ChapterProvider.upStyle()
         curPage.upStyle()
@@ -630,9 +573,6 @@ class ReadView(context: Context, attrs: AttributeSet) :
         }
     }
 
-    /**
-     * 更新背景
-     */
     fun upBg() {
         ReadBookConfig.upBg(width, height)
         curPage.upBg()
@@ -640,36 +580,24 @@ class ReadView(context: Context, attrs: AttributeSet) :
         nextPage.upBg()
     }
 
-    /**
-     * 更新背景透明度
-     */
     fun upBgAlpha() {
         curPage.upBgAlpha()
         prevPage.upBgAlpha()
         nextPage.upBgAlpha()
     }
 
-    /**
-     * 更新时间信息
-     */
     fun upTime() {
         curPage.upTime()
         prevPage.upTime()
         nextPage.upTime()
     }
 
-    /**
-     * 更新电量信息
-     */
     fun upBattery(battery: Int) {
         curPage.upBattery(battery)
         prevPage.upBattery(battery)
         nextPage.upBattery(battery)
     }
 
-    /**
-     * 从选择位置开始朗读
-     */
     suspend fun aloudStartSelect() {
         val selectStartPos = curPage.selectStartPos
         var pagePos = selectStartPos.relativePagePos
@@ -685,9 +613,6 @@ class ReadView(context: Context, attrs: AttributeSet) :
         ReadBook.readAloud(startPos = startPos)
     }
 
-    /**
-     * @return 选择的文本
-     */
     fun getSelectText(): String {
         return curPage.selectedText
     }

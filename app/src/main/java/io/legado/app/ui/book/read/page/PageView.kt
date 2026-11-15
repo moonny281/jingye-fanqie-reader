@@ -2,6 +2,7 @@ package io.legado.app.ui.book.read.page
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Color
 import android.graphics.drawable.LayerDrawable
 import android.view.LayoutInflater
 import android.widget.FrameLayout
@@ -10,11 +11,11 @@ import androidx.core.graphics.drawable.toDrawable
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isGone
-import androidx.core.view.isInvisible
 import io.legado.app.R
 import io.legado.app.constant.AppConst.timeFormat
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.databinding.ViewBookPageBinding
+import io.legado.app.eink.EinkRefreshHelper
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ReadTipConfig
@@ -36,7 +37,7 @@ import splitties.views.backgroundColor
 import java.util.Date
 
 /**
- * 页面视图
+ * 页面视图（墨水屏深度优化版：支持一键完全关闭进度与状态栏以释放 100% 屏幕阅读面积 + 分辨率自适应紧凑页眉页脚）
  */
 class PageView(context: Context) : FrameLayout(context) {
 
@@ -56,6 +57,9 @@ class PageView(context: Context) : FrameLayout(context) {
     private var tvTimeBatteryP: BatteryView? = null
     private var isMainView = false
     var isScroll = false
+
+    val contentView: ContentTextView
+        get() = binding.contentTextView
 
     val headerHeight: Int
         get() {
@@ -84,7 +88,7 @@ class PageView(context: Context) : FrameLayout(context) {
     fun upStyle() = binding.run {
         upTipStyle()
         ReadBookConfig.let {
-            val textColor = it.textColor
+            val textColor = Color.BLACK
             val tipColor = with(ReadTipConfig) {
                 if (tipColor == 0) textColor else tipColor
             }
@@ -106,18 +110,40 @@ class PageView(context: Context) : FrameLayout(context) {
             upStatusBar()
             upNavigationBar()
             upPaddingDisplayCutouts()
-            llHeader.setPadding(
-                it.headerPaddingLeft.dpToPx(),
-                it.headerPaddingTop.dpToPx(),
-                it.headerPaddingRight.dpToPx(),
-                it.headerPaddingBottom.dpToPx()
-            )
-            llFooter.setPadding(
-                it.footerPaddingLeft.dpToPx(),
-                it.footerPaddingTop.dpToPx(),
-                it.footerPaddingRight.dpToPx(),
-                it.footerPaddingBottom.dpToPx()
-            )
+
+            if (EinkRefreshHelper.adaptiveScreenResolution) {
+                val dm = resources.displayMetrics
+                val adaptive = EinkRefreshHelper.computeAdaptiveMargins(
+                    dm.widthPixels,
+                    dm.heightPixels,
+                    dm.density
+                )
+                llHeader.setPadding(
+                    adaptive.headerPadHorizontalDp.dpToPx(),
+                    adaptive.headerPadTopDp.dpToPx(),
+                    adaptive.headerPadHorizontalDp.dpToPx(),
+                    adaptive.headerPadBottomDp.dpToPx()
+                )
+                llFooter.setPadding(
+                    adaptive.footerPadHorizontalDp.dpToPx(),
+                    adaptive.footerPadTopDp.dpToPx(),
+                    adaptive.footerPadHorizontalDp.dpToPx(),
+                    adaptive.footerPadBottomDp.dpToPx()
+                )
+            } else {
+                llHeader.setPadding(
+                    it.headerPaddingLeft.dpToPx(),
+                    it.headerPaddingTop.dpToPx(),
+                    it.headerPaddingRight.dpToPx(),
+                    it.headerPaddingBottom.dpToPx()
+                )
+                llFooter.setPadding(
+                    it.footerPaddingLeft.dpToPx(),
+                    it.footerPaddingTop.dpToPx(),
+                    it.footerPaddingRight.dpToPx(),
+                    it.footerPaddingBottom.dpToPx()
+                )
+            }
             vwTopDivider.gone(llHeader.isGone || !it.showHeaderLine)
             vwBottomDivider.gone(llFooter.isGone || !it.showFooterLine)
         }
@@ -129,7 +155,6 @@ class PageView(context: Context) : FrameLayout(context) {
      * 显示状态栏时隐藏header
      */
     fun upStatusBar() = with(binding.vwStatusBar) {
-//        setPadding(paddingLeft, context.statusBarHeight, paddingRight, paddingBottom)
         isGone = ReadBookConfig.hideStatusBar || readBookActivity?.isInMultiWindow == true
     }
 
@@ -160,7 +185,7 @@ class PageView(context: Context) : FrameLayout(context) {
     }
 
     /**
-     * 更新阅读信息
+     * 更新阅读进度与页眉页脚显示状态（当进度总开关关闭或所有子项为空时彻底隐藏容器以释放 100% 屏幕高度）
      */
     private fun upTipStyle() = binding.run {
         tvHeaderLeft.tag = null
@@ -169,20 +194,39 @@ class PageView(context: Context) : FrameLayout(context) {
         tvFooterLeft.tag = null
         tvFooterMiddle.tag = null
         tvFooterRight.tag = null
-        llHeader.isGone = when (ReadTipConfig.headerMode) {
-            1 -> false
-            2 -> true
-            else -> !ReadBookConfig.hideStatusBar
+
+        val progressMasterEnabled = EinkRefreshHelper.showReadProgressBar
+        val hasAnyHeaderItem = with(ReadTipConfig) {
+            tipHeaderLeft != none || tipHeaderMiddle != none || tipHeaderRight != none
         }
-        llFooter.isGone = when (ReadTipConfig.footerMode) {
-            1 -> true
-            else -> false
+        val hasAnyFooterItem = with(ReadTipConfig) {
+            tipFooterLeft != none || tipFooterMiddle != none || tipFooterRight != none
         }
+
+        llHeader.isGone = if (!progressMasterEnabled || !hasAnyHeaderItem) {
+            true
+        } else {
+            when (ReadTipConfig.headerMode) {
+                1 -> false
+                2 -> true
+                else -> !ReadBookConfig.hideStatusBar
+            }
+        }
+
+        llFooter.isGone = if (!progressMasterEnabled || !hasAnyFooterItem) {
+            true
+        } else {
+            when (ReadTipConfig.footerMode) {
+                1 -> true
+                else -> false
+            }
+        }
+
         ReadTipConfig.apply {
             tvHeaderLeft.isGone = tipHeaderLeft == none
             tvHeaderRight.isGone = tipHeaderRight == none
             tvHeaderMiddle.isGone = tipHeaderMiddle == none
-            tvFooterLeft.isInvisible = tipFooterLeft == none
+            tvFooterLeft.isGone = tipFooterLeft == none
             tvFooterRight.isGone = tipFooterRight == none
             tvFooterMiddle.isGone = tipFooterMiddle == none
         }
@@ -190,72 +234,71 @@ class PageView(context: Context) : FrameLayout(context) {
             tag = ReadTipConfig.chapterTitle
             isBattery = false
             typeface = ChapterProvider.typeface
-            textSize = 12f
+            textSize = 11f
         }
         tvTime = getTipView(ReadTipConfig.time)?.apply {
             tag = ReadTipConfig.time
             isBattery = false
             typeface = ChapterProvider.typeface
-            textSize = 12f
+            textSize = 11f
         }
         tvBattery = getTipView(ReadTipConfig.battery)?.apply {
             tag = ReadTipConfig.battery
             isBattery = true
-            textSize = 11f
+            textSize = 10.5f
         }
         tvPage = getTipView(ReadTipConfig.page)?.apply {
             tag = ReadTipConfig.page
             isBattery = false
             typeface = ChapterProvider.typeface
-            textSize = 12f
+            textSize = 11f
         }
         tvTotalProgress = getTipView(ReadTipConfig.totalProgress)?.apply {
             tag = ReadTipConfig.totalProgress
             isBattery = false
             typeface = ChapterProvider.typeface
-            textSize = 12f
+            textSize = 11f
         }
         tvTotalProgress1 = getTipView(ReadTipConfig.totalProgress1)?.apply {
             tag = ReadTipConfig.totalProgress1
             isBattery = false
             typeface = ChapterProvider.typeface
-            textSize = 12f
+            textSize = 11f
         }
         tvPageAndTotal = getTipView(ReadTipConfig.pageAndTotal)?.apply {
             tag = ReadTipConfig.pageAndTotal
             isBattery = false
             typeface = ChapterProvider.typeface
-            textSize = 12f
+            textSize = 11f
         }
         tvBookName = getTipView(ReadTipConfig.bookName)?.apply {
             tag = ReadTipConfig.bookName
             isBattery = false
             typeface = ChapterProvider.typeface
-            textSize = 12f
+            textSize = 11f
         }
         tvTimeBattery = getTipView(ReadTipConfig.timeBattery)?.apply {
             tag = ReadTipConfig.timeBattery
             isBattery = true
             typeface = ChapterProvider.typeface
-            textSize = 11f
+            textSize = 10.5f
         }
         tvBatteryP = getTipView(ReadTipConfig.batteryPercentage)?.apply {
             tag = ReadTipConfig.batteryPercentage
             isBattery = false
             typeface = ChapterProvider.typeface
-            textSize = 12f
+            textSize = 11f
         }
         tvTimeBatteryP = getTipView(ReadTipConfig.timeBatteryPercentage)?.apply {
             tag = ReadTipConfig.timeBatteryPercentage
             isBattery = false
             typeface = ChapterProvider.typeface
-            textSize = 12f
+            textSize = 11f
         }
     }
 
     /**
      * 获取信息视图
-     * @param tip 信息类型
      */
     private fun getTipView(tip: Int): BatteryView? = binding.run {
         return when (tip) {
@@ -270,13 +313,13 @@ class PageView(context: Context) : FrameLayout(context) {
     }
 
     /**
-     * 更新背景
+     * 更新背景（原生纯白墨水屏背景）
      */
     fun upBg() {
         binding.vwRoot.background = LayerDrawable(
             arrayOf(
-                ReadBookConfig.bgMeanColor.toDrawable(),
-                ReadBookConfig.bg
+                Color.WHITE.toDrawable(),
+                ReadBookConfig.bg ?: Color.WHITE.toDrawable()
             )
         )
         upBgAlpha()
@@ -286,7 +329,7 @@ class PageView(context: Context) : FrameLayout(context) {
      * 更新背景透明度
      */
     fun upBgAlpha() {
-        ReadBookConfig.bg?.alpha = (ReadBookConfig.bgAlpha / 100f * 255).toInt()
+        ReadBookConfig.bg?.alpha = 255
         binding.vwRoot.invalidate()
     }
 
@@ -309,9 +352,6 @@ class PageView(context: Context) : FrameLayout(context) {
         upTimeBattery()
     }
 
-    /**
-     * 更新电池信息
-     */
     @SuppressLint("SetTextI18n")
     private fun upTimeBattery() {
         val time = timeFormat.format(Date(System.currentTimeMillis()))
@@ -340,16 +380,10 @@ class PageView(context: Context) : FrameLayout(context) {
         binding.contentTextView.invalidate()
     }
 
-    /**
-     * 设置无障碍文本
-     */
     fun setContentDescription(content: String) {
         binding.contentTextView.contentDescription = content
     }
 
-    /**
-     * 重置滚动位置
-     */
     fun resetPageOffset() {
         binding.contentTextView.resetPageOffset()
     }
@@ -388,31 +422,18 @@ class PageView(context: Context) : FrameLayout(context) {
         binding.contentTextView.setIsScroll(value)
     }
 
-    /**
-     * 滚动事件
-     */
     fun scroll(offset: Int) {
         binding.contentTextView.scroll(offset)
     }
 
-    /**
-     * 更新是否开启选择功能
-     */
     fun upSelectAble(selectAble: Boolean) {
         binding.contentTextView.selectAble = selectAble
     }
 
-    /**
-     * 优先处理页面内单击
-     * @return true:已处理, false:未处理
-     */
     fun onClick(x: Float, y: Float): Boolean {
         return binding.contentTextView.click(x - imgBgPaddingStart, y - headerHeight)
     }
 
-    /**
-     * 长按事件
-     */
     fun longPress(
         x: Float, y: Float,
         select: (textPos: TextPos) -> Unit,
@@ -420,9 +441,6 @@ class PageView(context: Context) : FrameLayout(context) {
         return binding.contentTextView.longPress(x - imgBgPaddingStart, y - headerHeight, select)
     }
 
-    /**
-     * 选择文本
-     */
     fun selectText(
         x: Float, y: Float,
         select: (textPos: TextPos) -> Unit,

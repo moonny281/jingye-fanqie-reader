@@ -9,6 +9,7 @@ import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.constant.EventBus
 import io.legado.app.databinding.DialogTipConfigBinding
+import io.legado.app.eink.EinkRefreshHelper
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ReadTipConfig
 import io.legado.app.lib.dialogs.selector
@@ -56,7 +57,11 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
         binding.tvHeaderShow.text =
             ReadTipConfig.getHeaderModes(requireContext())[ReadTipConfig.headerMode]
         binding.tvFooterShow.text =
-            ReadTipConfig.getFooterModes(requireContext())[ReadTipConfig.footerMode]
+            if (!EinkRefreshHelper.showReadProgressBar) {
+                getString(R.string.hide)
+            } else {
+                ReadTipConfig.getFooterModes(requireContext())[ReadTipConfig.footerMode]
+            }
 
         ReadTipConfig.run {
             tipNames.let { tipNames ->
@@ -118,16 +123,20 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
             val headerModes = ReadTipConfig.getHeaderModes(requireContext())
             context?.selector(items = headerModes.values.toList()) { _, i ->
                 ReadTipConfig.headerMode = headerModes.keys.toList()[i]
+                if (ReadTipConfig.headerMode != 2) {
+                    EinkRefreshHelper.showReadProgressBar = true
+                }
                 tvHeaderShow.text = headerModes[ReadTipConfig.headerMode]
-                postEvent(EventBus.UP_CONFIG, arrayListOf(2))
+                postEvent(EventBus.UP_CONFIG, arrayListOf(2, 5, 10))
             }
         }
         llFooterShow.setOnClickListener {
             val footerModes = ReadTipConfig.getFooterModes(requireContext())
             context?.selector(items = footerModes.values.toList()) { _, i ->
                 ReadTipConfig.footerMode = footerModes.keys.toList()[i]
+                EinkRefreshHelper.showReadProgressBar = (ReadTipConfig.footerMode == 0)
                 tvFooterShow.text = footerModes[ReadTipConfig.footerMode]
-                postEvent(EventBus.UP_CONFIG, arrayListOf(2))
+                postEvent(EventBus.UP_CONFIG, arrayListOf(2, 5, 10))
             }
         }
         llHeaderLeft.setOnClickListener {
@@ -136,7 +145,7 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
                 clearRepeat(tipValue)
                 ReadTipConfig.tipHeaderLeft = tipValue
                 tvHeaderLeft.text = ReadTipConfig.tipNames[i]
-                postEvent(EventBus.UP_CONFIG, arrayListOf(2, 6))
+                postEvent(EventBus.UP_CONFIG, arrayListOf(2, 5, 6, 10))
             }
         }
         llHeaderMiddle.setOnClickListener {
@@ -145,7 +154,7 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
                 clearRepeat(tipValue)
                 ReadTipConfig.tipHeaderMiddle = tipValue
                 tvHeaderMiddle.text = ReadTipConfig.tipNames[i]
-                postEvent(EventBus.UP_CONFIG, arrayListOf(2, 6))
+                postEvent(EventBus.UP_CONFIG, arrayListOf(2, 5, 6, 10))
             }
         }
         llHeaderRight.setOnClickListener {
@@ -154,7 +163,7 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
                 clearRepeat(tipValue)
                 ReadTipConfig.tipHeaderRight = tipValue
                 tvHeaderRight.text = ReadTipConfig.tipNames[i]
-                postEvent(EventBus.UP_CONFIG, arrayListOf(2, 6))
+                postEvent(EventBus.UP_CONFIG, arrayListOf(2, 5, 6, 10))
             }
         }
         llFooterLeft.setOnClickListener {
@@ -163,7 +172,7 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
                 clearRepeat(tipValue)
                 ReadTipConfig.tipFooterLeft = tipValue
                 tvFooterLeft.text = ReadTipConfig.tipNames[i]
-                postEvent(EventBus.UP_CONFIG, arrayListOf(2, 6))
+                postEvent(EventBus.UP_CONFIG, arrayListOf(2, 5, 6, 10))
             }
         }
         llFooterMiddle.setOnClickListener {
@@ -172,7 +181,7 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
                 clearRepeat(tipValue)
                 ReadTipConfig.tipFooterMiddle = tipValue
                 tvFooterMiddle.text = ReadTipConfig.tipNames[i]
-                postEvent(EventBus.UP_CONFIG, arrayListOf(2, 6))
+                postEvent(EventBus.UP_CONFIG, arrayListOf(2, 5, 6, 10))
             }
         }
         llFooterRight.setOnClickListener {
@@ -181,7 +190,7 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
                 clearRepeat(tipValue)
                 ReadTipConfig.tipFooterRight = tipValue
                 tvFooterRight.text = ReadTipConfig.tipNames[i]
-                postEvent(EventBus.UP_CONFIG, arrayListOf(2, 6))
+                postEvent(EventBus.UP_CONFIG, arrayListOf(2, 5, 6, 10))
             }
         }
         llTipColor.setOnClickListener {
