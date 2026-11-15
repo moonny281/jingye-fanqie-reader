@@ -168,7 +168,8 @@
         android:layout_height="0.8dp"
         android:layout_marginHorizontal="16dp"
         android:layout_marginVertical="8dp"
-        android:background="@color/btn_bg_press" />
+        android:background="@color/btn_bg_press"
+        android:visibility="gone" />
 
     <TextView
         android:id="@+id/tv_page_anim"
@@ -178,7 +179,8 @@
         android:layout_marginBottom="4dp"
         android:alpha="0.75"
         android:text="@string/page_anim"
-        android:textSize="12sp" />
+        android:textSize="12sp"
+        android:visibility="gone" />
 
     <RadioGroup
         android:id="@+id/rg_page_anim"
@@ -186,7 +188,8 @@
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="11dp"
         android:gravity="center"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:visibility="gone">
 
         <io.legado.app.lib.theme.view.ThemeRadioNoButton
             android:id="@+id/rb_anim0"
@@ -276,7 +279,7 @@
             android:layout_marginStart="16dp"
             android:layout_weight="1"
             android:alpha="0.75"
-            android:text="@string/text_bg_style"
+            android:text="墨水屏精排预设（已锁定零动画无闪烁翻页）"
             android:textSize="12sp" />
 
         <TextView

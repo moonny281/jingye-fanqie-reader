@@ -99,6 +99,7 @@
         android:background="@color/transparent30"
         android:gravity="center_horizontal"
         android:orientation="vertical"
+        android:visibility="gone"
         app:layout_constraintBottom_toTopOf="@+id/bottom_menu"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/title_bar"
@@ -152,7 +153,8 @@
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingStart="16dp"
-            android:paddingEnd="16dp">
+            android:paddingEnd="16dp"
+            android:visibility="gone">
 
             <com.google.android.material.floatingactionbutton.FloatingActionButton
                 android:id="@+id/fabSearch"
@@ -164,9 +166,9 @@
                 android:tint="@color/primaryText"
                 android:tooltipText="@string/search_content"
                 app:backgroundTint="@color/background_menu"
-                app:elevation="2dp"
+                app:elevation="0dp"
                 app:fabSize="mini"
-                app:pressedTranslationZ="2dp"
+                app:pressedTranslationZ="0dp"
                 tools:ignore="UnusedAttribute" />
 
             <Space
@@ -184,9 +186,9 @@
                 android:tint="@color/primaryText"
                 android:tooltipText="@string/auto_next_page"
                 app:backgroundTint="@color/background_menu"
-                app:elevation="2dp"
+                app:elevation="0dp"
                 app:fabSize="mini"
-                app:pressedTranslationZ="2dp"
+                app:pressedTranslationZ="0dp"
                 tools:ignore="UnusedAttribute" />
 
             <Space
@@ -204,9 +206,9 @@
                 android:tint="@color/primaryText"
                 android:tooltipText="@string/replace_rule_title"
                 app:backgroundTint="@color/background_menu"
-                app:elevation="2dp"
+                app:elevation="0dp"
                 app:fabSize="mini"
-                app:pressedTranslationZ="2dp"
+                app:pressedTranslationZ="0dp"
                 tools:ignore="UnusedAttribute" />
 
             <Space
@@ -224,9 +226,9 @@
                 android:tint="@color/primaryText"
                 android:tooltipText="@string/dark_theme"
                 app:backgroundTint="@color/background_menu"
-                app:elevation="2dp"
+                app:elevation="0dp"
                 app:fabSize="mini"
-                app:pressedTranslationZ="2dp"
+                app:pressedTranslationZ="0dp"
                 tools:ignore="UnusedAttribute" />
 
         </LinearLayout>
@@ -242,50 +244,18 @@
             android:paddingTop="10dp"
             android:paddingBottom="6dp">
 
-            <!-- 第一层：墨水屏扁平线框快捷胶囊排（取代原有的液晶悬浮圆球） -->
+            <!-- 第一层：原生墨水屏快捷控制栏（局部刷新清残影 + 全局全刷 + 显隐进度栏 + 刷新设置 + 全文搜索） -->
             <LinearLayout
                 android:id="@+id/ll_eink_quick_bar"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingHorizontal="14dp"
+                android:paddingHorizontal="12dp"
                 android:paddingBottom="8dp">
 
                 <TextView
-                    android:id="@+id/btn_eink_search"
-                    android:layout_width="0dp"
-                    android:layout_height="32dp"
-                    android:layout_marginEnd="6dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/selector_eink_button"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:singleLine="true"
-                    android:text="全文搜索"
-                    android:textColor="#FF000000"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
-
-                <TextView
                     android:id="@+id/btn_eink_autopage"
-                    android:layout_width="0dp"
-                    android:layout_height="32dp"
-                    android:layout_marginEnd="6dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/selector_eink_button"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:singleLine="true"
-                    android:text="自动翻页"
-                    android:textColor="#FF000000"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/btn_eink_refresh"
                     android:layout_width="0dp"
                     android:layout_height="32dp"
                     android:layout_marginEnd="6dp"
@@ -295,8 +265,40 @@
                     android:focusable="true"
                     android:gravity="center"
                     android:singleLine="true"
-                    android:text="全刷清残影"
+                    android:text="局刷清残影"
                     android:textColor="#FFFFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btn_eink_refresh"
+                    android:layout_width="0dp"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1.15"
+                    android:background="@drawable/selector_eink_button"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:singleLine="true"
+                    android:text="全刷清残影"
+                    android:textColor="#FF000000"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btn_eink_invert"
+                    android:layout_width="0dp"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1.05"
+                    android:background="@drawable/selector_eink_button"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:singleLine="true"
+                    android:text="进度:开"
+                    android:textColor="#FF000000"
                     android:textSize="12sp"
                     android:textStyle="bold" />
 
@@ -311,13 +313,13 @@
                     android:focusable="true"
                     android:gravity="center"
                     android:singleLine="true"
-                    android:text="全刷频率"
+                    android:text="刷新设置"
                     android:textColor="#FF000000"
                     android:textSize="12sp"
                     android:textStyle="bold" />
 
                 <TextView
-                    android:id="@+id/btn_eink_invert"
+                    android:id="@+id/btn_eink_search"
                     android:layout_width="0dp"
                     android:layout_height="32dp"
                     android:layout_weight="1"
@@ -326,7 +328,7 @@
                     android:focusable="true"
                     android:gravity="center"
                     android:singleLine="true"
-                    android:text="日夜反色"
+                    android:text="全文搜索"
                     android:textColor="#FF000000"
                     android:textSize="12sp"
                     android:textStyle="bold" />
