@@ -34,11 +34,11 @@ class NoAnimPageDelegate(readView: ReadView) : HorizontalPageDelegate(readView) 
         // E-Ink 无动画翻页无需录制过渡位图
     }
 
-    override fun onDraw(canvas: Canvas) {
+    override fun onAnimStop() {
         // nothing
     }
 
-    override fun onAnimStop() {
+    override fun onDraw(canvas: Canvas) {
         // nothing
     }
 }

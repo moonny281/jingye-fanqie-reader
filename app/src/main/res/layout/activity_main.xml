@@ -20,7 +20,7 @@
         android:background="@color/background"
         android:minHeight="50dp"
         app:itemActiveIndicatorStyle="@color/transparent"
-        app:labelVisibilityMode="unlabeled"
+        app:labelVisibilityMode="labeled"
         app:menu="@menu/main_bnv" />
 
 </LinearLayout>

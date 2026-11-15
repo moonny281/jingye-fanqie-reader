@@ -2,96 +2,108 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:background="@drawable/bg_eink_item_selector">
+    android:layout_marginBottom="8dp"
+    android:background="@drawable/bg_eink_card"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="10dp">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingTop="12dp"
-        android:paddingBottom="12dp"
-        android:paddingStart="4dp"
-        android:paddingEnd="4dp">
+    <!-- 书籍封面 + 文字首字回退 -->
+    <FrameLayout
+        android:layout_width="62dp"
+        android:layout_height="84dp"
+        android:background="@drawable/bg_eink_cover_border"
+        android:padding="1dp">
 
-        <LinearLayout
-            android:layout_width="46dp"
-            android:layout_height="62dp"
-            android:orientation="vertical"
+        <TextView
+            android:id="@+id/tvSearchThumb"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
             android:gravity="center"
             android:padding="4dp"
-            android:background="@drawable/bg_book_cover">
+            android:textColor="#FF000000"
+            android:textSize="13sp"
+            android:textStyle="bold" />
 
-            <TextView
-                android:id="@+id/tvSearchThumb"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:maxLines="3"
-                android:ellipsize="end"
-                android:text="番茄"
-                android:textSize="10sp"
-                android:textStyle="bold"
-                android:textColor="#000000" />
-        </LinearLayout>
+        <ImageView
+            android:id="@+id/ivSearchCover"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="封面"
+            android:scaleType="centerCrop" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
 
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="10dp"
-            android:orientation="vertical">
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
             <TextView
                 android:id="@+id/tvSearchTitle"
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:textColor="#FF000000"
                 android:textSize="16sp"
-                android:textStyle="bold"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:textColor="@color/selector_eink_text" />
+                android:textStyle="bold" />
 
             <TextView
-                android:id="@+id/tvSearchMeta"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:textSize="12sp"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:textColor="@color/selector_eink_text" />
+                android:id="@+id/btnQuickReadItem"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_eink_button_solid"
+                android:gravity="center"
+                android:paddingHorizontal="10dp"
+                android:text="立即阅读"
+                android:textColor="#FFFFFFFF"
+                android:textSize="11sp"
+                android:textStyle="bold" />
 
             <TextView
-                android:id="@+id/tvSearchIntro"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textSize="12sp"
-                android:maxLines="2"
-                android:ellipsize="end"
-                android:lineSpacingMultiplier="1.2"
-                android:textColor="@color/selector_eink_text" />
+                android:id="@+id/btnDetailItem"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_eink_button_outline"
+                android:gravity="center"
+                android:paddingHorizontal="8dp"
+                android:text="全本离线"
+                android:textColor="#FF000000"
+                android:textSize="11sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
         <TextView
-            android:layout_width="wrap_content"
+            android:id="@+id/tvSearchMeta"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
-            android:paddingTop="5dp"
-            android:paddingBottom="5dp"
-            android:background="@drawable/bg_eink_tag"
-            android:text="选书"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:textColor="#000000" />
+            android:layout_marginTop="4dp"
+            android:ellipsize="end"
+            android:singleLine="true"
+            android:textColor="#FF222222"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/tvSearchIntro"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:ellipsize="end"
+            android:lineSpacingMultiplier="1.15"
+            android:maxLines="2"
+            android:textColor="#FF333333"
+            android:textSize="12sp" />
     </LinearLayout>
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="#000000" />
 </LinearLayout>

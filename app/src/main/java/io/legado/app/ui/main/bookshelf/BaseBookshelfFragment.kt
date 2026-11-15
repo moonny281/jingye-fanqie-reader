@@ -25,7 +25,7 @@ import io.legado.app.ui.book.group.GroupManageDialog
 import io.legado.app.ui.book.import.local.ImportBookActivity
 import io.legado.app.ui.book.import.remote.RemoteBookActivity
 import io.legado.app.ui.book.manage.BookshelfManageActivity
-import io.legado.app.eink.EpdDebugActivity
+import io.legado.app.eink.EinkRefreshHelper
 import io.legado.app.fanqie.FanqieUiHelper
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.fanqie.FanqieActivity
@@ -100,7 +100,7 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
         when (item.itemId) {
             R.id.menu_fanqie_search -> startActivity<FanqieActivity>()
             R.id.menu_fanqie_check_update -> FanqieUiHelper.checkAllShelfFanqieBooks(requireContext())
-            R.id.menu_eink_debug -> startActivity<EpdDebugActivity>()
+            R.id.menu_eink_debug -> EinkRefreshHelper.showEinkSettingsDialog(requireContext(), view)
             R.id.menu_remote -> startActivity<RemoteBookActivity>()
             R.id.menu_search -> startActivity<SearchActivity>()
             R.id.menu_update_toc -> activityViewModel.upToc(books, onlyUpdateRead)

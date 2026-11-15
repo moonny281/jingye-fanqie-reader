@@ -1,55 +1,50 @@
-name: Android CI & Auto Release (Legado-E + Fanqie v0.3.2)
+name: Android E-Ink Legado + Fanqie Auto Build & Release
 
 on:
   push:
-    branches: [ main, master ]
-    tags: [ 'v*', 'V*' ]
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
   pull_request:
-    branches: [ main, master ]
+    branches:
+      - main
+      - master
   workflow_dispatch:
-    inputs:
-      custom_version:
-        description: '自定义版本号（留空则自动从 Tag / VERSION 文件读取）'
-        required: false
-        default: ''
 
 permissions:
   contents: write
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  build:
+  build-and-release:
+    name: Build Legado-E + Fanqie E-Ink APK
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout Source Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Auto Resolve Version Name & Code
-        id: version
+      - name: Clean Legacy Standalone Files (If Upgrading In-Place)
+        run: |
+          rm -rf app/src/main/java/com/jingye
+          rm -rf app/src/test
+
+      - name: Read Version from VERSION or build.gradle
+        id: get_version
         shell: bash
         run: |
-          set -e
-          RAW_VER=""
-          if [ -n "${{ github.event.inputs.custom_version }}" ]; then
-            RAW_VER="${{ github.event.inputs.custom_version }}"
-          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            RAW_VER="${GITHUB_REF#refs/tags/}"
-          elif [ -f "VERSION" ]; then
-            RAW_VER=$(cat VERSION | tr -d '[:space:]')
+          if [ -f "VERSION" ]; then
+            RAW_VERSION=$(head -n 1 VERSION | tr -d '[:space:]')
+          else
+            RAW_VERSION="0.4.0"
           fi
-          if [ -z "$RAW_VER" ]; then
-            RAW_VER="0.3.2"
-          fi
-          CLEAN_VER="${RAW_VER#[vV]}"
-          echo "APP_VERSION_NAME=${CLEAN_VER}" >> $GITHUB_ENV
-          echo "version_name=${CLEAN_VER}" >> $GITHUB_OUTPUT
-          echo "tag_name=v${CLEAN_VER}" >> $GITHUB_OUTPUT
-          echo "Resolved Version: ${CLEAN_VER}"
+          CLEAN_VERSION="${RAW_VERSION#v}"
+          echo "version=${CLEAN_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${CLEAN_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Detected Version: ${CLEAN_VERSION}"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -57,81 +52,78 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Configure Android SDK & Licenses
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK Licenses
         shell: bash
         run: |
-          set -e
-          SDK_DIR="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
-          export ANDROID_HOME="$SDK_DIR"
-          export ANDROID_SDK_ROOT="$SDK_DIR"
-          echo "ANDROID_HOME=$SDK_DIR" >> $GITHUB_ENV
-          echo "ANDROID_SDK_ROOT=$SDK_DIR" >> $GITHUB_ENV
-          mkdir -p "$SDK_DIR/licenses"
-          printf "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$SDK_DIR/licenses/android-sdk-license"
-          printf "\n84831b9409646a918e30573bab4c9c91346d8abd" > "$SDK_DIR/licenses/android-sdk-preview-license"
-          printf "\nd975f751698a77b662f1254ddbeed3901e976f5a" > "$SDK_DIR/licenses/intel-android-extra-license"
-          echo "sdk.dir=$SDK_DIR" > local.properties
+          yes | sdkmanager --licenses || true
 
-      - name: Bundle Open-Source E-Ink Reading Fonts (霞鹜文楷 & 思源宋体)
+      - name: Download Bundled Open-Source E-Ink Fonts (Optional)
         shell: bash
         run: |
           mkdir -p app/src/main/assets/fonts
-          curl -L --retry 3 --connect-timeout 20 -o app/src/main/assets/fonts/wenkai.ttf \
-            "https://github.com/lxgw/LxgwWenKai-Lite/releases/download/v1.500/LXGWWenKaiLite-Regular.ttf" || true
-          curl -L --retry 3 --connect-timeout 20 -o app/src/main/assets/fonts/serif.otf \
-            "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Serif/OTF/SimplifiedChinese/NotoSerifCJKsc-Regular.otf" || true
-          ls -lh app/src/main/assets/fonts/
+          curl -L --fail --retry 3 -o app/src/main/assets/fonts/LXGWWenKai-Regular.ttf \
+            "https://github.com/lxgw/LxgwWenKai/releases/download/v1.500/LXGWWenKai-Regular.ttf" || true
 
-      - name: Configure APK Signing (legado.jks)
+      - name: Configure APK Signing
         shell: bash
         run: |
-          echo "" > app/src/main/assets/18PlusList.txt
-          if [ -f ".github/workflows/legado.jks" ]; then
-            cp .github/workflows/legado.jks app/legado.jks
-            cat >> gradle.properties << 'EOF'
+          cp .github/workflows/legado.jks app/legado.jks
+          cat >> gradle.properties << 'EOF'
 
           RELEASE_STORE_FILE=./legado.jks
           RELEASE_KEY_ALIAS=legado
           RELEASE_STORE_PASSWORD=gedoor_legado
           RELEASE_KEY_PASSWORD=gedoor_legado
           EOF
-          fi
 
-      - name: Set up Gradle
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build Signed Release APK
+      - name: Build AppRelease APK
         shell: bash
         run: |
           chmod +x gradlew
-          ./gradlew assembleAppRelease \
-            -PappVersionName="${{ steps.version.outputs.version_name }}" \
-            --build-cache --parallel --daemon --stacktrace
-          mkdir -p dist
-          find app/build/outputs/apk -name "*.apk" -exec cp {} dist/ \;
-          ls -lh dist/
+          ./gradlew assembleAppRelease --stacktrace
+
+      - name: Collect & Rename Release APK
+        id: collect_apk
+        shell: bash
+        run: |
+          mkdir -p release-dist
+          APK_PATH=$(find app/build/outputs/apk -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "No APK found!"
+            exit 1
+          fi
+          OUT_NAME="Legado-E-Fanqie-EInk-v${{ steps.get_version.outputs.version }}.apk"
+          cp "$APK_PATH" "release-dist/$OUT_NAME"
+          echo "apk_name=$OUT_NAME" >> "$GITHUB_OUTPUT"
+          ls -lh release-dist/
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: legado-eink-fanqie-v${{ steps.version.outputs.version_name }}
-          path: dist/*.apk
+          name: Legado-E-Fanqie-EInk-v${{ steps.get_version.outputs.version }}
+          path: release-dist/*.apk
           if-no-files-found: error
 
-      - name: Publish GitHub Release
-        if: github.event_name != 'pull_request'
+      - name: Automatic Tag & GitHub Release
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag_name }}
-          name: "阅读Sigma · 净页墨水屏番茄聚合版 v${{ steps.version.outputs.version_name }}"
+          tag_name: ${{ steps.get_version.outputs.tag }}
+          name: "阅读Sigma × 番茄小说墨水屏原生聚合版 ${{ steps.get_version.outputs.tag }}"
           body: |
-            ### 阅读Sigma (Legado-E) · 海信 A7 墨水屏优化与番茄全本下载聚合版 `v${{ steps.version.outputs.version_name }}`
-            - **主体内核**：基于 `legado-E` (阅读Sigma) 完整书源、本地 TXT/EPUB/MOBI/PDF 阅读与书架管理系统。
-            - **墨水屏深度优化**：默认开启纯黑白高对比 E-Ink 模式、无动画翻页、左右滑动翻页抗抖动优化、每 N 页自动黑白全刷清残影，以及墨水屏残影测试实验室。
-            - **内置字体与微信读书精排**：内置 6 款墨水屏专用字体（思源宋体、霞鹜文楷、思源黑体、墨水屏凝黑、古籍刻本、护眼柔黑）与 6 套微信读书风格精排预设。
-            - **内嵌番茄小说全本下载器 (`fanqie-novel-downloader`)**：支持按书名/作者关键字直接搜书、链接/ID 解析、独立前台服务后台下载、系统状态栏实时进度通知、30章批次实时断点续下、书架一键检测更新与最新章节提示。
+            ### 阅读Sigma (`legado-E`) × 番茄小说全本下载墨水屏原生版 ${{ steps.get_version.outputs.tag }}
+            - **修复阅读期循环检更新与弹出测试格 Bug**：彻底移除 `ReadBookActivity.upMenu()` 中的误触发分支与旧版棋盘格测试页，改为阅读页内嵌式「全刷清残影 / 全刷频率」设置弹窗。
+            - **修复 20:9 墨水屏比例与全屏纸书画布**：开启 `resizeableActivity="true"` 与 `max_aspect=2.4`，默认启用沉浸式纸书画布并补齐全部 6 套墨水屏精排预设的页眉、页脚与边距参数。
+            - **番茄与阅读无缝衔接（秒开边看边下）**：书架顶栏内嵌一体式番茄搜书栏，支持真实书籍封面展示与「立即阅读（秒开首章流式边看边下）」+ 后台状态栏进度通知与 30 章断点续下。
+            - **重绘原生墨水屏阅读器 UI**：移除悬浮半透明亮度条与阴影圆球，重绘为纯白高对比三层式原生墨水屏操控台，配合去亚像素字形锐化（`HINTING_ON`）。
+          files: release-dist/*.apk
           draft: false
           prerelease: false
-          files: dist/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

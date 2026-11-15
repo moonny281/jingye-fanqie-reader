@@ -231,14 +231,106 @@
 
         </LinearLayout>
 
-        <!--底部设置栏-->
+        <!--底部原生墨水屏三层操控台-->
         <LinearLayout
             android:id="@+id/ll_bottom_bg"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@color/background_menu"
+            android:background="@drawable/bg_eink_border_top"
             android:importantForAccessibility="no"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:paddingTop="10dp"
+            android:paddingBottom="6dp">
+
+            <!-- 第一层：墨水屏扁平线框快捷胶囊排（取代原有的液晶悬浮圆球） -->
+            <LinearLayout
+                android:id="@+id/ll_eink_quick_bar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="14dp"
+                android:paddingBottom="8dp">
+
+                <TextView
+                    android:id="@+id/btn_eink_search"
+                    android:layout_width="0dp"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/selector_eink_button"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:singleLine="true"
+                    android:text="全文搜索"
+                    android:textColor="#FF000000"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btn_eink_autopage"
+                    android:layout_width="0dp"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/selector_eink_button"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:singleLine="true"
+                    android:text="自动翻页"
+                    android:textColor="#FF000000"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btn_eink_refresh"
+                    android:layout_width="0dp"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1.15"
+                    android:background="@drawable/bg_eink_button_solid"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:singleLine="true"
+                    android:text="全刷清残影"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btn_eink_config"
+                    android:layout_width="0dp"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1.05"
+                    android:background="@drawable/selector_eink_button"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:singleLine="true"
+                    android:text="全刷频率"
+                    android:textColor="#FF000000"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btn_eink_invert"
+                    android:layout_width="0dp"
+                    android:layout_height="32dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/selector_eink_button"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:singleLine="true"
+                    android:text="日夜反色"
+                    android:textColor="#FF000000"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
             <!--章节设置-->
             <LinearLayout
                 android:layout_width="match_parent"

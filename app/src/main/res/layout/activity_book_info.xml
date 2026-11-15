@@ -18,7 +18,7 @@
         android:id="@+id/vw_bg"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#50000000"
+        android:background="@color/background"
         android:orientation="vertical">
 
         <io.legado.app.ui.widget.TitleBar
@@ -26,7 +26,6 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:layout_constraintTop_toTopOf="parent"
-            app:themeMode="dark"
             app:title="@string/book_info" />
 
         <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -392,7 +391,23 @@
                 android:includeFontPadding="false"
                 android:text="@string/remove_from_bookshelf"
                 android:textColor="@color/primaryText"
-                android:textSize="15sp" />
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/tv_fanqie_info_action"
+                android:layout_width="0dp"
+                android:layout_height="50dp"
+                android:layout_weight="1.1"
+                android:background="@drawable/bg_eink_button_outline"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="检测更新 / 续下"
+                android:textColor="#FF000000"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
 
             <io.legado.app.ui.widget.text.AccentBgTextView
                 android:id="@+id/tv_read"

@@ -19,7 +19,10 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.book.group.GroupEditDialog
+import io.legado.app.fanqie.FanqieUiHelper
 import io.legado.app.ui.book.search.SearchActivity
+import io.legado.app.ui.fanqie.FanqieActivity
+import io.legado.app.utils.startActivity
 import io.legado.app.ui.main.bookshelf.BaseBookshelfFragment
 import io.legado.app.ui.main.bookshelf.style1.books.BooksFragment
 import io.legado.app.utils.isCreated
@@ -68,6 +71,9 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
         get() = bookGroups.getOrNull(tabLayout.selectedTabPosition)
 
     private fun initView() {
+        binding.tvEinkQuickSearch.setOnClickListener { startActivity<FanqieActivity>() }
+        binding.btnEinkFanqieStore.setOnClickListener { startActivity<FanqieActivity>() }
+        binding.btnEinkShelfUpdate.setOnClickListener { FanqieUiHelper.checkAllShelfFanqieBooks(requireContext()) }
         binding.viewPagerBookshelf.setEdgeEffectColor(primaryColor)
         tabLayout.isTabIndicatorFullWidth = false
         tabLayout.tabMode = TabLayout.MODE_SCROLLABLE

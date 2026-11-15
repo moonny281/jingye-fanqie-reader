@@ -211,7 +211,6 @@ object ChapterProvider {
                 BuiltinFontManager.isBuiltinFontKey(fontPath) -> {
                     BuiltinFontManager.resolveTypeface(appCtx, fontPath)
                 }
-
                 fontPath.isContentScheme() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> {
                     appCtx.contentResolver
                         .openFileDescriptor(fontPath.toUri(), "r")!!
@@ -267,6 +266,10 @@ object ChapterProvider {
         tPaint.typeface = titleFont
         tPaint.textSize = with(ReadBookConfig) { textSize + titleSize }.toFloat().spToPx()
         tPaint.isAntiAlias = true
+        if (AppConfig.isEInkMode) {
+            tPaint.isSubpixelText = false
+            tPaint.hinting = android.graphics.Paint.HINTING_ON
+        }
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q && AppConfig.optimizeRender) {
             tPaint.isLinearText = true
         }
@@ -277,6 +280,10 @@ object ChapterProvider {
         cPaint.typeface = textFont
         cPaint.textSize = ReadBookConfig.textSize.toFloat().spToPx()
         cPaint.isAntiAlias = true
+        if (AppConfig.isEInkMode) {
+            cPaint.isSubpixelText = false
+            cPaint.hinting = android.graphics.Paint.HINTING_ON
+        }
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q && AppConfig.optimizeRender) {
             cPaint.isLinearText = true
         }

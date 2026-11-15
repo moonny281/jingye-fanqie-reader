@@ -11,8 +11,8 @@
     <item
         android:id="@+id/menu_fanqie_update_info"
         android:icon="@drawable/ic_refresh_black_24dp"
-        android:title="检测番茄更新 / 断点续下"
-        app:showAsAction="ifRoom" />
+        android:title="番茄检测更新 / 断点续下"
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/menu_edit"

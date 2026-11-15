@@ -13,6 +13,63 @@
         app:contentLayout="@layout/view_tab_layout_min"
         app:title="@string/bookshelf" />
 
+    <!-- 微信读书墨水屏风格一体式搜书与快捷栏 -->
+    <LinearLayout
+        android:id="@+id/ll_eink_shelf_bar"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@drawable/bg_eink_border_bottom"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="12dp">
+
+        <TextView
+            android:id="@+id/tv_eink_quick_search"
+            android:layout_width="0dp"
+            android:layout_height="34dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_eink_search_box"
+            android:clickable="true"
+            android:ellipsize="end"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="10dp"
+            android:singleLine="true"
+            android:text="搜索番茄全网小说 / 书名或作者…"
+            android:textColor="#FF333333"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/btn_eink_fanqie_store"
+            android:layout_width="wrap_content"
+            android:layout_height="34dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_eink_button_solid"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingHorizontal="12dp"
+            android:text="番茄书城"
+            android:textColor="#FFFFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btn_eink_shelf_update"
+            android:layout_width="wrap_content"
+            android:layout_height="34dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/selector_eink_button"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingHorizontal="10dp"
+            android:text="检测更新"
+            android:textColor="#FF000000"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
     <androidx.viewpager.widget.ViewPager
         android:id="@+id/view_pager_bookshelf"
         android:layout_width="match_parent"

@@ -40,8 +40,8 @@ import androidx.core.graphics.drawable.toDrawable
 @Suppress("ConstPropertyName")
 @Keep
 object ReadBookConfig {
-    const val configFileName = "readConfig.json"
-    const val shareConfigFileName = "shareReadConfig.json"
+    const val configFileName = "readConfig_v040.json"
+    const val shareConfigFileName = "shareReadConfig_v040.json"
     val configFilePath = FileUtils.getPath(appCtx.filesDir, configFileName)
     val shareConfigFilePath = FileUtils.getPath(appCtx.filesDir, shareConfigFileName)
     val configList: ArrayList<Config> = arrayListOf()
@@ -243,8 +243,8 @@ object ReadBookConfig {
      */
     val textBottomJustify get() = appCtx.getPrefBoolean(PreferKey.textBottomJustify, true)
 
-    var hideStatusBar = appCtx.getPrefBoolean(PreferKey.hideStatusBar)
-    var hideNavigationBar = appCtx.getPrefBoolean(PreferKey.hideNavigationBar)
+    var hideStatusBar = appCtx.getPrefBoolean(PreferKey.hideStatusBar, true)
+    var hideNavigationBar = appCtx.getPrefBoolean(PreferKey.hideNavigationBar, true)
     var useZhLayout = appCtx.getPrefBoolean(PreferKey.useZhLayout)
 
     val config get() = if (shareLayout) shareConfig else durConfig

@@ -5,6 +5,7 @@ import io.legado.app.constant.BookType
 import io.legado.app.constant.EventBus
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
+import io.legado.app.model.ReadBook
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.localBook.TextFile
 import io.legado.app.utils.postEvent
@@ -87,6 +88,42 @@ object FanqieLegadoBridge {
     }
 
     /**
+     * 立即阅读（秒开流式阅读）：
+     * 若书架已存在该书则直接打开；若尚未下载，则秒级拉取前 8 章写入书架并立即打开阅读器，后续章节交由后台静默续下。
+     */
+    suspend fun quickStartRead(
+        fanqieBookId: String,
+        titleHint: String = "",
+        authorHint: String = "",
+        coverHint: String = "",
+        introHint: String = ""
+    ): Book = withContext(Dispatchers.IO) {
+        val cleanId = FanqieParser.resolveBookId(fanqieBookId)
+        val existing = findBookByFanqieId(cleanId)
+        if (existing != null && appDb.bookChapterDao.getChapterCount(existing.bookUrl) > 0) {
+            return@withContext existing
+        }
+        val crawler = newLocalCrawler()
+        val existingCache = FanqieChapterCacheStore.loadCachedMap(cleanId)
+        val outcome = crawler.downloadQuickStarter(cleanId, existingCache, quickCount = 8)
+        FanqieChapterCacheStore.saveCachedMap(cleanId, outcome.updatedCache)
+        saveOrUpdateLegadoBook(
+            fanqieBookId = cleanId,
+            title = outcome.metadata.title.ifBlank { titleHint },
+            author = outcome.metadata.author.ifBlank { authorHint },
+            coverUrl = outcome.metadata.coverUrl.ifBlank { coverHint },
+            intro = outcome.metadata.intro.ifBlank { introHint },
+            wordCountStr = outcome.metadata.formattedWordCount(),
+            serialStatus = outcome.metadata.serialStatus,
+            downloadedChapters = outcome.downloadedChapters,
+            remoteTotalChapters = outcome.remoteTotalChapters,
+            latestChapterTitle = outcome.latestChapterTitle,
+            isPartial = outcome.isPartial,
+            txtBytes = outcome.txtBytes
+        )
+    }
+
+    /**
      * 检测单本番茄书籍的远端更新与最新章节名，并写回 Legado 的 Room 数据库。
      */
     suspend fun checkBookUpdate(book: Book): BookUpdateCheckResult = withContext(Dispatchers.IO) {
@@ -127,6 +164,7 @@ object FanqieLegadoBridge {
 
     /**
      * 将下载或断点保存的 TXT 写入应用专属目录，并注册/更新到 Legado 的 Room 书架数据库与章节表中。
+     * 若用户当前正在阅读本书，保持阅读进度并热更新内存中的章节总数，实现无感边看边下。
      */
     @Synchronized
     fun saveOrUpdateLegadoBook(
@@ -167,8 +205,21 @@ object FanqieLegadoBridge {
                 "共 $downloadedChapters 章"
         }
 
+        // 若当前正在阅读器中打开了这本书，同步保留内存中的实时阅读章节与字偏移
+        val activeReadingBook = ReadBook.book?.takeIf {
+            it.bookUrl == fileUriStr || (existing != null && it.bookUrl == existing.bookUrl)
+        }
+
         val book = if (existing != null) {
             existing.apply {
+                if (activeReadingBook != null) {
+                    this.durChapterIndex = ReadBook.durChapterIndex
+                    this.durChapterPos = ReadBook.durChapterPos
+                    this.durChapterTime = System.currentTimeMillis()
+                    ReadBook.curTextChapter?.title?.takeIf { it.isNotBlank() }?.let {
+                        this.durChapterTitle = it
+                    }
+                }
                 this.bookUrl = fileUriStr
                 this.tocUrl = "^【[^\\r\\n]{1,75}】$"
                 this.origin = BookType.localTag
@@ -187,7 +238,8 @@ object FanqieLegadoBridge {
                 this.lastCheckTime = System.currentTimeMillis()
                 this.lastCheckCount = pendingCount
                 this.totalChapterNum = maxOf(downloadedChapters, 1)
-                this.canUpdate = true
+                // 关闭 Legado 原生书源自动轮询，交由番茄引擎独立管理断点与更新
+                this.canUpdate = false
             }
         } else {
             val minOrder = try { appDb.bookDao.minOrder } catch (_: Throwable) { 0 }
@@ -214,20 +266,27 @@ object FanqieLegadoBridge {
                 durChapterPos = 0,
                 durChapterTime = System.currentTimeMillis(),
                 wordCount = wordCountStr.ifBlank { null },
-                canUpdate = true,
+                canUpdate = false,
                 order = minOrder - 1
             )
         }
 
-        // 解析 TXT 章节偏移并同步写入 Legado 的 chapters 表，确保点击书籍秒开不卡顿
         try {
             TextFile.clear()
             val chapters = LocalBook.getChapterList(book)
-            // 保留我们的最新章节状态文案
             book.latestChapterTitle = displayLatest
             book.lastCheckCount = pendingCount
+            book.totalChapterNum = chapters.size.coerceAtLeast(1)
             appDb.bookChapterDao.delByBook(book.bookUrl)
             appDb.bookChapterDao.insert(*chapters.toTypedArray())
+
+            // 若用户正在阅读该书，无感热更新阅读器内的总章节数
+            if (activeReadingBook != null) {
+                ReadBook.chapterSize = chapters.size
+                ReadBook.book?.totalChapterNum = chapters.size
+                ReadBook.book?.customTag = book.customTag
+                ReadBook.book?.latestChapterTitle = book.latestChapterTitle
+            }
         } catch (_: Throwable) {
         }
 
@@ -249,14 +308,13 @@ object FanqieLegadoBridge {
         val crawler = newLocalCrawler()
         val existingCache = FanqieChapterCacheStore.loadCachedMap(fanqieBookId)
 
-        var lastSavedBook: Book? = null
         val outcome = crawler.downloadBookIncremental(
             bookId = fanqieBookId,
             existingCache = existingCache,
             shouldStop = shouldStop,
             onCheckpoint = { downloadedCount, totalCount, latestTitle, checkpointBytes, updatedCache ->
                 FanqieChapterCacheStore.saveCachedMap(fanqieBookId, updatedCache)
-                lastSavedBook = saveOrUpdateLegadoBook(
+                saveOrUpdateLegadoBook(
                     fanqieBookId = fanqieBookId,
                     title = titleHint,
                     author = authorHint,
@@ -275,7 +333,7 @@ object FanqieLegadoBridge {
         )
 
         FanqieChapterCacheStore.saveCachedMap(fanqieBookId, outcome.updatedCache)
-        val finalBook = saveOrUpdateLegadoBook(
+        return saveOrUpdateLegadoBook(
             fanqieBookId = outcome.metadata.bookId,
             title = outcome.metadata.title.ifBlank { titleHint },
             author = outcome.metadata.author.ifBlank { authorHint },
@@ -289,6 +347,5 @@ object FanqieLegadoBridge {
             isPartial = outcome.isPartial,
             txtBytes = outcome.txtBytes
         )
-        return finalBook
     }
 }

@@ -1,44 +1,33 @@
 package io.legado.app.eink
 
-import android.content.Context
-import android.provider.Settings
+import android.view.View
+
+enum class EpdDisplayMode(val displayName: String) {
+    CLEAR("清晰模式 (A2+/GC16 高清)"),
+    BALANCED("均衡模式 (推荐阅读)"),
+    FAST("极速模式 (滑动浏览)")
+}
 
 object EpdSettings {
-    val KEYS = listOf(
-        "current_epd_mode",
-        "ink_mode",
-        "dynamic_refresh_mode",
-        "eink_automatic_clearance_key",
-        "hmct_epd_bleach_mode",
-        "hmct_epd_boldsize",
-        "hmct_epd_darkthreshold"
-    )
-    val PROPS = listOf(
-        "sys.hmct.epd_mode",
-        "persist.sys.epd.black",
-        "persist.sys.epd.white",
-        "persist.sys.epd.contrast"
-    )
+    var currentMode: EpdDisplayMode = EpdDisplayMode.CLEAR
 
-    data class Item(val key: String, val namespace: String?, val value: String?)
-
-    fun read(ctx: Context): List<Item> {
-        val cr = ctx.contentResolver
-        return KEYS.map { k ->
-            val finders = listOf<Pair<String, () -> String?>>(
-                "system" to { Settings.System.getString(cr, k) },
-                "global" to { Settings.Global.getString(cr, k) },
-                "secure" to { Settings.Secure.getString(cr, k) }
-            )
-            for ((ns, f) in finders) {
-                val v = try {
-                    f()
-                } catch (_: Throwable) {
-                    null
-                }
-                if (v != null) return@map Item(k, ns, v)
+    fun applyRefresh(view: View, forceFull: Boolean = false) {
+        try {
+            val clazz = view.javaClass
+            val methodNames = if (forceFull) {
+                listOf("requestEpdFullRefresh", "invalidateEpd", "setEpdMode")
+            } else {
+                listOf("invalidateEpd", "postInvalidate")
             }
-            Item(k, null, null)
+            for (name in methodNames) {
+                val m = clazz.methods.firstOrNull { it.name.equals(name, ignoreCase = true) && it.parameterCount == 0 }
+                if (m != null) {
+                    m.invoke(view)
+                    break
+                }
+            }
+        } catch (_: Throwable) {
         }
+        view.postInvalidate()
     }
 }

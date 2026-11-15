@@ -7,19 +7,19 @@
     <item
         android:id="@+id/menu_fanqie_search"
         android:icon="@drawable/ic_add_online"
-        android:title="番茄搜书/下载"
+        android:title="番茄书城 / 全本下载"
         app:showAsAction="always" />
 
     <item
         android:id="@+id/menu_fanqie_check_update"
         android:icon="@drawable/ic_refresh_black_24dp"
-        android:title="检测番茄更新 / 断点续下"
+        android:title="检测全部番茄小说更新"
         app:showAsAction="never" />
 
     <item
         android:id="@+id/menu_eink_debug"
-        android:icon="@drawable/ic_view_quilt"
-        android:title="墨水屏全刷与残影实验室"
+        android:icon="@drawable/ic_settings"
+        android:title="墨水屏全刷频率设置"
         app:showAsAction="never" />
 
     <item

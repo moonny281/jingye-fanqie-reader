@@ -74,7 +74,6 @@ import io.legado.app.ui.book.bookmark.BookmarkDialog
 import io.legado.app.ui.book.changesource.ChangeBookSourceDialog
 import io.legado.app.ui.book.changesource.ChangeChapterSourceDialog
 import io.legado.app.eink.EinkRefreshHelper
-import io.legado.app.eink.EpdDebugActivity
 import io.legado.app.fanqie.FanqieUiHelper
 import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.book.read.config.AutoReadDialog
@@ -442,16 +441,6 @@ class ReadBookActivity : BaseReadBookActivity(),
                 R.id.menu_group_text -> item.isVisible = book.isLocalTxt
                 R.id.menu_group_epub -> item.isVisible = book.isEpub
                 else -> when (item.itemId) {
-            R.id.menu_eink_full_refresh -> {
-                binding.readMenu.runMenuOut()
-                EinkRefreshHelper.triggerFullRefresh(binding.readView)
-            }
-            R.id.menu_fanqie_check_update -> {
-                ReadBook.book?.let { FanqieUiHelper.onShelfBookActionClick(this, it) }
-            }
-            R.id.menu_eink_debug -> {
-                startActivity<EpdDebugActivity>()
-            }
                     R.id.menu_enable_replace -> item.isChecked = book.getUseReplaceRule()
                     R.id.menu_re_segment -> item.isChecked = book.getReSegment()
 //                    R.id.menu_enable_review -> {
@@ -484,10 +473,12 @@ class ReadBookActivity : BaseReadBookActivity(),
                 EinkRefreshHelper.triggerFullRefresh(binding.readView)
             }
             R.id.menu_fanqie_check_update -> {
+                binding.readMenu.runMenuOut()
                 ReadBook.book?.let { FanqieUiHelper.onShelfBookActionClick(this, it) }
             }
             R.id.menu_eink_debug -> {
-                startActivity<EpdDebugActivity>()
+                binding.readMenu.runMenuOut()
+                EinkRefreshHelper.showEinkSettingsDialog(this, binding.readView)
             }
             R.id.menu_change_source,
             R.id.menu_book_change_source -> {

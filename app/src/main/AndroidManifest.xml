@@ -29,6 +29,7 @@
         android:label="${app_name}"
         android:networkSecurityConfig="@xml/network_security_config"
         android:requestLegacyExternalStorage="true"
+        android:resizeableActivity="true"
         android:supportsRtl="true"
         android:theme="@style/AppTheme.Light"
         tools:ignore="AllowBackup,GoogleAppIndexingWarning,UnusedAttribute">
@@ -542,19 +543,16 @@
         <meta-data
             android:name="channel"
             android:value="${APP_CHANNEL_VALUE}" />
-    
-        <!-- 番茄搜书与后台断点下载中心 -->
+        <meta-data
+            android:name="android.max_aspect"
+            android:value="2.4" />
+
+        <!-- 番茄书城与后台断点下载中心 -->
         <activity
             android:name=".ui.fanqie.FanqieActivity"
+            android:configChanges="locale|keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout"
             android:exported="false"
-            android:screenOrientation="portrait"
             android:windowSoftInputMode="stateHidden|adjustResize" />
-
-        <!-- 海信 A7 墨水屏刷新与残影实验室 -->
-        <activity
-            android:name=".eink.EpdDebugActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
 
         <!-- 番茄小说后台下载与状态栏通知服务 -->
         <service

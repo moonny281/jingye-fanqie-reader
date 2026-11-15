@@ -24,7 +24,9 @@ import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.book.group.GroupEditDialog
 import io.legado.app.ui.book.info.BookInfoActivity
+import io.legado.app.fanqie.FanqieUiHelper
 import io.legado.app.ui.book.search.SearchActivity
+import io.legado.app.ui.fanqie.FanqieActivity
 import io.legado.app.ui.main.bookshelf.BaseBookshelfFragment
 import io.legado.app.utils.cnCompare
 import io.legado.app.utils.flowWithLifecycleAndDatabaseChangeFirst
@@ -77,6 +79,9 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
     private var totalRows = 0
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
+        binding.tvEinkQuickSearch.setOnClickListener { startActivity<FanqieActivity>() }
+        binding.btnEinkFanqieStore.setOnClickListener { startActivity<FanqieActivity>() }
+        binding.btnEinkShelfUpdate.setOnClickListener { FanqieUiHelper.checkAllShelfFanqieBooks(requireContext()) }
         setSupportToolbar(binding.titleBar.toolbar)
         initRecyclerView()
         initBookGroupData()

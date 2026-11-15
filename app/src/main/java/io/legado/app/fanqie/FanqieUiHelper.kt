@@ -42,14 +42,14 @@ object FanqieUiHelper {
             activeState != null && activeState.isRunning -> {
                 tvFanqieAction.setBackgroundResource(R.drawable.bg_eink_button_solid)
                 tvFanqieAction.setTextColor(0xFFFFFFFF.toInt())
-                tvFanqieAction.text = "下载中 ${activeState.percent}%"
+                tvFanqieAction.text = "离线中 ${activeState.percent}%"
                 bvUnread.setHighlight(true)
                 bvUnread.setBadgeCount(pending.coerceAtLeast(1))
             }
             pending > 0 -> {
                 tvFanqieAction.setBackgroundResource(R.drawable.bg_eink_button_solid)
                 tvFanqieAction.setTextColor(0xFFFFFFFF.toInt())
-                tvFanqieAction.text = if (tagInfo.isPartial) "断点续下(+$pending)" else "更新(+$pending)"
+                tvFanqieAction.text = if (tagInfo.isPartial) "续下(+$pending)" else "更新(+$pending)"
                 bvUnread.setHighlight(true)
                 bvUnread.setBadgeCount(pending)
             }
@@ -83,7 +83,7 @@ object FanqieUiHelper {
         if (pending > 0) {
             Toast.makeText(
                 context,
-                "已启动《${item.name}》后台断点续下（从第 ${tagInfo.downloadedChapters + 1} 章继续，待下 $pending 章），状态栏可看进度",
+                "已启动《${item.name}》后台断点续下（从第 ${tagInfo.downloadedChapters + 1} 章继续，待下 $pending 章）",
                 Toast.LENGTH_SHORT
             ).show()
             FanqieDownloadManager.startBackgroundDownload(
@@ -95,14 +95,14 @@ object FanqieUiHelper {
             return
         }
 
-        Toast.makeText(context, "正在检测《${item.name}》最新章节状态…", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "正在检测《${item.name}》最新章节…", Toast.LENGTH_SHORT).show()
         scope.launch {
             try {
                 val res = FanqieLegadoBridge.checkBookUpdate(item)
                 if (res.hasPendingDownload()) {
                     val actionText = if (res.isPartialResume) "断点续下" else "后台更新"
                     AlertDialog.Builder(context)
-                        .setTitle("《${res.title}》发现可用章节")
+                        .setTitle("《${res.title}》发现新章节")
                         .setMessage(
                             "本地已下：${res.localChapters} 章\n" +
                                 "远端总章：${res.remoteChapters} 章（待下 ${res.newChaptersCount} 章）\n" +
@@ -138,7 +138,7 @@ object FanqieUiHelper {
                 appDb.bookDao.all.filter { FanqieLegadoBridge.isFanqieBook(it) }
             }
             if (fanqieBooks.isEmpty()) {
-                Toast.makeText(context, "书架中暂无番茄下载书籍，可点击右上角「番茄搜书」添加", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "书架中暂无番茄小说，请点击顶部搜索栏添加", Toast.LENGTH_SHORT).show()
                 return@launch
             }
             Toast.makeText(context, "正在后台检测 ${fanqieBooks.size} 本番茄小说更新状态…", Toast.LENGTH_SHORT).show()

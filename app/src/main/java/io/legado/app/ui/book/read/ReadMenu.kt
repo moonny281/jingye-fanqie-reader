@@ -106,7 +106,7 @@ class ReadMenu @JvmOverloads constructor(
     private val showBrightnessView
         get() = context.getPrefBoolean(
             PreferKey.showBrightnessView,
-            true
+            !AppConfig.isEInkMode
         )
     private val sourceMenu by lazy {
         PopupMenu(context, binding.tvSourceAction).apply {
@@ -133,7 +133,8 @@ class ReadMenu @JvmOverloads constructor(
                 }
             }
             callBack.upSystemUiVisibility()
-            binding.llBrightness.visible(showBrightnessView)
+            binding.llBrightness.visible(showBrightnessView && !AppConfig.isEInkMode)
+            if (AppConfig.isEInkMode) binding.llFloatingButton.gone()
         }
 
         @SuppressLint("RtlHardcoded")
@@ -204,7 +205,16 @@ class ReadMenu @JvmOverloads constructor(
             titleBar.setBackgroundResource(R.drawable.bg_eink_border_bottom)
             llBottomBg.setBackgroundResource(R.drawable.bg_eink_border_top)
         } else {
+            if (AppConfig.isEInkMode) {
+            titleBar.setBackgroundResource(R.drawable.bg_eink_border_bottom)
+            llBottomBg.setBackgroundResource(R.drawable.bg_eink_border_top)
+            llFloatingButton.gone()
+            llBrightness.gone()
+            llEinkQuickBar.visible()
+        } else {
             llBottomBg.setBackgroundColor(bgColor)
+            llEinkQuickBar.gone()
+        }
         }
         fabSearch.backgroundTintList = bottomBackgroundList
         fabSearch.setColorFilter(textColor)
@@ -539,6 +549,24 @@ class ReadMenu @JvmOverloads constructor(
             }
 
         })
+
+        // 原生墨水屏底栏快捷胶囊按钮绑定
+        btnEinkSearch.setOnClickListener { fabSearch.performClick() }
+        btnEinkAutopage.setOnClickListener { fabAutoPage.performClick() }
+        btnEinkRefresh.setOnClickListener {
+            runMenuOut {
+                activity?.findViewById<android.view.View>(R.id.read_view)?.let { rv ->
+                    io.legado.app.eink.EinkRefreshHelper.triggerFullRefresh(rv)
+                }
+            }
+        }
+        btnEinkConfig.setOnClickListener {
+            runMenuOut {
+                val rv = activity?.findViewById<android.view.View>(R.id.read_view)
+                io.legado.app.eink.EinkRefreshHelper.showEinkSettingsDialog(context, rv)
+            }
+        }
+        btnEinkInvert.setOnClickListener { fabNightTheme.performClick() }
 
         //搜索
         fabSearch.setOnClickListener {

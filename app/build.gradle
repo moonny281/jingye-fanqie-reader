@@ -19,31 +19,9 @@ static def releaseTime() {
     return new Date().format("yy.MMddHH", TimeZone.getTimeZone("GMT+8"))
 }
 
-def readProjectVersion = {
-    def propVer = project.findProperty("appVersionName")?.toString()?.trim()
-    if (propVer) return propVer.replaceFirst(/^[vV]/, "")
-    def envVer = System.getenv("APP_VERSION_NAME")?.trim()
-    if (envVer) return envVer.replaceFirst(/^[vV]/, "")
-    def vf = rootProject.file("VERSION")
-    if (vf.exists()) {
-        def txt = vf.text.trim()
-        if (txt) return txt.replaceFirst(/^[vV]/, "")
-    }
-    return "0.3.2"
-}
-
-def safeGitCommits = {
-    try {
-        def out = 'git rev-list HEAD --count'.execute().text.trim()
-        return out ? Integer.parseInt(out) : 301
-    } catch (Throwable ignored) {
-        return 301
-    }
-}
-
-def name = "legado_eink"
-def version = readProjectVersion()
-def gitCommits = safeGitCommits()
+def name = "legado"
+def version = "3." + releaseTime()
+def gitCommits = Integer.parseInt('git rev-list HEAD --count'.execute().text.trim())
 
 android {
     compileSdk = compile_sdk_version

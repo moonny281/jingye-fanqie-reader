@@ -119,7 +119,6 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
 
     fun upToc(books: List<Book>, onlyUpdateRead: Boolean) {
         execute(context = upTocPool) {
-            // 同步检测书架上的番茄小说更新状态与最新章节
             books.filter { FanqieLegadoBridge.isFanqieBook(it) }.forEach { fqBook ->
                 kotlin.runCatching {
                     FanqieLegadoBridge.checkBookUpdate(fqBook)

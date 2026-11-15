@@ -72,6 +72,7 @@ import io.legado.app.ui.book.changesource.ChangeBookSourceDialog
 import io.legado.app.ui.book.group.GroupSelectDialog
 import io.legado.app.ui.book.info.edit.BookInfoEditActivity
 import io.legado.app.ui.book.manga.ReadMangaActivity
+import io.legado.app.fanqie.FanqieLegadoBridge
 import io.legado.app.fanqie.FanqieUiHelper
 import io.legado.app.ui.book.read.ReadBookActivity
 import io.legado.app.ui.book.read.ReadBookActivity.Companion.RESULT_DELETED
@@ -116,7 +117,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class BookInfoActivity :
-    VMBaseActivity<ActivityBookInfoBinding, BookInfoViewModel>(toolBarTheme = Theme.Dark, showOpenMenuIcon = false),
+    VMBaseActivity<ActivityBookInfoBinding, BookInfoViewModel>(toolBarTheme = Theme.Auto, showOpenMenuIcon = false),
     GroupSelectDialog.CallBack,
     ChangeBookSourceDialog.CallBack,
     ChangeCoverDialog.CallBack,
@@ -235,7 +236,13 @@ class BookInfoActivity :
 
     @SuppressLint("PrivateResource")
     override fun onActivityCreated(savedInstanceState: Bundle?) {
-        binding.titleBar.setBackgroundResource(R.color.transparent)
+        if (AppConfig.isEInkMode) {
+            binding.titleBar.setBackgroundResource(R.drawable.bg_eink_border_bottom)
+            binding.arcView?.gone()
+            binding.ivCoverC.cardElevation = 0f
+        } else {
+            binding.titleBar.setBackgroundResource(R.color.transparent)
+        }
         binding.refreshLayout?.setColorSchemeColors(accentColor)
         binding.arcView?.setBgColor(backgroundColor)
         binding.llInfo.setBackgroundColor(backgroundColor)
@@ -487,6 +494,20 @@ class BookInfoActivity :
 
     private fun showBook(book: Book) = binding.run {
         showCover(book)
+        if (FanqieLegadoBridge.isFanqieBook(book)) {
+            tvFanqieInfoAction.visible()
+            val tag = FanqieLegadoBridge.parseTag(book)
+            tvFanqieInfoAction.text = if (tag != null && tag.pendingCount > 0) {
+                "断点续下 (+${tag.pendingCount}章)"
+            } else {
+                "检测番茄更新"
+            }
+            tvFanqieInfoAction.setOnClickListener {
+                FanqieUiHelper.onShelfBookActionClick(this@BookInfoActivity, book)
+            }
+        } else {
+            tvFanqieInfoAction.gone()
+        }
         tvName.text = book.name
         tvAuthor.text = getString(R.string.author_show, book.getRealAuthor())
         tvOrigin.text = getString(R.string.origin_show, book.originName)

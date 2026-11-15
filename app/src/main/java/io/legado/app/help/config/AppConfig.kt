@@ -593,7 +593,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefBoolean(PreferKey.mouseWheelPage, true)
 
     val paddingDisplayCutouts
-        get() = appCtx.getPrefBoolean(PreferKey.paddingDisplayCutouts, false)
+        get() = appCtx.getPrefBoolean(PreferKey.paddingDisplayCutouts, true)
 
     var searchScope: String
         get() = appCtx.getPrefString("searchScope") ?: ""
@@ -823,3 +823,4 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     val autoUpdateVariant get() = appCtx.getPrefBoolean("autoUpdateVariant", true)
 }
+

@@ -1,11 +1,11 @@
 [
   {
-    "id": -100,
     "enable": true,
-    "name": "番茄小说章节标题【第X章】",
+    "example": "【第1章 楔子】",
+    "id": -999,
+    "name": "番茄墨水屏章节框【…】",
     "rule": "^【[^\\r\\n]{1,75}】$",
-    "example": "【第一章 番茄小说章节】",
-    "serialNumber": -1
+    "serialNumber": 0
   },
   {
     "id": -1,

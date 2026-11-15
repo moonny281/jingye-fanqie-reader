@@ -2,118 +2,117 @@ package io.legado.app.eink
 
 import android.content.Context
 import android.graphics.Typeface
-import android.os.Build
-import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 enum class BuiltinEinkFont(
+    val id: String,
     val uriKey: String,
     val displayName: String,
-    val description: String
+    val assetPath: String,
+    val fallbackFamily: String,
+    val fallbackStyle: Int
 ) {
-    SERIF("builtin://serif", "思源宋体 (墨水屏衬线)", "传统书卷衬线，长篇沉浸阅读首选"),
-    WENKAI("builtin://wenkai", "霞鹜文楷 (手写楷体)", "温润手写楷体，古风与文学佳作绝配"),
-    SANS("builtin://sans", "思源黑体 (无衬线黑体)", "现代无衬线黑体，字形干净利落"),
-    EINK_BOLD("builtin://eink_bold", "墨水屏凝黑 (高对比加粗)", "专为墨水屏粒子加深字重，边缘锐利"),
-    FANGSONG("builtin://fangsong", "古籍刻本 (传统书卷)", "高衬线对比与舒朗字怀，还原纸书质感"),
-    ROUNDED("builtin://rounded", "护眼柔黑 (圆润舒适)", "笔画柔和舒适，适合长时间速读");
+    SERIF(
+        id = "serif",
+        uriKey = "builtin://serif",
+        displayName = "思源宋体 · 墨水屏正文",
+        assetPath = "fonts/NotoSerifSC-Regular.otf",
+        fallbackFamily = "serif",
+        fallbackStyle = Typeface.NORMAL
+    ),
+    WENKAI(
+        id = "wenkai",
+        uriKey = "builtin://wenkai",
+        displayName = "霞鹜文楷 · 书卷楷体",
+        assetPath = "fonts/LXGWWenKai-Regular.ttf",
+        fallbackFamily = "serif",
+        fallbackStyle = Typeface.NORMAL
+    ),
+    SANS(
+        id = "sans",
+        uriKey = "builtin://sans",
+        displayName = "思源黑体 · 现代清晰",
+        assetPath = "fonts/NotoSansSC-Regular.otf",
+        fallbackFamily = "sans-serif",
+        fallbackStyle = Typeface.NORMAL
+    ),
+    EINK_BOLD(
+        id = "eink_bold",
+        uriKey = "builtin://eink_bold",
+        displayName = "墨水屏凝黑 · 高对比加粗",
+        assetPath = "fonts/NotoSansSC-Bold.otf",
+        fallbackFamily = "sans-serif",
+        fallbackStyle = Typeface.BOLD
+    ),
+    FANGSONG(
+        id = "fangsong",
+        uriKey = "builtin://fangsong",
+        displayName = "古籍刻本 · 雅致衬线",
+        assetPath = "fonts/NotoSerifSC-SemiBold.otf",
+        fallbackFamily = "serif",
+        fallbackStyle = Typeface.BOLD
+    ),
+    ROUNDED(
+        id = "rounded",
+        uriKey = "builtin://rounded",
+        displayName = "护眼柔黑 · 长时间阅读",
+        assetPath = "fonts/NotoSansSC-Medium.otf",
+        fallbackFamily = "sans-serif-medium",
+        fallbackStyle = Typeface.NORMAL
+    );
 
     companion object {
-        fun fromUriKey(key: String): BuiltinEinkFont? =
-            entries.firstOrNull { it.uriKey.equals(key.trim(), ignoreCase = true) }
+        fun fromKey(key: String?): BuiltinEinkFont? {
+            if (key.isNullOrBlank()) return null
+            return entries.firstOrNull {
+                it.uriKey.equals(key, ignoreCase = true) || it.id.equals(key, ignoreCase = true)
+            }
+        }
     }
 }
 
 object BuiltinFontManager {
-    private val assetCache = HashMap<String, Typeface?>()
+    private val cache = ConcurrentHashMap<String, Typeface>()
 
-    private fun loadAssetFont(ctx: Context, assetPath: String): Typeface? {
-        if (assetCache.containsKey(assetPath)) return assetCache[assetPath]
-        val tf = try {
-            Typeface.createFromAsset(ctx.assets, assetPath)
+    fun isBuiltinFontKey(path: String?): Boolean {
+        return BuiltinEinkFont.fromKey(path) != null
+    }
+
+    fun resolveTypeface(context: Context, fontKey: String?): Typeface {
+        val font = BuiltinEinkFont.fromKey(fontKey) ?: BuiltinEinkFont.SERIF
+        cache[font.id]?.let { return it }
+
+        val loaded = loadFromAssetsOrSystem(context, font)
+        cache[font.id] = loaded
+        return loaded
+    }
+
+    private fun loadFromAssetsOrSystem(context: Context, font: BuiltinEinkFont): Typeface {
+        try {
+            val assetList = context.assets.list("fonts") ?: emptyArray()
+            val fileName = font.assetPath.substringAfterLast("/")
+            if (assetList.contains(fileName)) {
+                return Typeface.createFromAsset(context.assets, font.assetPath)
+            }
         } catch (_: Throwable) {
-            null
         }
-        assetCache[assetPath] = tf
-        return tf
-    }
 
-    private fun loadSystemFont(paths: List<String>): Typeface? {
-        for (p in paths) {
-            val f = File(p)
-            if (f.isFile && f.length() > 1024L) {
-                try {
-                    return Typeface.createFromFile(f)
-                } catch (_: Throwable) {
-                }
-            }
+        val candidates = when (font) {
+            BuiltinEinkFont.SERIF -> listOf("noto-serif-cjk", "serif", "songti")
+            BuiltinEinkFont.WENKAI -> listOf("kaiti", "stkaiti", "serif", "noto-serif-cjk")
+            BuiltinEinkFont.SANS -> listOf("sans-serif", "noto-sans-cjk")
+            BuiltinEinkFont.EINK_BOLD -> listOf("sans-serif-black", "sans-serif-medium", "sans-serif")
+            BuiltinEinkFont.FANGSONG -> listOf("fangsong", "serif-monospace", "serif")
+            BuiltinEinkFont.ROUNDED -> listOf("sans-serif-medium", "sans-serif")
         }
-        return null
-    }
 
-    fun isBuiltinFontKey(fontPath: String): Boolean =
-        fontPath.startsWith("builtin://", ignoreCase = true)
-
-    fun getDisplayName(fontPath: String): String =
-        BuiltinEinkFont.fromUriKey(fontPath)?.displayName ?: fontPath.substringAfterLast("/")
-
-    fun resolveTypeface(ctx: Context, fontPath: String): Typeface? {
-        val builtin = BuiltinEinkFont.fromUriKey(fontPath) ?: return null
-        val baseTf = when (builtin) {
-            BuiltinEinkFont.WENKAI -> {
-                loadAssetFont(ctx, "fonts/wenkai.ttf")
-                    ?: loadAssetFont(ctx, "fonts/serif.otf")
-                    ?: loadSystemFont(
-                        listOf(
-                            "/system/fonts/NotoSerifCJK-Regular.ttc",
-                            "/system/fonts/DroidSansFallback.ttf"
-                        )
-                    )
-                    ?: Typeface.SERIF
-            }
-            BuiltinEinkFont.SERIF -> {
-                loadAssetFont(ctx, "fonts/serif.otf")
-                    ?: loadSystemFont(
-                        listOf(
-                            "/system/fonts/NotoSerifCJK-Regular.ttc",
-                            "/system/fonts/SourceHanSerifSC-Regular.otf"
-                        )
-                    )
-                    ?: Typeface.SERIF
-            }
-            BuiltinEinkFont.FANGSONG -> {
-                loadAssetFont(ctx, "fonts/wenkai.ttf")
-                    ?: loadAssetFont(ctx, "fonts/serif.otf")
-                    ?: Typeface.SERIF
-            }
-            BuiltinEinkFont.SANS -> {
-                loadSystemFont(
-                    listOf(
-                        "/system/fonts/NotoSansCJK-Regular.ttc",
-                        "/system/fonts/Roboto-Regular.ttf"
-                    )
-                ) ?: Typeface.SANS_SERIF
-            }
-            BuiltinEinkFont.EINK_BOLD -> {
-                val sans = loadSystemFont(
-                    listOf("/system/fonts/NotoSansCJK-Regular.ttc")
-                ) ?: Typeface.SANS_SERIF
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    Typeface.create(sans, 700, false)
-                } else {
-                    Typeface.create(sans, Typeface.BOLD)
-                }
-            }
-            BuiltinEinkFont.ROUNDED -> {
-                val sans = loadSystemFont(
-                    listOf("/system/fonts/NotoSansCJK-Regular.ttc")
-                ) ?: Typeface.SANS_SERIF
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    Typeface.create(sans, 450, false)
-                } else {
-                    Typeface.create(sans, Typeface.NORMAL)
-                }
+        for (family in candidates) {
+            try {
+                val tf = Typeface.create(family, font.fallbackStyle)
+                if (tf != null) return tf
+            } catch (_: Throwable) {
             }
         }
-        return baseTf
+        return Typeface.create(Typeface.SERIF, font.fallbackStyle)
     }
 }

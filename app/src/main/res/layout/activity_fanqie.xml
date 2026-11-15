@@ -1,293 +1,392 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/fanqieRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="#FFFFFF">
+    android:background="#FFFFFFFF"
+    android:orientation="vertical">
 
+    <!-- 墨水屏高对比顶栏 -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="54dp"
-        android:orientation="horizontal"
+        android:layout_height="52dp"
+        android:background="@drawable/bg_eink_border_bottom"
         android:gravity="center_vertical"
-        android:paddingStart="14dp"
-        android:paddingEnd="14dp">
+        android:orientation="horizontal"
+        android:paddingHorizontal="12dp">
 
         <Button
             android:id="@+id/btnBack"
-            android:background="@drawable/bg_eink_button_outline"
-                android:textColor="@color/selector_eink_text"
-                android:textStyle="bold"
             android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:minHeight="0dp"
+            android:layout_height="34dp"
+            android:background="@drawable/selector_eink_button"
             android:minWidth="0dp"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
+            android:minHeight="0dp"
+            android:paddingHorizontal="10dp"
+            android:stateListAnimator="@null"
             android:text="← 书架"
-            android:textSize="13sp" />
+            android:textColor="#FF000000"
+            android:textSize="13sp"
+            android:textStyle="bold" />
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginHorizontal="10dp"
             android:layout_weight="1"
-            android:layout_marginStart="12dp"
-            android:text="番茄搜书 · 后台断点下载"
-            android:textSize="17sp"
-            android:textStyle="bold"
-            android:textColor="#000000" />
+            android:ellipsize="end"
+            android:singleLine="true"
+            android:text="番茄书城 · 全本搜书与秒开阅读"
+            android:textColor="#FF000000"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnPasteClipboard"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/selector_eink_button"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:paddingHorizontal="8dp"
+            android:stateListAnimator="@null"
+            android:text="粘贴链接"
+            android:textColor="#FF000000"
+            android:textSize="12sp" />
 
         <Button
             android:id="@+id/btnToggleConfig"
-            android:background="@drawable/bg_eink_button_outline"
-                android:textColor="@color/selector_eink_text"
-                android:textStyle="bold"
             android:layout_width="wrap_content"
-            android:layout_height="34dp"
-            android:minHeight="0dp"
+            android:layout_height="32dp"
+            android:background="@drawable/selector_eink_button"
             android:minWidth="0dp"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
-            android:text="接口配置"
+            android:minHeight="0dp"
+            android:paddingHorizontal="8dp"
+            android:stateListAnimator="@null"
+            android:text="引擎"
+            android:textColor="#FF000000"
             android:textSize="12sp" />
     </LinearLayout>
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="2dp"
-        android:background="#000000" />
-
-    <!-- Search & Link Input Box -->
+    <!-- 隐藏式远端引擎面板（默认隐藏，避免工程调试感） -->
     <LinearLayout
+        android:id="@+id/configContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="@drawable/bg_eink_border_bottom"
         android:orientation="vertical"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:paddingTop="12dp"
-        android:paddingBottom="10dp"
-        android:background="#FFFFFF">
+        android:padding="12dp"
+        android:visibility="gone">
 
-        <EditText
-            android:id="@+id/etBookInput"
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minLines="1"
-            android:maxLines="3"
-            android:padding="10dp"
-            android:background="@drawable/bg_eink_input"
-            android:hint="输入书名/作者关键字搜书，或粘贴番茄分享链接/Book ID"
-            android:textColor="#000000"
-            android:textColorHint="#000000"
-            android:textSize="14sp"
-            android:imeOptions="actionSearch"
-            android:inputType="text" />
+            android:text="下载引擎模式（默认留空直接使用内置本地引擎，无需部署服务器）"
+            android:textColor="#FF222222"
+            android:textSize="12sp"
+            android:textStyle="bold" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="6dp"
             android:orientation="horizontal">
 
-            <Button
-                android:id="@+id/btnSearchBook"
-                android:background="@drawable/bg_eink_button_solid"
-                android:textColor="@color/selector_eink_text_solid"
-                android:textStyle="bold"
-                android:layout_width="0dp"
-                android:layout_height="38dp"
-                android:layout_weight="1.3"
-                android:text="搜索书名 / 作者"
-                android:textSize="13sp" />
-
-            <Button
-                android:id="@+id/btnParseBook"
-                android:background="@drawable/bg_eink_button_outline"
-                android:textColor="@color/selector_eink_text"
-                android:textStyle="bold"
+            <EditText
+                android:id="@+id/etServerUrl"
                 android:layout_width="0dp"
                 android:layout_height="38dp"
                 android:layout_weight="1"
-                android:layout_marginStart="6dp"
-                android:text="解析链接/ID"
-                android:textSize="13sp" />
+                android:background="@drawable/bg_eink_card"
+                android:hint="留空=手机内置引擎；或填 http://IP:5000"
+                android:inputType="textUri"
+                android:paddingHorizontal="10dp"
+                android:singleLine="true"
+                android:textColor="#FF000000"
+                android:textColorHint="#FF777777"
+                android:textSize="12sp" />
 
             <Button
-                android:id="@+id/btnPasteClipboard"
-                android:background="@drawable/bg_eink_button_outline"
-                android:textColor="@color/selector_eink_text"
-                android:textStyle="bold"
+                android:id="@+id/btnSaveServer"
                 android:layout_width="wrap_content"
                 android:layout_height="38dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_eink_button_solid"
                 android:minWidth="0dp"
-                android:paddingStart="10dp"
-                android:paddingEnd="10dp"
-                android:layout_marginStart="6dp"
-                android:text="粘贴"
-                android:textSize="12sp" />
+                android:paddingHorizontal="12dp"
+                android:stateListAnimator="@null"
+                android:text="保存"
+                android:textColor="#FFFFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- 微信读书墨水屏风格一体式搜索框 + 分类快捷胶囊栏 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_eink_border_bottom"
+        android:orientation="vertical"
+        android:paddingHorizontal="12dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/etBookInput"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/bg_eink_search_box"
+                android:hint="输入书名、作者、主角名，或粘贴番茄分享链接"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:paddingHorizontal="12dp"
+                android:singleLine="true"
+                android:textColor="#FF000000"
+                android:textColorHint="#FF666666"
+                android:textSize="14sp" />
 
             <Button
                 android:id="@+id/btnClearInput"
-                android:background="@drawable/bg_eink_button_outline"
-                android:textColor="@color/selector_eink_text"
-                android:textStyle="bold"
                 android:layout_width="wrap_content"
-                android:layout_height="38dp"
-                android:minWidth="0dp"
-                android:paddingStart="10dp"
-                android:paddingEnd="10dp"
+                android:layout_height="match_parent"
                 android:layout_marginStart="6dp"
+                android:background="@drawable/selector_eink_button"
+                android:minWidth="0dp"
+                android:paddingHorizontal="10dp"
+                android:stateListAnimator="@null"
                 android:text="清空"
-                android:textSize="12sp" />
+                android:textColor="#FF000000"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btnSearchBook"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_eink_button_solid"
+                android:minWidth="0dp"
+                android:paddingHorizontal="16dp"
+                android:stateListAnimator="@null"
+                android:text="搜索"
+                android:textColor="#FFFFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
         </LinearLayout>
+
+        <!-- 热门分类一键探索胶囊排 -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:text="热门分类："
+                    android:textColor="#FF333333"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/chipCat1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_eink_pill_outline"
+                    android:gravity="center"
+                    android:paddingHorizontal="12dp"
+                    android:text="十日终焉"
+                    android:textColor="#FF000000"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/chipCat2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_eink_pill_outline"
+                    android:gravity="center"
+                    android:paddingHorizontal="12dp"
+                    android:text="玄幻仙侠"
+                    android:textColor="#FF000000"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/chipCat3"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_eink_pill_outline"
+                    android:gravity="center"
+                    android:paddingHorizontal="12dp"
+                    android:text="历史古代"
+                    android:textColor="#FF000000"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/chipCat4"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_eink_pill_outline"
+                    android:gravity="center"
+                    android:paddingHorizontal="12dp"
+                    android:text="悬疑脑洞"
+                    android:textColor="#FF000000"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/chipCat5"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_eink_pill_outline"
+                    android:gravity="center"
+                    android:paddingHorizontal="12dp"
+                    android:text="科幻末世"
+                    android:textColor="#FF000000"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/chipCat6"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:background="@drawable/bg_eink_pill_outline"
+                    android:gravity="center"
+                    android:paddingHorizontal="12dp"
+                    android:text="都市高武"
+                    android:textColor="#FF000000"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </HorizontalScrollView>
 
         <TextView
             android:id="@+id/tvStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="支持后台下载、状态栏实时进度通知与断点续下，下载时可随时返回书架阅读。"
-            android:textSize="12sp"
-            android:textColor="#000000" />
-    </LinearLayout>
-
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="#000000" />
-
-    <!-- Collapsible Server Config Panel -->
-    <LinearLayout
-        android:id="@+id/configContainer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="14dp"
-        android:background="#FFFFFF"
-        android:visibility="gone">
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="远端 FastAPI 服务地址（留空则使用手机本地内置引擎搜书与断点下载）"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:textColor="#000000" />
-
-        <EditText
-            android:id="@+id/etServerUrl"
-            android:layout_width="match_parent"
-            android:layout_height="38dp"
-            android:layout_marginTop="4dp"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
-            android:background="@drawable/bg_eink_input"
-            android:hint="例如 http://192.168.1.100:8000（可留空）"
-            android:textColor="#000000"
-            android:textSize="13sp"
-            android:singleLine="true" />
-
-        <Button
-            android:id="@+id/btnSaveServer"
-            android:background="@drawable/bg_eink_button_outline"
-                android:textColor="@color/selector_eink_text"
-                android:textStyle="bold"
-            android:layout_width="match_parent"
-            android:layout_height="36dp"
-            android:layout_marginTop="8dp"
-            android:text="保存接口配置"
+            android:text="点击任意搜索结果可直接「立即阅读」（秒开边看边下），或启动「全本后台离线」"
+            android:textColor="#FF222222"
             android:textSize="12sp" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginTop="10dp"
-            android:background="#000000" />
     </LinearLayout>
 
-    <!-- Selected Book Detail & Background Download Card -->
+    <!-- 书籍详情与流式阅读/后台断点下载卡片 -->
     <LinearLayout
         android:id="@+id/bookInfoCard"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="14dp"
+        android:layout_margin="12dp"
+        android:background="@drawable/bg_eink_card_thick"
         android:orientation="vertical"
         android:padding="14dp"
-        android:background="@drawable/bg_eink_hero_card"
         android:visibility="gone">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/tvBookTitle"
+            <ImageView
+                android:id="@+id/ivDetailCover"
+                android:layout_width="76dp"
+                android:layout_height="104dp"
+                android:background="@drawable/bg_eink_cover_border"
+                android:contentDescription="封面"
+                android:padding="1dp"
+                android:scaleType="centerCrop"
+                android:src="@drawable/image_cover_default" />
+
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
                 android:layout_weight="1"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:textColor="#000000" />
+                android:orientation="vertical">
 
-            <Button
-                android:id="@+id/btnBackToSearch"
-                android:background="@drawable/bg_eink_button_outline"
-                android:textColor="@color/selector_eink_text"
-                android:textStyle="bold"
-                android:layout_width="wrap_content"
-                android:layout_height="30dp"
-                android:minHeight="0dp"
-                android:minWidth="0dp"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:text="返回搜索列表"
-                android:textSize="11sp"
-                android:visibility="gone" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvBookTitle"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textColor="#FF000000"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/btnBackToSearch"
+                        android:layout_width="wrap_content"
+                        android:layout_height="28dp"
+                        android:background="@drawable/selector_eink_button"
+                        android:minWidth="0dp"
+                        android:minHeight="0dp"
+                        android:paddingHorizontal="8dp"
+                        android:stateListAnimator="@null"
+                        android:text="返回列表"
+                        android:textColor="#FF000000"
+                        android:textSize="11sp"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvBookAuthor"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="#FF222222"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/tvBookLatestChapter"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="#FF000000"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvBookCheckpointInfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:textColor="#FF333333"
+                    android:textSize="12sp" />
+            </LinearLayout>
         </LinearLayout>
-
-        <TextView
-            android:id="@+id/tvBookAuthor"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:textColor="#000000" />
-
-        <TextView
-            android:id="@+id/tvBookLatestChapter"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:textColor="#000000" />
-
-        <TextView
-            android:id="@+id/tvBookCheckpointInfo"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
-            android:paddingTop="3dp"
-            android:paddingBottom="3dp"
-            android:background="@drawable/bg_eink_tag"
-            android:textSize="11sp"
-            android:textColor="#000000" />
 
         <TextView
             android:id="@+id/tvBookIntro"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:maxLines="3"
+            android:layout_marginTop="10dp"
             android:ellipsize="end"
             android:lineSpacingMultiplier="1.25"
-            android:textSize="12sp"
-            android:textColor="#000000" />
+            android:maxLines="4"
+            android:textColor="#FF111111"
+            android:textSize="13sp" />
 
         <ProgressBar
             android:id="@+id/downloadProgressBar"
@@ -297,9 +396,10 @@
             android:layout_marginTop="10dp"
             android:max="100"
             android:progress="0"
-            android:progressDrawable="@drawable/bg_eink_progress"
+            android:progressTint="#FF000000"
             android:visibility="gone" />
 
+        <!-- 原生无缝操作栏：立即阅读（秒开） + 全本后台离线 + 暂停 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -307,55 +407,55 @@
             android:orientation="horizontal">
 
             <Button
-                android:id="@+id/btnDownloadBook"
-                android:background="@drawable/bg_eink_button_solid"
-                android:textColor="@color/selector_eink_text_solid"
-                android:textStyle="bold"
+                android:id="@+id/btnOpenDownloadedBook"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="42dp"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1.15"
+                android:background="@drawable/bg_eink_button_solid"
+                android:stateListAnimator="@null"
+                android:text="立即阅读（秒开）"
+                android:textColor="#FFFFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btnDownloadBook"
+                android:layout_width="0dp"
+                android:layout_height="42dp"
                 android:layout_weight="1"
-                android:text="后台全本下载（状态栏提示）"
-                android:textSize="13sp" />
+                android:background="@drawable/selector_eink_button"
+                android:stateListAnimator="@null"
+                android:text="全本后台离线"
+                android:textColor="#FF000000"
+                android:textSize="13sp"
+                android:textStyle="bold" />
 
             <Button
                 android:id="@+id/btnPauseDownload"
-                android:background="@drawable/bg_eink_button_outline"
-                android:textColor="@color/selector_eink_text"
-                android:textStyle="bold"
                 android:layout_width="wrap_content"
-                android:layout_height="40dp"
+                android:layout_height="42dp"
                 android:layout_marginStart="8dp"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
+                android:background="@drawable/selector_eink_button"
+                android:paddingHorizontal="12dp"
+                android:stateListAnimator="@null"
                 android:text="暂停存断点"
-                android:textSize="12sp"
-                android:visibility="gone" />
-
-            <Button
-                android:id="@+id/btnOpenDownloadedBook"
-                android:background="@drawable/bg_eink_button_outline"
-                android:textColor="@color/selector_eink_text"
-                android:textStyle="bold"
-                android:layout_width="wrap_content"
-                android:layout_height="40dp"
-                android:layout_marginStart="8dp"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:text="立即阅读"
+                android:textColor="#FF000000"
                 android:textSize="12sp"
                 android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Search Results List Section -->
+    <!-- 搜索结果列表头 -->
     <LinearLayout
         android:id="@+id/searchHeaderRow"
         android:layout_width="match_parent"
-        android:layout_height="30dp"
-        android:orientation="horizontal"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_eink_border_bottom"
         android:gravity="center_vertical"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
+        android:orientation="horizontal"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="6dp"
         android:visibility="gone">
 
         <TextView
@@ -363,10 +463,10 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="搜索结果（点按书籍即可查看最新章节与后台下载）"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:textColor="#000000" />
+            android:text="搜索结果"
+            android:textColor="#FF000000"
+            android:textSize="13sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
@@ -374,10 +474,10 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
         android:clipToPadding="false"
         android:overScrollMode="never"
-        android:scrollbars="none" />
+        android:paddingHorizontal="12dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="16dp" />
 
 </LinearLayout>

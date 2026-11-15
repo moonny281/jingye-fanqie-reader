@@ -106,7 +106,7 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
 
         private fun upRefresh(binding: ItemBookshelfListBinding, item: Book) {
             FanqieUiHelper.bindShelfItem(binding.root, binding.tvFanqieAction, binding.bvUnread, item)
-        if (!item.isLocal && callBack.isUpdate(item.bookUrl)) {
+            if (!item.isLocal && callBack.isUpdate(item.bookUrl)) {
                 binding.bvUnread.invisible()
                 binding.rlLoading.visible()
             } else {
@@ -175,7 +175,7 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
 
         private fun upRefresh(binding: ItemBookshelfList2Binding, item: Book) {
             FanqieUiHelper.bindShelfItem(binding.root, binding.tvFanqieAction, binding.bvUnread, item)
-        if (!item.isLocal && callBack.isUpdate(item.bookUrl)) {
+            if (!item.isLocal && callBack.isUpdate(item.bookUrl)) {
                 binding.bvUnread.invisible()
                 binding.rlLoading.visible()
             } else {

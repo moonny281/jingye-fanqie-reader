@@ -695,4 +695,80 @@ class FanqieCrawler(
         )
         return outcome.metadata to outcome.txtBytes
     }
+
+    /**
+     * 极速拉取前 [quickCount] 章以供「立即阅读」秒开阅读器，其余章节交由后台服务静默断点续下。
+     */
+    fun downloadQuickStarter(
+        bookId: String,
+        existingCache: Map<String, String> = emptyMap(),
+        quickCount: Int = 8
+    ): IncrementalDownloadOutcome {
+        val cleanId = FanqieParser.resolveBookId(bookId)
+        val detail = fetchDetailInfo(cleanId)
+        val chapters = fetchChapterList(cleanId, detail.html)
+        if (chapters.isEmpty()) {
+            throw FanqieException("未能获取到《${detail.title}》的章节目录（Book ID: $cleanId）")
+        }
+
+        val total = chapters.size
+        val latestTitle = chapters.lastOrNull()?.title.orEmpty().ifBlank { detail.latestChapterTitle }
+        val workingCache = LinkedHashMap<String, String>(existingCache)
+
+        val targetChapters = chapters.take(quickCount.coerceAtLeast(1))
+        val missingStarter = targetChapters.filter { ch ->
+            val cached = workingCache[ch.itemId]
+            cached.isNullOrBlank() || cached.length < 15
+        }
+
+        if (missingStarter.isNotEmpty()) {
+            val ids = missingStarter.map { it.itemId }
+            val batchMap = try {
+                appApi.fetchBatchChapterMap(ids)
+            } catch (_: Exception) {
+                emptyMap()
+            }
+            for (ch in missingStarter) {
+                val rawBody = batchMap[ch.itemId]
+                val finalBody = if (!rawBody.isNullOrBlank() && rawBody.length >= 20) {
+                    rawBody
+                } else {
+                    try {
+                        fetchSingleChapterFallback(ch.itemId, ch.title)
+                    } catch (_: Exception) {
+                        "（本章正在后台同步中，请稍候翻页刷新）"
+                    }
+                }
+                workingCache[ch.itemId] = finalBody
+            }
+        }
+
+        val metadata = FanqieMetadata(
+            bookId = cleanId,
+            title = detail.title,
+            author = detail.author,
+            score = detail.score,
+            coverUrl = detail.coverUrl,
+            intro = detail.intro,
+            wordCount = detail.wordCount,
+            chapterCount = total,
+            serialStatus = detail.serialStatus,
+            availableChapters = workingCache.size,
+            pcAvailable = true,
+            chapterTitles = chapters.take(25).map { it.title },
+            latestChapterTitle = latestTitle
+        )
+
+        val txtBytes = assembleOrderedTxtBytes(detail, chapters, workingCache, total, latestTitle)
+        return IncrementalDownloadOutcome(
+            metadata = metadata,
+            txtBytes = txtBytes,
+            downloadedChapters = workingCache.size,
+            remoteTotalChapters = total,
+            latestChapterTitle = latestTitle,
+            isPartial = workingCache.size < total,
+            updatedCache = workingCache
+        )
+    }
+
 }
