@@ -1,13 +1,10 @@
 package io.legado.app.ui.widget.checkbox
 
-import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.*
 import android.util.AttributeSet
 import android.view.View
-import android.view.animation.LinearInterpolator
 import android.widget.Checkable
-import androidx.core.view.postDelayed
 import io.legado.app.R
 import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.utils.dpToPx
@@ -17,6 +14,9 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
+/**
+ * 墨水屏复选框（已禁用全部 ValueAnimator 缩放与延时绘制动画，即时完成勾选渲染）
+ */
 class SmoothCheckBox @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
@@ -50,7 +50,7 @@ class SmoothCheckBox @JvmOverloads constructor(
         mUnCheckedColor = context.getCompatColor(R.color.background_menu)
         mFloorColor = context.getCompatColor(R.color.transparent30)
         tickColor = ta.getColor(R.styleable.SmoothCheckBox_color_tick, tickColor)
-        mAnimDuration = ta.getInt(R.styleable.SmoothCheckBox_duration, DEF_ANIM_DURATION)
+        mAnimDuration = 0
         mFloorColor = ta.getColor(R.styleable.SmoothCheckBox_color_unchecked_stroke, mFloorColor)
         mCheckedColor = ta.getColor(R.styleable.SmoothCheckBox_color_checked, mCheckedColor)
         mUnCheckedColor = ta.getColor(R.styleable.SmoothCheckBox_color_unchecked, mUnCheckedColor)
@@ -72,13 +72,6 @@ class SmoothCheckBox @JvmOverloads constructor(
         mTickPoints = arrayOf(Point(), Point(), Point())
         setOnClickListener {
             toggle()
-            mTickDrawing = false
-            mDrewDistance = 0f
-            if (isChecked) {
-                startCheckedAnimation()
-            } else {
-                startUnCheckedAnimation()
-            }
         }
     }
 
@@ -97,26 +90,8 @@ class SmoothCheckBox @JvmOverloads constructor(
         this.isChecked = !isChecked
     }
 
-    /**
-     * checked with animation
-     *
-     * @param checked checked
-     * @param animate change with animation
-     */
     fun setChecked(checked: Boolean, animate: Boolean) {
-        if (animate) {
-            mTickDrawing = false
-            mChecked = checked
-            mDrewDistance = 0f
-            if (checked) {
-                startCheckedAnimation()
-            } else {
-                startUnCheckedAnimation()
-            }
-            onCheckedChangeListener?.invoke(this@SmoothCheckBox, mChecked)
-        } else {
-            this.isChecked = checked
-        }
+        this.isChecked = checked
     }
 
     private fun reset() {
@@ -173,6 +148,9 @@ class SmoothCheckBox @JvmOverloads constructor(
                     (mTickPoints[2].y - mTickPoints[1].y.toDouble()).pow(2.0)
         ).toFloat()
         mTickPaint.strokeWidth = mStrokeWidth.toFloat()
+        if (isChecked) {
+            mDrewDistance = mLeftLineDistance + mRightLineDistance
+        }
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -199,129 +177,16 @@ class SmoothCheckBox @JvmOverloads constructor(
     }
 
     private fun drawTick(canvas: Canvas) {
-        if (mTickDrawing && isChecked) {
-            drawTickPath(canvas)
-        }
-    }
-
-    private fun drawTickPath(canvas: Canvas) {
-        mTickPath.reset()
-        // draw left of the tick
-        if (mDrewDistance < mLeftLineDistance) {
-            val step: Float = if (mWidth / 20.0f < 3) 3f else mWidth / 20.0f
-            mDrewDistance += step
-            val stopX =
-                mTickPoints[0].x + (mTickPoints[1].x - mTickPoints[0].x) * mDrewDistance / mLeftLineDistance
-            val stopY =
-                mTickPoints[0].y + (mTickPoints[1].y - mTickPoints[0].y) * mDrewDistance / mLeftLineDistance
-            mTickPath.moveTo(mTickPoints[0].x.toFloat(), mTickPoints[0].y.toFloat())
-            mTickPath.lineTo(stopX, stopY)
-            canvas.drawPath(mTickPath, mTickPaint)
-            if (mDrewDistance > mLeftLineDistance) {
-                mDrewDistance = mLeftLineDistance
-            }
-        } else {
+        if (isChecked) {
+            mTickPath.reset()
             mTickPath.moveTo(mTickPoints[0].x.toFloat(), mTickPoints[0].y.toFloat())
             mTickPath.lineTo(mTickPoints[1].x.toFloat(), mTickPoints[1].y.toFloat())
+            mTickPath.lineTo(mTickPoints[2].x.toFloat(), mTickPoints[2].y.toFloat())
             canvas.drawPath(mTickPath, mTickPaint)
-            // draw right of the tick
-            if (mDrewDistance < mLeftLineDistance + mRightLineDistance) {
-                val stopX =
-                    mTickPoints[1].x + (mTickPoints[2].x - mTickPoints[1].x) * (mDrewDistance - mLeftLineDistance) / mRightLineDistance
-                val stopY =
-                    mTickPoints[1].y - (mTickPoints[1].y - mTickPoints[2].y) * (mDrewDistance - mLeftLineDistance) / mRightLineDistance
-                mTickPath.reset()
-                mTickPath.moveTo(mTickPoints[1].x.toFloat(), mTickPoints[1].y.toFloat())
-                mTickPath.lineTo(stopX, stopY)
-                canvas.drawPath(mTickPath, mTickPaint)
-                val step: Float = if (mWidth / 20f < 3) 3f else mWidth / 20f
-                mDrewDistance += step
-            } else {
-                mTickPath.reset()
-                mTickPath.moveTo(mTickPoints[1].x.toFloat(), mTickPoints[1].y.toFloat())
-                mTickPath.lineTo(mTickPoints[2].x.toFloat(), mTickPoints[2].y.toFloat())
-                canvas.drawPath(mTickPath, mTickPaint)
-            }
-        }
-        // invalidate
-        if (mDrewDistance < mLeftLineDistance + mRightLineDistance) {
-            postDelayed(10) { this.postInvalidate() }
-        }
-    }
-
-    private fun startCheckedAnimation() {
-        val animator = ValueAnimator.ofFloat(1.0f, 0f)
-        animator.duration = mAnimDuration / 3 * 2.toLong()
-        animator.interpolator = LinearInterpolator()
-        animator.addUpdateListener { animation: ValueAnimator ->
-            mScaleVal = animation.animatedValue as Float
-            mFloorColor = getGradientColor(
-                mUnCheckedColor,
-                mCheckedColor,
-                1 - mScaleVal
-            )
-            postInvalidate()
-        }
-        animator.start()
-        val floorAnimator = ValueAnimator.ofFloat(1.0f, 0.8f, 1.0f)
-        floorAnimator.duration = mAnimDuration.toLong()
-        floorAnimator.interpolator = LinearInterpolator()
-        floorAnimator.addUpdateListener { animation: ValueAnimator ->
-            mFloorScale = animation.animatedValue as Float
-            postInvalidate()
-        }
-        floorAnimator.start()
-        drawTickDelayed()
-    }
-
-    private fun startUnCheckedAnimation() {
-        val animator = ValueAnimator.ofFloat(0f, 1.0f)
-        animator.duration = mAnimDuration.toLong()
-        animator.interpolator = LinearInterpolator()
-        animator.addUpdateListener { animation: ValueAnimator ->
-            mScaleVal = animation.animatedValue as Float
-            mFloorColor = getGradientColor(
-                mCheckedColor,
-                mFloorUnCheckedColor,
-                mScaleVal
-            )
-            postInvalidate()
-        }
-        animator.start()
-        val floorAnimator = ValueAnimator.ofFloat(1.0f, 0.8f, 1.0f)
-        floorAnimator.duration = mAnimDuration.toLong()
-        floorAnimator.interpolator = LinearInterpolator()
-        floorAnimator.addUpdateListener { animation: ValueAnimator ->
-            mFloorScale = animation.animatedValue as Float
-            postInvalidate()
-        }
-        floorAnimator.start()
-    }
-
-    private fun drawTickDelayed() {
-        postDelayed(mAnimDuration.toLong()) {
-            mTickDrawing = true
-            postInvalidate()
         }
     }
 
     companion object {
         private const val DEF_DRAW_SIZE = 25
-        private const val DEF_ANIM_DURATION = 300
-        private fun getGradientColor(startColor: Int, endColor: Int, percent: Float): Int {
-            val startA = Color.alpha(startColor)
-            val startR = Color.red(startColor)
-            val startG = Color.green(startColor)
-            val startB = Color.blue(startColor)
-            val endA = Color.alpha(endColor)
-            val endR = Color.red(endColor)
-            val endG = Color.green(endColor)
-            val endB = Color.blue(endColor)
-            val currentA = (startA * (1 - percent) + endA * percent).toInt()
-            val currentR = (startR * (1 - percent) + endR * percent).toInt()
-            val currentG = (startG * (1 - percent) + endG * percent).toInt()
-            val currentB = (startB * (1 - percent) + endB * percent).toInt()
-            return Color.argb(currentA, currentR, currentG, currentB)
-        }
     }
 }
