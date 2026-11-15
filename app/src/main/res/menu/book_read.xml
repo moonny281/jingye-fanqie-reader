@@ -5,21 +5,33 @@
     tools:ignore="AlwaysShowAction">
 
     <item
-        android:id="@+id/menu_eink_full_refresh"
+        android:id="@+id/menu_eink_partial_refresh"
         android:icon="@drawable/ic_refresh_black_24dp"
-        android:title="墨水屏全刷清残影"
+        android:title="墨水屏局刷清残影"
         app:showAsAction="always" />
 
     <item
-        android:id="@+id/menu_fanqie_check_update"
-        android:icon="@drawable/ic_download_line"
-        android:title="检测番茄更新 / 断点续下"
+        android:id="@+id/menu_eink_full_refresh"
+        android:icon="@drawable/ic_refresh_black_24dp"
+        android:title="墨水屏全刷清残影"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_eink_toggle_progress"
+        android:icon="@drawable/ic_interface_setting"
+        android:title="显隐阅读进度栏（最大化面积）"
         app:showAsAction="never" />
 
     <item
         android:id="@+id/menu_eink_debug"
         android:icon="@drawable/ic_settings"
-        android:title="墨水屏全刷频率设置"
+        android:title="墨水屏刷新与自适应面积设置"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_fanqie_check_update"
+        android:icon="@drawable/ic_download_line"
+        android:title="检测番茄更新 / 断点续下"
         app:showAsAction="never" />
 
     <group android:id="@+id/menu_group_on_line">
@@ -70,11 +82,6 @@
     <item
         android:id="@+id/menu_edit_content"
         android:title="@string/edit_content"
-        app:showAsAction="never" />
-
-    <item
-        android:id="@+id/menu_page_anim"
-        android:title="@string/book_page_anim"
         app:showAsAction="never" />
 
     <item
@@ -163,11 +170,6 @@
     <item
         android:id="@+id/menu_log"
         android:title="@string/log"
-        app:showAsAction="never" />
-
-    <item
-        android:id="@+id/menu_help"
-        android:title="@string/help"
         app:showAsAction="never" />
 
 </menu>
