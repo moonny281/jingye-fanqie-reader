@@ -23,7 +23,6 @@ import io.legado.app.constant.AppConst.appInfo
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
 import io.legado.app.databinding.ActivityMainBinding
-import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.LifecycleHelp
 import io.legado.app.help.book.BookHelp
@@ -34,18 +33,22 @@ import io.legado.app.help.storage.Backup
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.service.BaseReadAloudService
-import io.legado.app.ui.about.CrashLogsDialog
 import io.legado.app.ui.association.ImportBookSourceDialog
+import io.legado.app.ui.association.ImportDictRuleDialog
+import io.legado.app.ui.association.ImportHttpTtsDialog
 import io.legado.app.ui.association.ImportReplaceRuleDialog
 import io.legado.app.ui.association.ImportRssSourceDialog
+import io.legado.app.ui.association.ImportTxtTocRuleDialog
 import io.legado.app.ui.main.bookshelf.BaseBookshelfFragment
 import io.legado.app.ui.main.bookshelf.style1.BookshelfFragment1
 import io.legado.app.ui.main.bookshelf.style2.BookshelfFragment2
 import io.legado.app.ui.main.explore.ExploreFragment
 import io.legado.app.ui.main.my.MyFragment
 import io.legado.app.ui.main.rss.RssFragment
-import io.legado.app.ui.widget.dialog.TextDialog
 import io.legado.app.ui.widget.text.BadgeView
+import io.legado.app.utils.StringUtils
+import io.legado.app.utils.clearClip
+import io.legado.app.utils.getClipText
 import io.legado.app.utils.isCreated
 import io.legado.app.utils.navigationBarHeight
 import io.legado.app.utils.observeEvent
@@ -56,22 +59,11 @@ import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import splitties.views.bottomPadding
-import kotlin.coroutines.resume
-import io.legado.app.help.update.AppUpdate
-import io.legado.app.ui.about.UpdateDialog
-import io.legado.app.ui.association.ImportDictRuleDialog
-import io.legado.app.ui.association.ImportHttpTtsDialog
-import io.legado.app.ui.association.ImportTxtTocRuleDialog
-import io.legado.app.utils.StringUtils
-import io.legado.app.utils.clearClip
-import io.legado.app.utils.getClipText
-import kotlin.time.Duration.Companion.hours
 
 /**
- * 主界面
+ * 主界面（原生墨水屏纯净版：移除免责声明弹窗、更新日志弹窗与首次引导弹窗）
  */
 @Suppress("PrivatePropertyName")
 class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
@@ -106,7 +98,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         upHomePage()
         onBackPressedDispatcher.addCallback(this) {
             if (pagePosition != 0) {
-                binding.viewPagerMain.currentItem = 0
+                binding.viewPagerMain.setCurrentItem(0, false)
                 return@addCallback
             }
             (fragmentMap[getFragmentId(0)] as? BookshelfFragment2)?.let {
@@ -130,13 +122,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     override fun onPostCreate(savedInstanceState: Bundle?) {
         super.onPostCreate(savedInstanceState)
         lifecycleScope.launch {
-            //隐私协议
-            if (!privacyPolicy()) return@launch
-            //版本更新
-            upVersion()
-            //设置本地密码
-            setLocalPassword()
-            notifyAppCrash()
+            LocalConfig.versionCode = appInfo.versionCode
             //备份同步
             backupSync()
             //设置回调
@@ -203,113 +189,11 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         viewPagerMain.addOnPageChangeListener(PageChangeCallback())
         bottomNavigationView.setOnNavigationItemSelectedListener(this@MainActivity)
         bottomNavigationView.setOnNavigationItemReselectedListener(this@MainActivity)
-        if (AppConfig.isEInkMode) {
-            bottomNavigationView.setBackgroundResource(R.drawable.bg_eink_border_top)
-        }
+        bottomNavigationView.setBackgroundResource(R.drawable.bg_eink_border_top)
         bottomNavigationView.setOnApplyWindowInsetsListenerCompat { view, windowInsets ->
             val height = windowInsets.navigationBarHeight
             view.bottomPadding = height
             windowInsets.inset(0, 0, 0, height)
-        }
-    }
-
-    /**
-     * 用户隐私与协议
-     */
-    private suspend fun privacyPolicy(): Boolean = suspendCancellableCoroutine sc@{ block ->
-        if (LocalConfig.privacyPolicyOk) {
-            block.resume(true)
-            return@sc
-        }
-        val privacyPolicy = String(assets.open("privacyPolicy.md").readBytes())
-        alert(getString(R.string.privacy_policy), privacyPolicy) {
-            positiveButton(R.string.agree) {
-                LocalConfig.privacyPolicyOk = true
-                block.resume(true)
-            }
-            negativeButton(R.string.refuse) {
-                finish()
-                block.resume(false)
-            }
-        }
-    }
-
-    /**
-     * 版本更新日志
-     */
-    private suspend fun upVersion() = suspendCancellableCoroutine sc@{ block ->
-        if (LocalConfig.versionCode == appInfo.versionCode) {
-            if (AppConfig.autoUpdateVariant) {
-                if (LocalConfig.lastCheckUpdate + 24.hours.inWholeMilliseconds < System.currentTimeMillis()) {
-                    AppUpdate.giteeUpdate.check(lifecycleScope)
-                        .onSuccess {
-                            showDialogFragment(
-                                UpdateDialog(it)
-                            )
-                        }
-                    LocalConfig.lastCheckUpdate = System.currentTimeMillis()
-                }
-            }
-            block.resume(null)
-            return@sc
-        }
-        LocalConfig.versionCode = appInfo.versionCode
-        if (LocalConfig.isFirstOpenApp) {
-            val help = String(assets.open("web/help/md/appHelp.md").readBytes())
-            val dialog = TextDialog(getString(R.string.help), help, TextDialog.Mode.MD)
-            dialog.setOnDismissListener {
-                block.resume(null)
-            }
-            showDialogFragment(dialog)
-        } else if (!BuildConfig.DEBUG) {
-            val log = String(assets.open("updateLog.md").readBytes())
-            val dialog = TextDialog(getString(R.string.update_log), log, TextDialog.Mode.MD)
-            dialog.setOnDismissListener {
-                block.resume(null)
-            }
-            showDialogFragment(dialog)
-        } else {
-            block.resume(null)
-        }
-    }
-
-    /**
-     * 设置本地密码
-     */
-    private suspend fun setLocalPassword() = suspendCancellableCoroutine sc@{ block ->
-        if (LocalConfig.password != null) {
-            block.resume(null)
-            return@sc
-        }
-        alert(R.string.set_local_password, R.string.set_local_password_summary) {
-            val editTextBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
-                editView.hint = "password"
-            }
-            customView {
-                editTextBinding.root
-            }
-            onDismiss {
-                block.resume(null)
-            }
-            okButton {
-                LocalConfig.password = editTextBinding.editView.text.toString()
-            }
-            cancelButton {
-                LocalConfig.password = ""
-            }
-        }
-    }
-
-    private fun notifyAppCrash() {
-        if (!LocalConfig.appCrash || BuildConfig.DEBUG) {
-            return
-        }
-        LocalConfig.appCrash = false
-        alert(getString(R.string.draw), "检测到阅读发生了崩溃，是否打开崩溃日志以便报告问题？") {
-            yesButton {
-                showDialogFragment<CrashLogsDialog>()
-            }
-            noButton()
         }
     }
 
@@ -493,7 +377,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
 
     }
 
-    override fun openImportUi(type:Int, source: String) {
+    override fun openImportUi(type: Int, source: String) {
         when (type) {
             0 -> showDialogFragment(
                 ImportBookSourceDialog(source)
@@ -516,8 +400,8 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             if (!text.isNullOrBlank()) {
                 if ("#L:" in text) {
                     this@MainActivity.clearClip() //清理一下防重复
-                    val (url, type, customWord) = StringUtils.unShibboleth(text)
-                    when(type) {
+                    val (url, type, _) = StringUtils.unShibboleth(text)
+                    when (type) {
                         StringUtils.BOOK_SOURCE ->
                             showDialogFragment(ImportBookSourceDialog(url))
                         StringUtils.RSS_SOURCE ->
