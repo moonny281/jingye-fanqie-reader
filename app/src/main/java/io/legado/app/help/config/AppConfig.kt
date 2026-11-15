@@ -3,7 +3,6 @@ package io.legado.app.help.config
 import android.content.SharedPreferences
 import android.os.Build
 import io.legado.app.BuildConfig
-import io.legado.app.constant.AppConst
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.utils.GSON
@@ -13,14 +12,12 @@ import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getPrefInt
 import io.legado.app.utils.getPrefLong
 import io.legado.app.utils.getPrefString
-import io.legado.app.utils.isNightMode
 import io.legado.app.utils.parseIpsFromString
 import io.legado.app.utils.putPrefBoolean
 import io.legado.app.utils.putPrefInt
 import io.legado.app.utils.putPrefLong
 import io.legado.app.utils.putPrefString
 import io.legado.app.utils.removePref
-import io.legado.app.utils.sysConfiguration
 import io.legado.app.utils.toastOnUi
 import splitties.init.appCtx
 import java.net.InetAddress
@@ -28,13 +25,24 @@ import java.net.InetAddress
 @Suppress("MemberVisibilityCanBePrivate", "ConstPropertyName")
 object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val isCronet = appCtx.getPrefBoolean(PreferKey.cronet)
-    var useAntiAlias = appCtx.getPrefBoolean(PreferKey.antiAlias)
+    var useAntiAlias = appCtx.getPrefBoolean(PreferKey.antiAlias, true)
     var userAgent: String = getPrefUserAgent()
     var customHosts = appCtx.getPrefString(PreferKey.customHosts)
     var editTheme = appCtx.getPrefInt(PreferKey.editTheme, 0)
     var editThemeDark = appCtx.getPrefInt(PreferKey.editThemeDark, 0)
-    var editTemeAuto = appCtx.getPrefBoolean(PreferKey.editTemeAuto)
-    var isEInkMode = appCtx.getPrefString(PreferKey.themeMode, "3") == "3"
+    var editTemeAuto = false
+
+    /**
+     * 强制锁定原生墨水屏模式，主题不可切换，默认且唯一为墨水屏模式 ("3")
+     */
+    var isEInkMode: Boolean
+        get() = true
+        set(_) {}
+
+    var themeMode: String?
+        get() = "3"
+        set(_) {}
+
     var clickActionTL = appCtx.getPrefInt(PreferKey.clickActionTL, 2)
     var clickActionTC = appCtx.getPrefInt(PreferKey.clickActionTC, 2)
     var clickActionTR = appCtx.getPrefInt(PreferKey.clickActionTR, 1)
@@ -44,7 +52,6 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     var clickActionBL = appCtx.getPrefInt(PreferKey.clickActionBL, 2)
     var clickActionBC = appCtx.getPrefInt(PreferKey.clickActionBC, 1)
     var clickActionBR = appCtx.getPrefInt(PreferKey.clickActionBR, 1)
-    var themeMode = appCtx.getPrefString(PreferKey.themeMode, "3")
     var useDefaultCover = appCtx.getPrefBoolean(PreferKey.useDefaultCover, false)
     var optimizeRender = CanvasRecorderFactory.isSupport
             && appCtx.getPrefBoolean(PreferKey.optimizeRender, false)
@@ -66,8 +73,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             PreferKey.adaptSpecialStyle -> adaptSpecialStyle = appCtx.getPrefBoolean(PreferKey.adaptSpecialStyle, true)
 
             PreferKey.themeMode -> {
-                themeMode = appCtx.getPrefString(PreferKey.themeMode, "0")
-                isEInkMode = themeMode == "3"
+                // 保持墨水屏唯一锁定状态
             }
 
             PreferKey.clickActionTL -> clickActionTL =
@@ -115,9 +121,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
             PreferKey.editThemeDark -> editThemeDark = appCtx.getPrefInt(PreferKey.editThemeDark, 0)
 
-            PreferKey.editTemeAuto -> editTemeAuto = appCtx.getPrefBoolean(PreferKey.editTemeAuto)
-
-            PreferKey.antiAlias -> useAntiAlias = appCtx.getPrefBoolean(PreferKey.antiAlias)
+            PreferKey.antiAlias -> useAntiAlias = appCtx.getPrefBoolean(PreferKey.antiAlias, true)
 
             PreferKey.useDefaultCover -> useDefaultCover =
                 appCtx.getPrefBoolean(PreferKey.useDefaultCover, false)
@@ -160,28 +164,16 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         }
 
     var isNightTheme: Boolean
-        get() = when (themeMode) {
-            "1" -> false
-            "2" -> true
-            "3" -> false
-            else -> sysConfiguration.isNightMode
-        }
-        set(value) {
-            if (isNightTheme != value) {
-                if (value) {
-                    appCtx.putPrefString(PreferKey.themeMode, "2")
-                } else {
-                    appCtx.putPrefString(PreferKey.themeMode, "1")
-                }
-            }
-        }
+        get() = false
+        set(_) {}
+
     var showBookname: Int
         get() = appCtx.getPrefInt(PreferKey.showBooknameLayout, 0)
         set(value) {
             appCtx.putPrefInt(PreferKey.showBooknameLayout, value)
         }
     var bookshelfMargin: Int
-        get() = appCtx.getPrefInt(PreferKey.bookshelfMargin, 12)
+        get() = appCtx.getPrefInt(PreferKey.bookshelfMargin, 8)
         set(value) {
             appCtx.putPrefInt(PreferKey.bookshelfMargin, value)
         }
@@ -205,27 +197,19 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         }
 
     var readBrightness: Int
-        get() = if (isNightTheme) {
-            appCtx.getPrefInt(PreferKey.nightBrightness, 100)
-        } else {
-            appCtx.getPrefInt(PreferKey.brightness, 100)
-        }
+        get() = appCtx.getPrefInt(PreferKey.brightness, 100)
         set(value) {
-            if (isNightTheme) {
-                appCtx.putPrefInt(PreferKey.nightBrightness, value)
-            } else {
-                appCtx.putPrefInt(PreferKey.brightness, value)
-            }
+            appCtx.putPrefInt(PreferKey.brightness, value)
         }
 
     val textSelectAble: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.textSelectAble, true)
 
     val isTransparentStatusBar: Boolean
-        get() = appCtx.getPrefBoolean(PreferKey.transparentStatusBar, true)
+        get() = false
 
     val immNavigationBar: Boolean
-        get() = appCtx.getPrefBoolean(PreferKey.immNavigationBar, true)
+        get() = true
 
     val screenOrientation: String?
         get() = appCtx.getPrefString(PreferKey.screenOrientation)
@@ -336,7 +320,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         }
 
     val noAnimScrollPage: Boolean
-        get() = appCtx.getPrefBoolean(PreferKey.noAnimScrollPage, false)
+        get() = true
 
     const val defaultSpeechRate = 5
 
@@ -367,13 +351,8 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         }
 
     var elevation: Int
-        get() = if (isEInkMode) 0 else appCtx.getPrefInt(
-            PreferKey.barElevation,
-            AppConst.sysElevation
-        )
-        set(value) {
-            appCtx.putPrefInt(PreferKey.barElevation, value)
-        }
+        get() = 0
+        set(_) {}
 
     var readUrlInBrowser: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.readUrlOpenInBrowser)
@@ -707,10 +686,8 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         }
 
     var disableMangaPageAnim: Boolean
-        get() = appCtx.getPrefBoolean(PreferKey.disableMangaPageAnim, false)
-        set(value) {
-            appCtx.putPrefBoolean(PreferKey.disableMangaPageAnim, value)
-        }
+        get() = true
+        set(_) {}
 
     //漫画预加载数量
     var mangaPreDownloadNum
@@ -762,7 +739,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     //开启墨水屏模式
     var enableMangaEInk
-        get() = appCtx.getPrefBoolean(PreferKey.enableMangaEInk, false)
+        get() = appCtx.getPrefBoolean(PreferKey.enableMangaEInk, true)
         set(value) {
             appCtx.putPrefBoolean(PreferKey.enableMangaEInk, value)
         }
@@ -780,7 +757,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         }
 
     var enableMangaGray
-        get() = appCtx.getPrefBoolean(PreferKey.enableMangaGray, false)
+        get() = appCtx.getPrefBoolean(PreferKey.enableMangaGray, true)
         set(value) {
             appCtx.putPrefBoolean(PreferKey.enableMangaGray, value)
         }
@@ -821,6 +798,5 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefBoolean(PreferKey.welcomeShowIconDark, value)
         }
 
-    val autoUpdateVariant get() = appCtx.getPrefBoolean("autoUpdateVariant", true)
+    val autoUpdateVariant get() = false
 }
-

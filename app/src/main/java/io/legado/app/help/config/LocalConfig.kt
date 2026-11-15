@@ -17,10 +17,10 @@ by appCtx.getSharedPreferences("local", Context.MODE_PRIVATE) {
     private const val versionCodeKey = "appVersionCode"
 
     /**
-     * 本地密码,用来对需要备份的敏感信息加密,如 webdav 配置等
+     * 本地密码,用来对需要备份的敏感信息加密,如 webdav 配置等（默认置空免弹窗）
      */
     var password: String?
-        get() = getString("password", null)
+        get() = getString("password", "")
         set(value) {
             if (value != null) {
                 putString("password", value)
@@ -36,28 +36,28 @@ by appCtx.getSharedPreferences("local", Context.MODE_PRIVATE) {
         }
 
     var privacyPolicyOk: Boolean
-        get() = getBoolean("privacyPolicyOk")
+        get() = true
         set(value) {
             putBoolean("privacyPolicyOk", value)
         }
 
     val readHelpVersionIsLast: Boolean
-        get() = isLastVersion(1, "readHelpVersion", "firstRead")
+        get() = true
 
     val backupHelpVersionIsLast: Boolean
-        get() = isLastVersion(1, "backupHelpVersion", "firstBackup")
+        get() = true
 
     val readMenuHelpVersionIsLast: Boolean
-        get() = isLastVersion(1, "readMenuHelpVersion", "firstReadMenu")
+        get() = true
 
     val bookSourcesHelpVersionIsLast: Boolean
-        get() = isLastVersion(1, "bookSourceHelpVersion", "firstOpenBookSources")
+        get() = true
 
     val webDavBookHelpVersionIsLast: Boolean
-        get() = isLastVersion(1, "webDavBookHelpVersion", "firstOpenWebDavBook")
+        get() = true
 
     val ruleHelpVersionIsLast: Boolean
-        get() = isLastVersion(1, "ruleHelpVersion")
+        get() = true
 
     val needUpHttpTTS: Boolean
         get() = !isLastVersion(6, "httpTtsVersion")
@@ -83,13 +83,7 @@ by appCtx.getSharedPreferences("local", Context.MODE_PRIVATE) {
         }
 
     val isFirstOpenApp: Boolean
-        get() {
-            val value = getBoolean("firstOpen", true)
-            if (value) {
-                edit { putBoolean("firstOpen", false) }
-            }
-            return value
-        }
+        get() = false
 
     @Suppress("SameParameterValue")
     private fun isLastVersion(
@@ -123,7 +117,7 @@ by appCtx.getSharedPreferences("local", Context.MODE_PRIVATE) {
         }
 
     var appCrash: Boolean
-        get() = getBoolean("appCrash")
+        get() = false
         set(value) {
             putBoolean("appCrash", value)
         }
