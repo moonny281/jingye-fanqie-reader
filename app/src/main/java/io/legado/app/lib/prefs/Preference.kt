@@ -67,9 +67,8 @@ open class Preference(context: Context, attrs: AttributeSet) :
             }
             val iconView = viewHolder.findViewById(R.id.preference_icon)
             if (iconView is ImageView) {
-                iconView.isVisible = icon != null
-                iconView.setImageDrawable(icon)
-                iconView.setColorFilter(context.accentColor)
+                // 微信读书墨水屏纯黑白线性风格：设置列表隐藏装饰图标，仅保留纯文字线性排版
+                iconView.isVisible = false
             }
 
             if (weightLayoutRes != null && weightLayoutRes != 0 && viewId != null && viewId != 0) {

@@ -54,10 +54,7 @@ class OkHttpStreamFetcher(
     }
 
     override fun loadData(priority: Priority, callback: DataFetcher.DataCallback<in InputStream>) {
-        if (failUrl.contains(url.toStringUrl())) {
-            callback.onLoadFailed(NoStackTraceException("跳过加载失败的图片"))
-            return
-        }
+        // 不对图片 URL 永久拉黑，允许网络恢复或切换页面时重试加载封面
         val loadOnlyWifi = options.get(OkHttpModelLoader.loadOnlyWifiOption) ?: false
         if (loadOnlyWifi && !appCtx.isWifiConnect) {
             callback.onLoadFailed(NoStackTraceException("只在wifi加载图片"))
@@ -74,8 +71,18 @@ class OkHttpStreamFetcher(
             coroutineContext = coroutineContext
         ).getGlideUrl()
 
-        val requestBuilder = Request.Builder().url(analyzedUrl.toStringUrl())
+        var targetUrlStr = analyzedUrl.toStringUrl()
+        if (targetUrlStr.startsWith("http://") && (targetUrlStr.contains("byteimg.com") || targetUrlStr.contains("fqnovel") || targetUrlStr.contains("snssdk"))) {
+            targetUrlStr = "https://" + targetUrlStr.removePrefix("http://")
+        }
+        val requestBuilder = Request.Builder().url(targetUrlStr)
         requestBuilder.addHeaders(analyzedUrl.headers)
+        if (analyzedUrl.headers["User-Agent"].isNullOrBlank()) {
+            requestBuilder.header(
+                "User-Agent",
+                "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+            )
+        }
         val request: Request = requestBuilder.build()
         this.callback = callback
         call = if (manga) {

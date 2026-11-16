@@ -721,11 +721,11 @@ class BookInfoActivity :
     }
 
     private fun showCover(book: Book) {
-        // 0.4.3 微信读书墨水屏纯黑白线性无图模式：不加载书籍封面图片与高斯模糊背景图
         binding.bgBook.gone()
         binding.arcView?.gone()
-        binding.ivCoverC.gone()
-        binding.ivCover.gone()
+        binding.ivCoverC.visible()
+        binding.ivCover.visible()
+        binding.ivCover.load(book, false)
     }
 
     private fun upLoading(isLoading: Boolean, chapterList: List<BookChapter>? = null) {

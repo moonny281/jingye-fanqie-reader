@@ -65,8 +65,23 @@
             android:clickable="true"
             android:focusable="true"
             android:gravity="center"
-            android:paddingHorizontal="10dp"
+            android:paddingHorizontal="9dp"
             android:text="检测更新"
+            android:textColor="#FF000000"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btn_eink_refresh_cfg"
+            android:layout_width="wrap_content"
+            android:layout_height="34dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/selector_eink_button"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingHorizontal="9dp"
+            android:text="清残影"
             android:textColor="#FF000000"
             android:textSize="12sp"
             android:textStyle="bold" />

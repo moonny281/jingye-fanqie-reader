@@ -16,6 +16,7 @@ import android.widget.FrameLayout
 import androidx.activity.addCallback
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.viewbinding.ViewBinding
 import io.legado.app.R
 import io.legado.app.constant.AppConst
@@ -73,7 +74,8 @@ abstract class BaseActivity<VB : ViewBinding>(
     @SuppressLint("ObsoleteSdkInt")
     override fun onCreate(savedInstanceState: Bundle?) {
         window.decorView.disableAutoFill()
-        window.setWindowAnimations(0)
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+        window.setWindowAnimations(R.style.Animation_EInk_None)
         initTheme()
         super.onCreate(savedInstanceState)
         setupSystemBar()
@@ -129,6 +131,11 @@ abstract class BaseActivity<VB : ViewBinding>(
     final override fun onCreateOptionsMenu(menu: Menu): Boolean {
         val bool = onCompatCreateOptionsMenu(menu)
         menu.applyTint(this, toolBarTheme)
+        findViewById<TitleBar>(R.id.title_bar)?.toolbar?.let { tb ->
+            EinkRefreshHelper.attachLinearOverflowMenu(tb) { item ->
+                onOptionsItemSelected(item)
+            }
+        }
         return bool
     }
 

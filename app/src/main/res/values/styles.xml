@@ -1,56 +1,123 @@
 <resources>
 
-    //**************************************************************Theme******************************************************************************//
+    <!-- 0.4.3 全局零动画样式：彻底禁用 Activity / Window / Dialog / PopupMenu / OverflowMenu 进出场动画 -->
+    <style name="Animation.EInk.None" parent="@android:style/Animation">
+        <item name="android:windowEnterAnimation">@null</item>
+        <item name="android:windowExitAnimation">@null</item>
+        <item name="android:activityOpenEnterAnimation">@null</item>
+        <item name="android:activityOpenExitAnimation">@null</item>
+        <item name="android:activityCloseEnterAnimation">@null</item>
+        <item name="android:activityCloseExitAnimation">@null</item>
+        <item name="android:taskOpenEnterAnimation">@null</item>
+        <item name="android:taskOpenExitAnimation">@null</item>
+        <item name="android:taskCloseEnterAnimation">@null</item>
+        <item name="android:taskCloseExitAnimation">@null</item>
+        <item name="android:fragmentOpenEnterAnimation">@null</item>
+        <item name="android:fragmentOpenExitAnimation">@null</item>
+        <item name="android:fragmentCloseEnterAnimation">@null</item>
+        <item name="android:fragmentCloseExitAnimation">@null</item>
+    </style>
 
-    <!-- 亮色主题 -->
+    <!-- 亮色主题（唯一原生 1-bit 墨水屏主题） -->
     <style name="AppTheme.Light" parent="Base.AppTheme">
         <item name="actionBarStyle">@style/AppTheme.AppBarOverlay.Light</item>
     </style>
 
-    <!-- 暗色主题 -->
+    <!-- 暗色主题（强制映射为同一 1-bit 墨水屏主题） -->
     <style name="AppTheme.Dark" parent="Base.AppTheme">
-        <item name="actionBarStyle">@style/AppTheme.AppBarOverlay.Dark</item>
+        <item name="actionBarStyle">@style/AppTheme.AppBarOverlay.Light</item>
     </style>
 
     <!-- 透明主题 -->
     <style name="AppTheme.Transparent" parent="Base.AppTheme">
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@style/Animation.EInk.None</item>
     </style>
 
     <!-- Welcome主题 -->
     <style name="AppTheme.Welcome" parent="Base.AppTheme">
         <item name="android:windowNoTitle">true</item>
+        <item name="android:windowAnimationStyle">@style/Animation.EInk.None</item>
     </style>
 
-    <!-- Base application theme. -->
-    <style name="Base.AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+    <!-- Base application theme: 1-bit 线性墨水屏全局基类 -->
+    <style name="Base.AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryDark">@color/primaryDark</item>
         <item name="colorAccent">@color/accent</item>
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:windowAnimationStyle">@style/Animation.EInk.None</item>
+        <item name="android:popupAnimationStyle">@style/Animation.EInk.None</item>
         <item name="actionOverflowMenuStyle">@style/Style.PopupMenu</item>
-        <item name="android:itemTextAppearance">@style/Style.MenuItemText</item>
+        <item name="android:actionOverflowMenuStyle">@style/Style.PopupMenu</item>
+        <item name="popupMenuStyle">@style/Style.PopupMenu</item>
         <item name="android:popupMenuStyle">@style/Style.PopupMenu</item>
-        <item name="android:statusBarColor">@color/transparent</item>
+        <item name="listPopupWindowStyle">@style/Style.ListPopupWindow.EInk</item>
+        <item name="android:listPopupWindowStyle">@style/Style.ListPopupWindow.EInk</item>
+        <item name="dropDownListViewStyle">@style/Style.DropDownListView.EInk</item>
+        <item name="android:dropDownListViewStyle">@style/Style.DropDownListView.EInk</item>
+        <item name="android:itemTextAppearance">@style/Style.MenuItemText</item>
+        <item name="android:statusBarColor">@color/white</item>
+        <item name="android:navigationBarColor">@color/white</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:colorControlHighlight">#00000000</item>
+        <item name="colorControlHighlight">#00000000</item>
+        <item name="android:selectableItemBackground">@drawable/selector_eink_list_item</item>
+        <item name="selectableItemBackground">@drawable/selector_eink_list_item</item>
+        <item name="android:selectableItemBackgroundBorderless">@drawable/selector_eink_list_item</item>
+        <item name="selectableItemBackgroundBorderless">@drawable/selector_eink_list_item</item>
+        <item name="android:checkboxStyle">@style/Widget.EInk.CheckBox</item>
+        <item name="checkboxStyle">@style/Widget.EInk.CheckBox</item>
+        <item name="android:radioButtonStyle">@style/Widget.EInk.RadioButton</item>
+        <item name="radioButtonStyle">@style/Widget.EInk.RadioButton</item>
+        <item name="switchStyle">@style/Widget.EInk.Switch</item>
+        <item name="android:seekBarStyle">@style/Widget.EInk.SeekBar</item>
+        <item name="seekBarStyle">@style/Widget.EInk.SeekBar</item>
+        <item name="alertDialogTheme">@style/Style.EInk.AlertDialog</item>
+        <item name="android:alertDialogTheme">@style/Style.EInk.AlertDialog</item>
+        <item name="dialogTheme">@style/Style.EInk.AlertDialog</item>
+        <item name="android:dialogTheme">@style/Style.EInk.AlertDialog</item>
     </style>
 
     <style name="AppTheme.AppBarOverlay.Light" parent="ThemeOverlay.AppCompat.Light">
-        <item name="colorAccent">@color/md_grey_900</item>
+        <item name="colorAccent">@color/black</item>
+        <item name="android:textColorPrimary">@color/black</item>
+        <item name="android:windowAnimationStyle">@style/Animation.EInk.None</item>
+        <item name="android:popupAnimationStyle">@style/Animation.EInk.None</item>
+        <item name="actionOverflowMenuStyle">@style/Style.PopupMenu</item>
+        <item name="popupMenuStyle">@style/Style.PopupMenu</item>
     </style>
 
-    <style name="AppTheme.AppBarOverlay.Dark" parent="ThemeOverlay.AppCompat.Dark">
-        <item name="colorAccent">@color/md_grey_50</item>
-    </style>
+    <style name="AppTheme.AppBarOverlay.Dark" parent="AppTheme.AppBarOverlay.Light" />
 
+    <!-- Toolbar 三点菜单与弹出层：强制 1-bit 纯白底黑框、0 阴影、0 动画 -->
     <style name="AppTheme.PopupOverlay" parent="ThemeOverlay.AppCompat.Light">
         <item name="overlapAnchor">false</item>
-        <item name="colorAccent">@color/md_grey_900</item>
+        <item name="android:overlapAnchor">false</item>
+        <item name="colorAccent">@color/black</item>
+        <item name="android:textColorPrimary">@color/black</item>
+        <item name="android:textColor">@color/black</item>
+        <item name="android:popupBackground">@drawable/bg_popup_menu</item>
+        <item name="popupMenuBackground">@drawable/bg_popup_menu</item>
+        <item name="android:popupElevation">0dp</item>
+        <item name="android:windowAnimationStyle">@style/Animation.EInk.None</item>
+        <item name="android:popupAnimationStyle">@style/Animation.EInk.None</item>
+        <item name="actionOverflowMenuStyle">@style/Style.PopupMenu</item>
+        <item name="android:actionOverflowMenuStyle">@style/Style.PopupMenu</item>
+        <item name="popupMenuStyle">@style/Style.PopupMenu</item>
+        <item name="android:popupMenuStyle">@style/Style.PopupMenu</item>
+        <item name="listPopupWindowStyle">@style/Style.ListPopupWindow.EInk</item>
+        <item name="android:listPopupWindowStyle">@style/Style.ListPopupWindow.EInk</item>
+        <item name="dropDownListViewStyle">@style/Style.DropDownListView.EInk</item>
+        <item name="android:dropDownListViewStyle">@style/Style.DropDownListView.EInk</item>
+        <item name="android:colorControlHighlight">#00000000</item>
+        <item name="colorControlHighlight">#00000000</item>
+        <item name="android:selectableItemBackground">@drawable/selector_eink_list_item</item>
+        <item name="selectableItemBackground">@drawable/selector_eink_list_item</item>
     </style>
 
-    <style name="Spinner" parent="android:Theme.Holo.Light" />
-
-    //**********System Style******************//
+    <style name="Spinner" parent="Base.AppTheme" />
 
     <style name="Style.NavigationView" parent="android:Widget">
         <item name="android:listPreferredItemHeightSmall">44dp</item>
@@ -61,53 +128,122 @@
     </style>
 
     <style name="Style.MenuItemText" parent="@android:style/TextAppearance.Widget.IconMenu.Item">
-        <item name="android:textColor">@color/menu_color_default</item>
-        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">@color/black</item>
+        <item name="android:textSize">15sp</item>
     </style>
 
     <style name="Style.PopupMenu" parent="Widget.AppCompat.PopupMenu">
         <item name="android:popupBackground">@drawable/bg_popup_menu</item>
+        <item name="android:popupElevation">0dp</item>
+        <item name="android:popupAnimationStyle">@style/Animation.EInk.None</item>
+        <item name="overlapAnchor">false</item>
+        <item name="android:overlapAnchor">false</item>
+        <item name="android:dropDownSelector">@drawable/selector_eink_list_item</item>
     </style>
 
+    <style name="Style.ListPopupWindow.EInk" parent="Widget.AppCompat.ListPopupWindow">
+        <item name="android:popupBackground">@drawable/bg_popup_menu</item>
+        <item name="android:popupElevation">0dp</item>
+        <item name="android:popupAnimationStyle">@style/Animation.EInk.None</item>
+        <item name="overlapAnchor">false</item>
+        <item name="android:overlapAnchor">false</item>
+        <item name="android:dropDownSelector">@drawable/selector_eink_list_item</item>
+    </style>
 
-    <style name="Activity.Permission" parent="Theme.AppCompat.DayNight.NoActionBar">
+    <style name="Style.DropDownListView.EInk" parent="Widget.AppCompat.ListView.DropDown">
+        <item name="android:divider">@drawable/bg_eink_divider_line</item>
+        <item name="android:dividerHeight">1px</item>
+        <item name="android:listSelector">@drawable/selector_eink_list_item</item>
+        <item name="android:background">@color/white</item>
+        <item name="android:overScrollMode">never</item>
+    </style>
+
+    <style name="Style.EInk.AlertDialog" parent="Theme.AppCompat.Light.Dialog.Alert">
+        <item name="android:windowBackground">@drawable/bg_eink_border_dialog</item>
+        <item name="android:windowAnimationStyle">@style/Animation.EInk.None</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="colorAccent">@color/black</item>
+        <item name="colorPrimary">@color/black</item>
+        <item name="android:textColorPrimary">@color/black</item>
+        <item name="android:colorControlHighlight">#00000000</item>
+        <item name="colorControlHighlight">#00000000</item>
+    </style>
+
+    <!-- 1-Bit 线性开关、复选框、单选框与滑块全局默认样式 -->
+    <style name="Widget.EInk.CheckBox" parent="Widget.AppCompat.CompoundButton.CheckBox">
+        <item name="android:button">@drawable/eink_checkbox_1bit</item>
+        <item name="buttonCompat">@drawable/eink_checkbox_1bit</item>
+        <item name="android:buttonTint">@null</item>
+        <item name="buttonTint">@null</item>
+        <item name="android:background">@null</item>
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="Widget.EInk.RadioButton" parent="Widget.AppCompat.CompoundButton.RadioButton">
+        <item name="android:button">@drawable/eink_radiobutton_1bit</item>
+        <item name="buttonCompat">@drawable/eink_radiobutton_1bit</item>
+        <item name="android:buttonTint">@null</item>
+        <item name="buttonTint">@null</item>
+        <item name="android:background">@null</item>
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="Widget.EInk.Switch" parent="Widget.AppCompat.CompoundButton.Switch">
+        <item name="track">@drawable/eink_switch_track_1bit</item>
+        <item name="android:thumb">@drawable/eink_switch_thumb_1bit</item>
+        <item name="trackTint">@null</item>
+        <item name="thumbTint">@null</item>
+        <item name="android:background">@null</item>
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="Widget.EInk.SeekBar" parent="Widget.AppCompat.SeekBar">
+        <item name="android:progressDrawable">@drawable/eink_seekbar_progress_1bit</item>
+        <item name="android:thumb">@drawable/eink_seekbar_thumb_1bit</item>
+        <item name="android:thumbTint">@null</item>
+        <item name="android:progressTint">@null</item>
+        <item name="android:background">@null</item>
+        <item name="android:splitTrack">false</item>
+    </style>
+
+    <style name="Activity.Permission" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowDisablePreview">true</item>
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowTranslucentStatus">true</item>
-        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:windowAnimationStyle">@style/Animation.EInk.None</item>
     </style>
 
     <style name="ToolbarTitle" parent="@style/TextAppearance.Widget.AppCompat.Toolbar.Title">
-        <item name="android:textSize">20sp</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:textColor">#FF000000</item>
+        <item name="android:textStyle">bold</item>
     </style>
 
-    //*******************Widget Style**********************************//
-
+    <!-- 阴影全部替换为 1px 纯黑线性分割线 -->
     <style name="Style.Shadow.Top" parent="android:Widget">
         <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">@dimen/shadow_height</item>
-        <item name="android:background">@drawable/bg_shadow_top</item>
+        <item name="android:layout_height">1px</item>
+        <item name="android:background">@drawable/bg_eink_divider_line</item>
     </style>
 
     <style name="Style.Shadow.Bottom" parent="android:Widget">
         <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">@dimen/shadow_height</item>
-        <item name="android:background">@drawable/bg_shadow_bottom</item>
+        <item name="android:layout_height">1px</item>
+        <item name="android:background">@drawable/bg_eink_divider_line</item>
     </style>
-
 
     <style name="Style.Line" parent="android:Widget">
         <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">0.5dp</item>
-        <item name="android:background">@color/divider</item>
+        <item name="android:layout_height">1px</item>
+        <item name="android:background">#FF000000</item>
     </style>
 
     <style name="Style.Text.Primary.Normal" parent="android:Widget">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:textSize">@dimen/font_size_normal</item>
-        <item name="android:textColor">#000</item>
+        <item name="android:textColor">#FF000000</item>
         <item name="android:includeFontPadding">false</item>
     </style>
 
@@ -119,7 +255,7 @@
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:textSize">@dimen/font_size_normal</item>
-        <item name="android:textColor">#676767</item>
+        <item name="android:textColor">#FF000000</item>
         <item name="android:includeFontPadding">false</item>
     </style>
 
@@ -127,9 +263,10 @@
         <item name="android:layout_width">wrap_content</item>
     </style>
 
-    <style name="dialog_style" parent="@android:style/Theme.Dialog">
+    <style name="dialog_style" parent="@style/Style.EInk.AlertDialog">
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowNoTitle">true</item>
+        <item name="android:windowAnimationStyle">@style/Animation.EInk.None</item>
     </style>
 
 </resources>

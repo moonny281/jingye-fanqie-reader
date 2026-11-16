@@ -27,6 +27,9 @@ class PopupAction(private val context: Context) :
         isTouchable = true
         isOutsideTouchable = false
         isFocusable = true
+        animationStyle = io.legado.app.R.style.Animation_EInk_None
+        elevation = 0f
+        binding.root.setBackgroundResource(io.legado.app.R.drawable.bg_popup_menu)
 
         binding.recyclerView.adapter = adapter
     }

@@ -34,7 +34,7 @@ class BooksAdapterList2(
         item: Book,
         payloads: MutableList<Any>
     ) = binding.run {
-        ivCover.gone()
+        ivCover.visible()
         ivAuthor.gone()
         ivLast.gone()
         vwForeground.gone()
@@ -44,6 +44,7 @@ class BooksAdapterList2(
             tvAuthor.text = item.author.ifBlank { "未知" }
             tvRead.text = "读至：${item.durChapterTitle?.takeIf { it.isNotBlank() } ?: "未读"}"
             tvLast.text = "最新：${item.latestChapterTitle?.takeIf { it.isNotBlank() } ?: "无"}"
+            ivCover.load(item, false, fragment, lifecycle)
             upRefresh(binding, item)
             upLastUpdateTime(binding, item)
         } else {
@@ -55,6 +56,7 @@ class BooksAdapterList2(
                         "author" -> tvAuthor.text = item.author.ifBlank { "未知" }
                         "dur" -> tvRead.text = "读至：${item.durChapterTitle?.takeIf { s -> s.isNotBlank() } ?: "未读"}"
                         "last" -> tvLast.text = "最新：${item.latestChapterTitle?.takeIf { s -> s.isNotBlank() } ?: "无"}"
+                        "cover" -> ivCover.load(item, false, fragment, lifecycle)
                         "refresh" -> upRefresh(binding, item)
                         "lastUpdateTime" -> upLastUpdateTime(binding, item)
                     }

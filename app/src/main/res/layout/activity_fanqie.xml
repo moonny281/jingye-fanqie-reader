@@ -36,7 +36,7 @@
             android:layout_weight="1"
             android:ellipsize="end"
             android:singleLine="true"
-            android:text="番茄书城 · 纯净墨水屏版"
+            android:text="番茄书城 · 墨水屏版"
             android:textColor="#FF000000"
             android:textSize="16sp"
             android:textStyle="bold" />
@@ -303,12 +303,12 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="纯黑白线性无图模式：点击搜索结果可立即阅读、全本后台离线或导出含目录 TXT/EPUB"
+            android:text="点击搜索结果可直接立即阅读、全本后台离线或导出含目录 TXT/EPUB"
             android:textColor="#FF000000"
             android:textSize="12sp" />
     </LinearLayout>
 
-    <!-- 书籍详情与流式阅读/后台断点下载/原生目录导出纯黑白线性卡片（移除封面图片） -->
+    <!-- 书籍详情与流式阅读/后台断点下载/原生目录导出卡片（保留书籍封面 + 纯黑白线性边框） -->
     <LinearLayout
         android:id="@+id/bookInfoCard"
         android:layout_width="match_parent"
@@ -319,68 +319,85 @@
         android:padding="14dp"
         android:visibility="gone">
 
-        <ImageView
-            android:id="@+id/ivDetailCover"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:contentDescription="封面"
-            android:visibility="gone" />
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/tvBookTitle"
+            <ImageView
+                android:id="@+id/ivDetailCover"
+                android:layout_width="76dp"
+                android:layout_height="104dp"
+                android:background="@drawable/bg_eink_cover_border"
+                android:contentDescription="封面"
+                android:padding="1dp"
+                android:scaleType="centerCrop"
+                android:src="@drawable/bg_eink_default_cover_linear" />
+
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
                 android:layout_weight="1"
-                android:textColor="#FF000000"
-                android:textSize="18sp"
-                android:textStyle="bold" />
+                android:orientation="vertical">
 
-            <Button
-                android:id="@+id/btnBackToSearch"
-                android:layout_width="wrap_content"
-                android:layout_height="28dp"
-                android:background="@drawable/selector_eink_button"
-                android:minWidth="0dp"
-                android:minHeight="0dp"
-                android:paddingHorizontal="10dp"
-                android:stateListAnimator="@null"
-                android:text="返回列表"
-                android:textColor="#FF000000"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                android:visibility="gone" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvBookTitle"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textColor="#FF000000"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/btnBackToSearch"
+                        android:layout_width="wrap_content"
+                        android:layout_height="28dp"
+                        android:background="@drawable/selector_eink_button"
+                        android:minWidth="0dp"
+                        android:minHeight="0dp"
+                        android:paddingHorizontal="10dp"
+                        android:stateListAnimator="@null"
+                        android:text="返回列表"
+                        android:textColor="#FF000000"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvBookAuthor"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="#FF000000"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/tvBookLatestChapter"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="#FF000000"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvBookCheckpointInfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:textColor="#FF000000"
+                    android:textSize="12sp" />
+            </LinearLayout>
         </LinearLayout>
-
-        <TextView
-            android:id="@+id/tvBookAuthor"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:textColor="#FF000000"
-            android:textSize="13sp" />
-
-        <TextView
-            android:id="@+id/tvBookLatestChapter"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:textColor="#FF000000"
-            android:textSize="12sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tvBookCheckpointInfo"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:textColor="#FF000000"
-            android:textSize="12sp" />
 
         <TextView
             android:id="@+id/tvBookIntro"

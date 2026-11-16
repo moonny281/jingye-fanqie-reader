@@ -1,6 +1,14 @@
 package io.legado.app.fanqie
 
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.concurrent.ConcurrentHashMap
 import io.legado.app.constant.BookType
 import io.legado.app.constant.EventBus
 import io.legado.app.data.appDb
@@ -37,6 +45,151 @@ object FanqieLegadoBridge {
         get() = File(appCtx.filesDir, "fanqie_books").apply { mkdirs() }
 
     private val remoteClient = FanqieRemoteClient()
+
+    private val coverRepairScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val repairingCovers = ConcurrentHashMap.newKeySet<String>()
+
+    fun localCoverFile(fanqieBookId: String): File =
+        File(booksDir, "fanqie_${fanqieBookId}_cover.jpg")
+
+    fun localCoverFileForBook(book: Book): File {
+        val tag = parseTag(book)
+        if (tag != null && tag.fanqieBookId.isNotBlank()) {
+            return localCoverFile(tag.fanqieBookId)
+        }
+        val key = MD5Utils.md5Encode16(book.bookUrl.ifBlank { "${book.name}_${book.author}" })
+        return File(booksDir, "shelf_${key}_cover.jpg")
+    }
+
+    fun downloadAndCacheCover(targetFile: File, rawCoverUrl: String?): String {
+        val normUrl = FanqieCrawler.normalizeCoverUrl(rawCoverUrl)
+        if (targetFile.isFile && targetFile.length() > 256L) {
+            return targetFile.absolutePath
+        }
+        if (normUrl.isBlank()) return ""
+        try {
+            val conn = (URL(normUrl).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 10000
+                readTimeout = 10000
+                instanceFollowRedirects = true
+                setRequestProperty(
+                    "User-Agent",
+                    "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                )
+            }
+            try {
+                if (conn.responseCode in 200..299) {
+                    val bytes = conn.inputStream.use { it.readBytes() }
+                    if (bytes.size > 256) {
+                        targetFile.parentFile?.mkdirs()
+                        val tmp = File(targetFile.parentFile, "${targetFile.name}.tmp")
+                        tmp.writeBytes(bytes)
+                        if (targetFile.exists()) targetFile.delete()
+                        tmp.renameTo(targetFile)
+                        return targetFile.absolutePath
+                    }
+                }
+            } finally {
+                conn.disconnect()
+            }
+        } catch (_: Throwable) {
+        }
+        return normUrl
+    }
+
+    /**
+     * 同步检查本地是否已有缓存的封面文件或元数据封面 URL
+     */
+    fun resolveCachedCoverSync(book: Book): String? {
+        val cur = book.getDisplayCover()?.trim().orEmpty()
+        if (cur.isNotEmpty()) {
+            if (cur.startsWith("http")) return FanqieCrawler.normalizeCoverUrl(cur)
+            val f = if (cur.startsWith("file://")) File(Uri.parse(cur).path ?: "") else File(cur)
+            if (f.isFile && f.length() > 256L) return f.absolutePath
+        }
+        val localFile = localCoverFileForBook(book)
+        if (localFile.isFile && localFile.length() > 256L) {
+            return localFile.absolutePath
+        }
+        val tag = parseTag(book)
+        if (tag != null) {
+            val metaCover = FanqieChapterCacheStore.loadMetadata(tag.fanqieBookId)?.coverUrl
+            val norm = FanqieCrawler.normalizeCoverUrl(metaCover)
+            if (norm.isNotEmpty()) return norm
+        }
+        return null
+    }
+
+    /**
+     * 异步自动补全/修复书架书籍封面（解决已有书架书籍 coverUrl 为空或未缓存到本地的问题）
+     */
+    fun ensureBookCoverAsync(book: Book, onRepaired: ((String) -> Unit)? = null) {
+        val syncCover = resolveCachedCoverSync(book)
+        if (!syncCover.isNullOrBlank() && !syncCover.startsWith("http")) {
+            if (book.coverUrl != syncCover) {
+                book.coverUrl = syncCover
+            }
+            onRepaired?.invoke(syncCover)
+            return
+        }
+        val bookKey = book.bookUrl.ifBlank { "${book.name}_${book.author}" }
+        if (!repairingCovers.add(bookKey)) return
+
+        coverRepairScope.launch {
+            try {
+                val tag = parseTag(book)
+                val targetFile = localCoverFileForBook(book)
+                var candidateUrl = syncCover.orEmpty()
+
+                if (candidateUrl.isBlank() && tag != null) {
+                    val savedMeta = FanqieChapterCacheStore.loadMetadata(tag.fanqieBookId)
+                    candidateUrl = FanqieCrawler.normalizeCoverUrl(savedMeta?.coverUrl)
+                }
+
+                val crawler = newLocalCrawler()
+                if (candidateUrl.isBlank() && tag != null) {
+                    try {
+                        val meta = crawler.fetchMetadata(tag.fanqieBookId, forceRefresh = true)
+                        candidateUrl = FanqieCrawler.normalizeCoverUrl(meta.coverUrl)
+                    } catch (_: Throwable) {
+                    }
+                }
+
+                if (candidateUrl.isBlank() && book.name.isNotBlank()) {
+                    try {
+                        val cleanName = book.name.replace(Regex("[《》\\[\\]()（）]"), "").trim()
+                        if (cleanName.isNotEmpty()) {
+                            val results = crawler.searchBooks(cleanName)
+                            val matched = (if (tag != null) results.firstOrNull { it.bookId == tag.fanqieBookId && it.coverUrl.isNotBlank() } else null)
+                                ?: results.firstOrNull { it.title == cleanName && it.coverUrl.isNotBlank() }
+                                ?: results.firstOrNull { it.coverUrl.isNotBlank() }
+                            candidateUrl = FanqieCrawler.normalizeCoverUrl(matched?.coverUrl)
+                        }
+                    } catch (_: Throwable) {
+                    }
+                }
+
+                if (candidateUrl.isNotBlank()) {
+                    val finalCover = downloadAndCacheCover(targetFile, candidateUrl)
+                    if (finalCover.isNotBlank()) {
+                        book.coverUrl = finalCover
+                        try {
+                            appDb.bookDao.update(book)
+                        } catch (_: Throwable) {
+                        }
+                        mainHandler.post {
+                            onRepaired?.invoke(finalCover)
+                            postEvent(EventBus.UP_BOOKSHELF, book.bookUrl)
+                        }
+                    }
+                }
+            } finally {
+                repairingCovers.remove(bookKey)
+            }
+        }
+    }
+
 
     fun newLocalCrawler() = FanqieCrawler(
         cacheFile = deviceCacheFile,
@@ -241,6 +394,12 @@ object FanqieLegadoBridge {
         val latestTitle = meta.effectiveLatestChapter()
         val isPartial = tagInfo.isPartial && newChapters > 0
 
+        if (meta.coverUrl.isNotBlank()) {
+            val cachedCover = downloadAndCacheCover(localCoverFile(tagInfo.fanqieBookId), meta.coverUrl)
+            if (cachedCover.isNotBlank()) {
+                book.coverUrl = cachedCover
+            }
+        }
         book.customTag = encodeTag(tagInfo.fanqieBookId, localCount, remoteCount, isPartial)
         book.latestChapterTitle = if (newChapters > 0) {
             "[待续${newChapters}章] ${latestTitle.ifBlank { "共${remoteCount}章" }}"
@@ -299,6 +458,14 @@ object FanqieLegadoBridge {
             ?: appDb.bookDao.getBook(fileUriStr)
             ?: appDb.bookDao.getBook(cleanTitle, cleanAuthor)
 
+        val rawCoverCandidate = coverUrl.ifBlank {
+            FanqieChapterCacheStore.loadMetadata(fanqieBookId)?.coverUrl.orEmpty()
+        }.ifBlank {
+            existing?.coverUrl.orEmpty()
+        }
+        val resolvedCoverPath = downloadAndCacheCover(localCoverFile(fanqieBookId), rawCoverCandidate)
+            .ifBlank { existing?.coverUrl.orEmpty() }
+
         val effectiveRemote = maxOf(remoteTotalChapters, downloadedChapters)
         val pendingCount = (effectiveRemote - downloadedChapters).coerceAtLeast(0)
         val displayLatest = when {
@@ -337,7 +504,7 @@ object FanqieLegadoBridge {
                 this.originName = "${cleanTitle}.txt"
                 this.name = cleanTitle
                 this.author = cleanAuthor
-                if (coverUrl.isNotBlank()) this.coverUrl = coverUrl
+                if (resolvedCoverPath.isNotBlank()) this.coverUrl = resolvedCoverPath
                 if (intro.isNotBlank()) this.intro = intro
                 this.charset = "UTF-8"
                 this.type = BookType.text or BookType.local
@@ -365,7 +532,7 @@ object FanqieLegadoBridge {
                 author = cleanAuthor,
                 kind = listOf("番茄小说", serialStatus).filter { it.isNotBlank() }.joinToString(","),
                 customTag = encodeTag(fanqieBookId, downloadedChapters, effectiveRemote, isPartial),
-                coverUrl = coverUrl.ifBlank { null },
+                coverUrl = resolvedCoverPath.ifBlank { null },
                 intro = intro.ifBlank { null },
                 charset = "UTF-8",
                 type = BookType.text or BookType.local,
@@ -424,6 +591,7 @@ object FanqieLegadoBridge {
         fanqieBookId: String,
         titleHint: String = "",
         authorHint: String = "",
+        coverHint: String = "",
         shouldStop: (() -> Boolean)? = null,
         onProgress: (FanqieProgress) -> Unit
     ): Book {
@@ -436,12 +604,13 @@ object FanqieLegadoBridge {
             shouldStop = shouldStop,
             onCheckpoint = { downloadedCount, totalCount, latestTitle, checkpointBytes, checkpointToc, updatedCache ->
                 FanqieChapterCacheStore.saveCachedMap(fanqieBookId, updatedCache)
+                val savedMeta = FanqieChapterCacheStore.loadMetadata(fanqieBookId)
                 saveOrUpdateLegadoBook(
                     fanqieBookId = fanqieBookId,
-                    title = titleHint,
-                    author = authorHint,
-                    coverUrl = "",
-                    intro = "",
+                    title = savedMeta?.title?.ifBlank { titleHint } ?: titleHint,
+                    author = savedMeta?.author?.ifBlank { authorHint } ?: authorHint,
+                    coverUrl = savedMeta?.coverUrl?.ifBlank { coverHint } ?: coverHint,
+                    intro = savedMeta?.intro.orEmpty(),
                     wordCountStr = "",
                     serialStatus = "",
                     downloadedChapters = downloadedCount,
@@ -460,7 +629,7 @@ object FanqieLegadoBridge {
             fanqieBookId = outcome.metadata.bookId,
             title = outcome.metadata.title.ifBlank { titleHint },
             author = outcome.metadata.author.ifBlank { authorHint },
-            coverUrl = outcome.metadata.coverUrl,
+            coverUrl = outcome.metadata.coverUrl.ifBlank { coverHint },
             intro = outcome.metadata.intro,
             wordCountStr = outcome.metadata.formattedWordCount(),
             serialStatus = outcome.metadata.serialStatus,

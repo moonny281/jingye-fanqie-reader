@@ -28,6 +28,7 @@ class FanqieDownloadService : Service() {
         const val EXTRA_FANQIE_BOOK_ID = "fanqie_book_id"
         const val EXTRA_BOOK_TITLE = "book_title"
         const val EXTRA_BOOK_AUTHOR = "book_author"
+        const val EXTRA_BOOK_COVER = "book_cover"
     }
 
     private val executor = Executors.newSingleThreadExecutor()
@@ -52,6 +53,7 @@ class FanqieDownloadService : Service() {
         val fanqieBookId = intent?.getStringExtra(EXTRA_FANQIE_BOOK_ID).orEmpty()
         val titleHint = intent?.getStringExtra(EXTRA_BOOK_TITLE).orEmpty().ifBlank { "番茄小说" }
         val authorHint = intent?.getStringExtra(EXTRA_BOOK_AUTHOR).orEmpty()
+        val coverHint = intent?.getStringExtra(EXTRA_BOOK_COVER).orEmpty()
 
         if (fanqieBookId.isBlank()) {
             stopSelf()
@@ -72,13 +74,13 @@ class FanqieDownloadService : Service() {
         }
 
         executor.execute {
-            runDownloadJob(fanqieBookId, titleHint, authorHint)
+            runDownloadJob(fanqieBookId, titleHint, authorHint, coverHint)
         }
 
         return START_NOT_STICKY
     }
 
-    private fun runDownloadJob(fanqieBookId: String, titleHint: String, authorHint: String) {
+    private fun runDownloadJob(fanqieBookId: String, titleHint: String, authorHint: String, coverHint: String = "") {
         var lastNotifTime = 0L
 
         try {
@@ -86,6 +88,7 @@ class FanqieDownloadService : Service() {
                 fanqieBookId = fanqieBookId,
                 titleHint = titleHint,
                 authorHint = authorHint,
+                coverHint = coverHint,
                 shouldStop = { FanqieDownloadManager.shouldStop(fanqieBookId) },
                 onProgress = { prog ->
                     val bookTitle = prog.title.ifBlank { titleHint }

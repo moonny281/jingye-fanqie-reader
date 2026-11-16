@@ -12,6 +12,7 @@ import androidx.appcompat.view.SupportMenuInflater
 import androidx.appcompat.widget.Toolbar
 import androidx.fragment.app.Fragment
 import io.legado.app.R
+import io.legado.app.eink.EinkRefreshHelper
 import io.legado.app.ui.widget.TitleBar
 import io.legado.app.utils.applyTint
 
@@ -62,6 +63,10 @@ abstract class BaseFragment(@LayoutRes layoutID: Int) : Fragment(layoutID) {
             it.setOnMenuItemClickListener { item ->
                 onCompatOptionsItemSelected(item)
                 true
+            }
+
+            EinkRefreshHelper.attachLinearOverflowMenu(it) { item ->
+                onCompatOptionsItemSelected(item)
             }
         }
     }

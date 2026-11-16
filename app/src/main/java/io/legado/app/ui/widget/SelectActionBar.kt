@@ -12,17 +12,10 @@ import androidx.annotation.StringRes
 import androidx.appcompat.widget.PopupMenu
 import io.legado.app.R
 import io.legado.app.databinding.ViewSelectActionBarBinding
+import io.legado.app.eink.EinkRefreshHelper
 import io.legado.app.lib.theme.TintHelper
-import io.legado.app.lib.theme.accentColor
-import io.legado.app.lib.theme.bottomBackground
-import io.legado.app.lib.theme.elevation
-import io.legado.app.lib.theme.getPrimaryTextColor
-import io.legado.app.lib.theme.getSecondaryDisabledTextColor
-import io.legado.app.lib.theme.transparentNavBar
-import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.visible
-
 
 @Suppress("unused")
 class SelectActionBar @JvmOverloads constructor(
@@ -30,33 +23,32 @@ class SelectActionBar @JvmOverloads constructor(
     attrs: AttributeSet? = null
 ) : FrameLayout(context, attrs) {
 
-    private val bgIsLight = ColorUtils.isColorLight(context.bottomBackground)
-    private val primaryTextColor = context.getPrimaryTextColor(bgIsLight)
-    private val disabledColor = context.getSecondaryDisabledTextColor(bgIsLight)
-
     private var callBack: CallBack? = null
     private var selMenu: PopupMenu? = null
+    private var menuListener: PopupMenu.OnMenuItemClickListener? = null
     private val binding = ViewSelectActionBarBinding
         .inflate(LayoutInflater.from(context), this, true)
 
     init {
         if (!isInEditMode) {
-            val transparentNavBar = context.transparentNavBar
-            if (transparentNavBar) {
-                setBackgroundColor(Color.TRANSPARENT)
-            } else {
-                setBackgroundColor(context.bottomBackground)
-                elevation = context.elevation
-            }
-            binding.cbSelectedAll.setTextColor(primaryTextColor)
-            TintHelper.setTint(binding.cbSelectedAll, context.accentColor, !bgIsLight)
-            binding.ivMenuMore.setColorFilter(disabledColor, PorterDuff.Mode.SRC_IN)
+            setBackgroundResource(R.drawable.bg_eink_border_top)
+            elevation = 0f
+            binding.cbSelectedAll.setTextColor(Color.BLACK)
+            TintHelper.setTint(binding.cbSelectedAll, Color.BLACK, false)
+            binding.ivMenuMore.setColorFilter(Color.BLACK, PorterDuff.Mode.SRC_IN)
             binding.cbSelectedAll.setOnUserCheckedChangeListener { isChecked ->
                 callBack?.selectAll(isChecked)
             }
             binding.btnRevertSelection.setOnClickListener { callBack?.revertSelection() }
             binding.btnSelectActionMain.setOnClickListener { callBack?.onClickSelectBarMainAction() }
-            binding.ivMenuMore.setOnClickListener { selMenu?.show() }
+            binding.ivMenuMore.setOnClickListener {
+                val pm = selMenu
+                if (pm != null) {
+                    EinkRefreshHelper.showLinearMenuPopup(binding.ivMenuMore, pm.menu, onlyOverflow = false) { item ->
+                        menuListener?.onMenuItemClick(item)
+                    }
+                }
+            }
             applyNavigationBarPadding()
         }
     }
@@ -83,6 +75,7 @@ class SelectActionBar @JvmOverloads constructor(
     }
 
     fun setOnMenuItemClickListener(listener: PopupMenu.OnMenuItemClickListener) {
+        menuListener = listener
         selMenu?.setOnMenuItemClickListener(listener)
     }
 
@@ -93,7 +86,6 @@ class SelectActionBar @JvmOverloads constructor(
             cbSelectedAll.isChecked = selectCount >= allCount
         }
 
-        //重置全选的文字
         if (cbSelectedAll.isChecked) {
             cbSelectedAll.text = context.getString(
                 R.string.select_cancel_count,
@@ -115,21 +107,14 @@ class SelectActionBar @JvmOverloads constructor(
         btnRevertSelection.isClickable = isClickable
         btnSelectActionMain.isEnabled = isClickable
         btnSelectActionMain.isClickable = isClickable
-        if (isClickable) {
-            ivMenuMore.setColorFilter(primaryTextColor, PorterDuff.Mode.SRC_IN)
-        } else {
-            ivMenuMore.setColorFilter(disabledColor, PorterDuff.Mode.SRC_IN)
-        }
+        ivMenuMore.setColorFilter(Color.BLACK, PorterDuff.Mode.SRC_IN)
         ivMenuMore.isEnabled = isClickable
         ivMenuMore.isClickable = isClickable
     }
 
     interface CallBack {
-
         fun selectAll(selectAll: Boolean)
-
         fun revertSelection()
-
         fun onClickSelectBarMainAction() {}
     }
 }

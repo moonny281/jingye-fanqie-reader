@@ -280,7 +280,7 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
         if (AppConfig.isEInkMode) {
             binding.rvBookshelf.scrollToPosition(0)
         } else {
-            binding.rvBookshelf.smoothScrollToPosition(0)
+            binding.rvBookshelf.scrollToPosition(0)
         }
     }
 

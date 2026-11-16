@@ -113,11 +113,37 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     fun upProgressToggleBtnText() {
-        binding.btnEinkInvert.text = if (EinkRefreshHelper.showReadProgressBar) {
-            "进度:开"
+        val partialOn = EinkRefreshHelper.partialRefreshEnabled
+        binding.btnEinkPartialSwitch.text = EinkRefreshHelper.getPartialRefreshButtonLabel()
+        if (partialOn) {
+            binding.btnEinkPartialSwitch.setBackgroundResource(R.drawable.bg_eink_button_solid)
+            binding.btnEinkPartialSwitch.setTextColor(Color.WHITE)
         } else {
-            "进度:关"
+            binding.btnEinkPartialSwitch.setBackgroundResource(R.drawable.selector_eink_button)
+            binding.btnEinkPartialSwitch.setTextColor(Color.BLACK)
         }
+
+        val fullOn = EinkRefreshHelper.autoPageRefreshEnabled
+        binding.btnEinkFullSwitch.text = EinkRefreshHelper.getFullRefreshButtonLabel()
+        if (fullOn) {
+            binding.btnEinkFullSwitch.setBackgroundResource(R.drawable.bg_eink_button_solid)
+            binding.btnEinkFullSwitch.setTextColor(Color.WHITE)
+        } else {
+            binding.btnEinkFullSwitch.setBackgroundResource(R.drawable.selector_eink_button)
+            binding.btnEinkFullSwitch.setTextColor(Color.BLACK)
+        }
+
+        val showProgress = EinkRefreshHelper.showReadProgressBar
+        binding.btnEinkInvert.text = if (showProgress) "进度:开" else "进度:关"
+        if (showProgress) {
+            binding.btnEinkInvert.setBackgroundResource(R.drawable.bg_eink_button_solid)
+            binding.btnEinkInvert.setTextColor(Color.WHITE)
+        } else {
+            binding.btnEinkInvert.setBackgroundResource(R.drawable.selector_eink_button)
+            binding.btnEinkInvert.setTextColor(Color.BLACK)
+        }
+
+        binding.btnEinkConfig.text = EinkRefreshHelper.getIntervalButtonLabel()
     }
 
     fun reset() {
@@ -291,51 +317,58 @@ class ReadMenu @JvmOverloads constructor(
         })
 
         // 原生墨水屏底栏快捷胶囊按钮：
-        // 1. 局刷清残影（无全屏黑闪，仅刷正文区）
+        // 1. 独立开关按钮：控制是否开启局部刷新清残影
+        btnEinkPartialSwitch.setOnClickListener {
+            EinkRefreshHelper.togglePartialRefresh(context)
+            upProgressToggleBtnText()
+        }
+        // 2. 独立开关按钮：控制是否开启全局刷新清残影（隔页全刷）
+        btnEinkFullSwitch.setOnClickListener {
+            EinkRefreshHelper.toggleFullRefresh(context)
+            upProgressToggleBtnText()
+        }
+        // 3. 独立开关按钮：控制底部阅读进度栏显示/隐藏
+        btnEinkInvert.setOnClickListener {
+            EinkRefreshHelper.toggleReadProgressBar(context)
+            upProgressToggleBtnText()
+        }
+        // 4. 立即执行一次局部刷新清残影
         btnEinkAutopage.setOnClickListener {
             runMenuOut {
                 val rv = activity?.findViewById<ReadView>(R.id.read_view)
                 if (rv != null) {
                     rv.triggerPartialRefresh(showToast = true)
                 } else {
-                    activity?.window?.decorView?.let {
-                        EinkRefreshHelper.triggerPartialRefresh(it, showToast = true)
-                    }
+                    val target = activity?.window?.decorView ?: this@ReadMenu
+                    EinkRefreshHelper.triggerPartialRefresh(target, showToast = true)
                 }
             }
         }
-        // 2. 全刷清残影（全局黑白反转深层消残影）
+        // 5. 立即执行一次全局黑白全刷清残影
         btnEinkRefresh.setOnClickListener {
             runMenuOut {
                 val rv = activity?.findViewById<ReadView>(R.id.read_view)
                 if (rv != null) {
                     rv.triggerFullRefresh(showToast = true)
                 } else {
-                    activity?.window?.decorView?.let {
-                        EinkRefreshHelper.triggerFullRefresh(it, showToast = true)
-                    }
+                    val target = activity?.window?.decorView ?: this@ReadMenu
+                    EinkRefreshHelper.triggerFullRefresh(target, showToast = true)
                 }
             }
         }
-        // 3. 一键开关阅读进度栏（关闭后 100% 屏幕高度用于正文阅读）
-        btnEinkInvert.setOnClickListener {
-            EinkRefreshHelper.toggleReadProgressBar(context)
+        // 6. 点击快速循环切换隔几页刷新间隔（5 / 10 / 15 / 20 / 30 页）
+        btnEinkConfig.setOnClickListener {
+            EinkRefreshHelper.cycleCleanEveryNPages(context)
             upProgressToggleBtnText()
         }
-        // 4. 刷新与阅读面积综合设置
-        btnEinkConfig.setOnClickListener {
+        // 7. 打开 1-bit 纯黑白线性墨水屏清残影与阅读综合设置面板
+        btnEinkSearch.setOnClickListener {
             runMenuOut {
                 val rv = activity?.findViewById<ReadView>(R.id.read_view)
                 val target = rv?.curPage?.contentView ?: rv ?: activity?.window?.decorView
                 EinkRefreshHelper.showEinkSettingsDialog(context, target) {
                     upProgressToggleBtnText()
                 }
-            }
-        }
-        // 5. 全文搜索
-        btnEinkSearch.setOnClickListener {
-            runMenuOut {
-                callBack.openSearchActivity(null)
             }
         }
 

@@ -22,8 +22,8 @@ class RefreshProgressBar @JvmOverloads constructor(
     var maxProgress = 100
     var secondMaxProgress = 100
     var bgColor = 0x00000000
-    var secondColor = -0x3e3e3f
-    var fontColor = -0xc9c9ca
+    var secondColor = -0x1000000
+    var fontColor = -0x1000000
     var speed = 2
     var secondFinalProgress = 0
         private set
@@ -101,35 +101,8 @@ class RefreshProgressBar @JvmOverloads constructor(
             canvas.drawRect(fontRectF, paint)
         }
 
-        if (this.isAutoLoading) {
-            if (secondDurProgress >= secondMaxProgress) {
-                a = -1
-            } else if (secondDurProgress <= 0) {
-                a = 1
-            }
-            secondDurProgress += a * speed
-            if (secondDurProgress < 0)
-                secondDurProgress = 0
-            else if (secondDurProgress > secondMaxProgress)
-                secondDurProgress = secondMaxProgress
-            secondFinalProgress = secondDurProgress
-            invalidate()
-        } else {
-            if (secondDurProgress != secondFinalProgress) {
-                if (secondDurProgress > secondFinalProgress) {
-                    secondDurProgress -= speed
-                    if (secondDurProgress < secondFinalProgress) {
-                        secondDurProgress = secondFinalProgress
-                    }
-                } else {
-                    secondDurProgress += speed
-                    if (secondDurProgress > secondFinalProgress) {
-                        secondDurProgress = secondFinalProgress
-                    }
-                }
-                this.invalidate()
-            }
-        }
+        // 墨水屏禁用进度条往返动画与渐进动画，直接同步到位
+        secondDurProgress = secondFinalProgress
     }
 
     fun getDurProgress(): Int {

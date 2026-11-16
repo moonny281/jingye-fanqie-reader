@@ -30,6 +30,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import io.legado.app.R
 import io.legado.app.eink.EinkRefreshHelper
 import io.legado.app.fanqie.DownloadTaskState
@@ -42,7 +43,6 @@ import io.legado.app.fanqie.FanqiePrefs
 import io.legado.app.fanqie.FanqieSearchItem
 import io.legado.app.ui.book.read.ReadBookActivity
 import kotlinx.coroutines.launch
-import java.util.Locale
 
 class FanqieActivity : AppCompatActivity() {
 
@@ -149,7 +149,6 @@ class FanqieActivity : AppCompatActivity() {
 
         bookInfoCard = findViewById(R.id.bookInfoCard)
         ivDetailCover = findViewById(R.id.ivDetailCover)
-        ivDetailCover.visibility = View.GONE
         tvBookTitle = findViewById(R.id.tvBookTitle)
         tvBookAuthor = findViewById(R.id.tvBookAuthor)
         tvBookLatestChapter = findViewById(R.id.tvBookLatestChapter)
@@ -176,7 +175,7 @@ class FanqieActivity : AppCompatActivity() {
         }
 
         findViewById<Button>(R.id.btnEinkClean)?.setOnClickListener {
-            EinkRefreshHelper.triggerFullRefresh(rootView, showToast = true)
+            EinkRefreshHelper.showEinkSettingsDialog(this, rootView)
         }
 
         findViewById<Button>(R.id.btnToggleConfig).setOnClickListener {
@@ -274,9 +273,10 @@ class FanqieActivity : AppCompatActivity() {
                 ctx = this,
                 fanqieBookId = meta.bookId,
                 title = meta.title,
-                author = meta.author
+                author = meta.author,
+                coverUrl = meta.coverUrl
             )
-            Toast.makeText(this, "已加入书架并转入后台全本离线（自动抓取原生分卷目录与排版）", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "已加入书架并转入后台全本离线（自动抓取封面、原生分卷目录与排版）", Toast.LENGTH_SHORT).show()
         }
 
         btnExportBook.setOnClickListener {
@@ -346,7 +346,7 @@ class FanqieActivity : AppCompatActivity() {
         }
 
         val options = arrayOf(
-            "1. 导出标准 EPUB（含原生树状目录 + 精排）至 Download",
+            "1. 导出标准 EPUB（含原生树状目录 + 封面 + 精排）至 Download",
             "2. 导出精排 TXT（含原生分卷目录索引 + 精排正文）至 Download",
             "3. 导出标准 EPUB 并自选保存位置",
             "4. 导出精排 TXT 并自选保存位置",
@@ -478,7 +478,8 @@ class FanqieActivity : AppCompatActivity() {
                         ctx = this@FanqieActivity,
                         fanqieBookId = bookId,
                         title = book.name,
-                        author = book.author
+                        author = book.author,
+                        coverUrl = book.coverUrl ?: coverUrl
                     )
                 }
 
@@ -542,7 +543,7 @@ class FanqieActivity : AppCompatActivity() {
                 lastSearchResults = items
                 tvStatus.text = "搜索「$keyword」找到 ${items.size} 本小说 · 点击「立即阅读」秒开阅读器，或点击卡片下载/导出："
                 searchHeaderRow.visibility = View.VISIBLE
-                tvSearchResultCount.text = "搜索结果（共 ${items.size} 本 · 纯黑白线性无图模式）"
+                tvSearchResultCount.text = "搜索结果（共 ${items.size} 本 · 支持秒开边看边下与原生目录导出）"
                 searchRecyclerView.visibility = View.VISIBLE
                 searchRecyclerView.adapter = SearchAdapter(
                     items = items,
@@ -572,7 +573,14 @@ class FanqieActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                val meta = FanqieLegadoBridge.parseInput(item.bookId)
+                val rawMeta = FanqieLegadoBridge.parseInput(item.bookId)
+                val meta = if (rawMeta.coverUrl.isBlank() && item.coverUrl.isNotBlank()) {
+                    rawMeta.copy(coverUrl = item.coverUrl).also {
+                        io.legado.app.fanqie.FanqieChapterCacheStore.saveMetadata(it)
+                    }
+                } else {
+                    rawMeta
+                }
                 isQueryBusy = false
                 showBookDetailCard(meta, fromSearch = true)
             } catch (_: Exception) {
@@ -619,13 +627,24 @@ class FanqieActivity : AppCompatActivity() {
         currentMetadata = meta
         bookInfoCard.visibility = View.VISIBLE
         btnBackToSearch.visibility = if (fromSearch) View.VISIBLE else View.GONE
-        ivDetailCover.visibility = View.GONE
+        ivDetailCover.visibility = View.VISIBLE
+
+        if (meta.coverUrl.isNotBlank()) {
+            Glide.with(this)
+                .load(meta.coverUrl)
+                .dontAnimate()
+                .placeholder(R.drawable.bg_eink_default_cover_linear)
+                .error(R.drawable.bg_eink_default_cover_linear)
+                .into(ivDetailCover)
+        } else {
+            ivDetailCover.setImageResource(R.drawable.bg_eink_default_cover_linear)
+        }
 
         tvBookTitle.text = meta.title
         val volSummary = if (meta.volumes.isNotEmpty()) "${meta.volumes.size} 卷" else ""
         val chCountText = if (meta.chapterCount > 0) "共 ${meta.chapterCount} 章" else "支持全本拉取"
         val wcText = meta.formattedWordCount()
-        val extra = listOf("作者：${meta.author}", meta.serialStatus, volSummary, chCountText, wcText).filter { it.isNotBlank() }
+        val extra = listOf(meta.author, meta.serialStatus, volSummary, chCountText, wcText).filter { it.isNotBlank() }
         tvBookAuthor.text = extra.joinToString(" · ")
 
         val latest = meta.effectiveLatestChapter()
@@ -683,8 +702,16 @@ class FanqieActivity : AppCompatActivity() {
 
         override fun onBindViewHolder(holder: VH, position: Int) {
             val item = items[position]
-            holder.cover.visibility = View.GONE
-            holder.thumb.text = String.format(Locale.US, "%02d", position + 1)
+            holder.thumb.text = item.title.take(2)
+            holder.cover.visibility = View.VISIBLE
+            if (item.coverUrl.isNotBlank()) {
+                Glide.with(holder.cover.context)
+                    .load(item.coverUrl)
+                    .dontAnimate()
+                    .into(holder.cover)
+            } else {
+                holder.cover.setImageDrawable(null)
+            }
             holder.title.text = item.title
             holder.meta.text = item.metaLine()
             holder.intro.text = item.intro.ifBlank { "点击「立即阅读」秒开阅读器，或点击「详情/离线」后台下载与导出" }

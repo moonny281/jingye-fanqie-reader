@@ -59,7 +59,8 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
         RecyclerView.ViewHolder(binding.root) {
 
         fun onBind(item: Book, position: Int) = binding.run {
-            ivCover.gone()
+            ivCover.visible()
+            ivCover.load(item, false)
             ivAuthor.gone()
             ivLast.gone()
             ivRead.gone()
@@ -84,6 +85,7 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                             "author" -> tvAuthor.text = "作者：${item.author.ifBlank { "未知" }}"
                             "dur" -> tvRead.text = "读至：${item.durChapterTitle?.takeIf { s -> s.isNotBlank() } ?: "尚未开始阅读"}"
                             "last" -> tvLast.text = "最新：${item.latestChapterTitle?.takeIf { s -> s.isNotBlank() } ?: "无"}"
+                            "cover" -> ivCover.load(item, false)
                             "refresh" -> upRefresh(this, item)
                         }
                     }
@@ -121,7 +123,8 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
         RecyclerView.ViewHolder(binding.root) {
 
         fun onBind(item: Book, position: Int) = binding.run {
-            ivCover.gone()
+            ivCover.visible()
+            ivCover.load(item, false)
             ivAuthor.gone()
             ivLast.gone()
             vwForeground.gone()
@@ -145,6 +148,7 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                             "author" -> tvAuthor.text = item.author.ifBlank { "未知" }
                             "dur" -> tvRead.text = "读至：${item.durChapterTitle?.takeIf { s -> s.isNotBlank() } ?: "未读"}"
                             "last" -> tvLast.text = "最新：${item.latestChapterTitle?.takeIf { s -> s.isNotBlank() } ?: "无"}"
+                            "cover" -> ivCover.load(item, false)
                             "refresh" -> upRefresh(this, item)
                         }
                     }
@@ -182,7 +186,8 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
         RecyclerView.ViewHolder(binding.root) {
 
         fun onBind(item: BookGroup, position: Int) = binding.run {
-            ivCover.gone()
+            ivCover.visible()
+            ivCover.load(item.cover, item.groupName, "")
             tvName.text = "【分组】${item.groupName}"
             flHasNew.gone()
             ivAuthor.gone()
@@ -202,6 +207,7 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                     bundle.keySet().forEach {
                         when (it) {
                             "groupName" -> tvName.text = "【分组】${item.groupName}"
+                            "cover" -> ivCover.load(item.cover, item.groupName, "")
                         }
                     }
                 }

@@ -44,6 +44,46 @@ class FanqieCrawler(
         private fun cleanHighlightText(raw: String): String =
             TAG_RE.replace(raw, "").replace("《", "").replace("》", "").trim()
 
+        fun normalizeCoverUrl(rawUrl: String?): String {
+            var u = (rawUrl ?: "").trim()
+                .replace("\\/", "/")
+                .replace("\\u0026", "&")
+            if (u.isEmpty() || u == "null") return ""
+            if (u.startsWith("//")) {
+                u = "https:$u"
+            } else if (u.startsWith("http://")) {
+                u = "https://" + u.removePrefix("http://")
+            } else if (!u.startsWith("http") && !u.startsWith("/") && (u.contains("novel-pic") || u.contains("tos-cn") || u.contains("byteimg"))) {
+                u = "https://p3-novel.byteimg.com/origin/$u"
+            }
+            return u
+        }
+
+        fun extractCoverUrl(obj: JSONObject?): String {
+            if (obj == null) return ""
+            val directKeys = listOf(
+                "thumb_url", "cover_url", "expand_thumb_url",
+                "detail_page_thumb_url", "audio_thumb_url_hd",
+                "horiz_thumb_url", "avatar_url", "thumb_uri", "uri"
+            )
+            for (k in directKeys) {
+                val v = normalizeCoverUrl(obj.optString(k, ""))
+                if (v.startsWith("http")) return v
+            }
+            val nestedObjects = listOfNotNull(
+                obj.optJSONObject("book_info"),
+                obj.optJSONObject("book_data"),
+                obj.optJSONObject("data")
+            )
+            for (nested in nestedObjects) {
+                for (k in directKeys) {
+                    val v = normalizeCoverUrl(nested.optString(k, ""))
+                    if (v.startsWith("http")) return v
+                }
+            }
+            return ""
+        }
+
         /**
          * 规范化原生章节标题：清除零宽字符与换行，补全空标题。
          */
@@ -486,7 +526,7 @@ class FanqieCrawler(
             val intro = cleanHighlightText(
                 bookObj.optString("abstract").ifBlank { bookObj.optString("intro", "") }
             )
-            val coverUrl = bookObj.optString("thumb_url").ifBlank { bookObj.optString("cover_url", "") }
+            val coverUrl = extractCoverUrl(bookObj).ifBlank { extractCoverUrl(rawItem) }
 
             out.add(
                 FanqieSearchItem(
@@ -575,7 +615,21 @@ class FanqieCrawler(
             title = bookData.optString("title", "未知书名"),
             author = authorObj?.optString("name")?.ifBlank { "未知作者" } ?: "未知作者",
             score = bookData.optString("score", "暂无").ifBlank { "暂无" },
-            coverUrl = bookData.optString("cover_url", ""),
+            coverUrl = extractCoverUrl(bookData)
+                .ifBlank { FanqieChapterCacheStore.loadMetadata(bookId)?.coverUrl?.let { normalizeCoverUrl(it) }.orEmpty() }
+                .ifBlank {
+                    try {
+                        val titleStr = bookData.optString("title", "").trim()
+                        if (titleStr.isNotEmpty()) {
+                            val searchMatches = searchBooks(titleStr)
+                            val matched = searchMatches.firstOrNull { it.bookId == bookId && it.coverUrl.isNotBlank() }
+                                ?: searchMatches.firstOrNull { it.title == titleStr && it.coverUrl.isNotBlank() }
+                            normalizeCoverUrl(matched?.coverUrl)
+                        } else ""
+                    } catch (_: Exception) {
+                        ""
+                    }
+                },
             intro = bookData.optString("intro", "").trim(),
             wordCount = wordCount,
             chapterCount = totalChapterCount,

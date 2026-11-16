@@ -37,7 +37,8 @@ object FanqieDownloadManager {
         ctx: Context,
         fanqieBookId: String,
         title: String,
-        author: String = ""
+        author: String = "",
+        coverUrl: String = ""
     ) {
         if (fanqieBookId.isBlank()) return
         stopFlags[fanqieBookId] = false
@@ -62,6 +63,7 @@ object FanqieDownloadManager {
             putExtra(FanqieDownloadService.EXTRA_FANQIE_BOOK_ID, fanqieBookId)
             putExtra(FanqieDownloadService.EXTRA_BOOK_TITLE, title)
             putExtra(FanqieDownloadService.EXTRA_BOOK_AUTHOR, author)
+            putExtra(FanqieDownloadService.EXTRA_BOOK_COVER, coverUrl)
         }
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

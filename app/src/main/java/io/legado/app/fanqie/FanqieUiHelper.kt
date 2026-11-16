@@ -6,6 +6,7 @@ import android.view.View
 import android.widget.TextView
 import android.widget.Toast
 import io.legado.app.R
+import io.legado.app.eink.EinkRefreshHelper
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.help.config.AppConfig
@@ -112,7 +113,10 @@ object FanqieUiHelper {
                 }
             }
             .setNegativeButton("取消", null)
-            .show()
+            .create().also {
+                EinkRefreshHelper.applyEinkDialogStyle(it)
+                it.show()
+            }
     }
 
     private fun checkSingleBookUpdate(context: Context, item: Book) {
@@ -139,7 +143,10 @@ object FanqieUiHelper {
                             )
                         }
                         .setNegativeButton("稍后", null)
-                        .show()
+                        .create().also {
+                            EinkRefreshHelper.applyEinkDialogStyle(it)
+                            it.show()
+                        }
                 } else {
                     Toast.makeText(
                         context,
@@ -231,7 +238,10 @@ object FanqieUiHelper {
                         }
                     }
                     .setNegativeButton("稍后", null)
-                    .show()
+                    .create().also {
+                        EinkRefreshHelper.applyEinkDialogStyle(it)
+                        it.show()
+                    }
             } else {
                 Toast.makeText(
                     context,

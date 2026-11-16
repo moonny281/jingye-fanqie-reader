@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import androidx.annotation.DrawableRes
+import androidx.core.net.toUri
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import com.bumptech.glide.Glide
@@ -14,26 +15,37 @@ import io.legado.app.utils.isContentScheme
 import io.legado.app.utils.isDataUrl
 import io.legado.app.utils.lifecycle
 import java.io.File
-import androidx.core.net.toUri
 
-//https://bumptech.github.io/glide/doc/generatedapi.html
-//Instead of GlideApp, use com.bumptech.Glide
 @Suppress("unused")
 object ImageLoader {
 
-    /**
-     * 自动判断path类型
-     */
+    private fun resolveLocalFile(path: String): File? {
+        return try {
+            val clean = if (path.startsWith("file://")) {
+                Uri.parse(path).path ?: path.removePrefix("file://")
+            } else {
+                path
+            }
+            val f = File(clean)
+            if (f.exists()) f else null
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
     fun load(context: Context, path: String?): RequestBuilder<Drawable> {
         return when {
             path.isNullOrEmpty() -> Glide.with(context).load(path)
             path.isDataUrl() -> Glide.with(context).load(path)
             path.isAbsUrl() -> Glide.with(context).load(path)
             path.isContentScheme() -> Glide.with(context).load(path.toUri())
-            else -> kotlin.runCatching {
-                Glide.with(context).load(File(path))
-            }.getOrElse {
-                Glide.with(context).load(path)
+            else -> {
+                val localF = resolveLocalFile(path)
+                if (localF != null) {
+                    Glide.with(context).load(localF)
+                } else {
+                    Glide.with(context).load(path)
+                }
             }
         }
     }
@@ -45,11 +57,13 @@ object ImageLoader {
             path.isDataUrl() -> requestManager.load(path)
             path.isAbsUrl() -> requestManager.load(path)
             path.isContentScheme() -> requestManager.load(path.toUri())
-
-            else -> kotlin.runCatching {
-                requestManager.load(File(path))
-            }.getOrElse {
-                requestManager.load(path)
+            else -> {
+                val localF = resolveLocalFile(path)
+                if (localF != null) {
+                    requestManager.load(localF)
+                } else {
+                    requestManager.load(path)
+                }
             }
         }
     }
@@ -61,10 +75,13 @@ object ImageLoader {
             path.isDataUrl() -> requestManager.load(path)
             path.isAbsUrl() -> requestManager.load(path)
             path.isContentScheme() -> requestManager.load(path.toUri())
-            else -> kotlin.runCatching {
-                requestManager.load(File(path))
-            }.getOrElse {
-                requestManager.load(path)
+            else -> {
+                val localF = resolveLocalFile(path)
+                if (localF != null) {
+                    requestManager.load(localF)
+                } else {
+                    requestManager.load(path)
+                }
             }
         }
     }
@@ -74,10 +91,13 @@ object ImageLoader {
             path.isNullOrEmpty() -> Glide.with(context).asFile().load(path)
             path.isAbsUrl() -> Glide.with(context).asFile().load(path)
             path.isContentScheme() -> Glide.with(context).asFile().load(path.toUri())
-            else -> kotlin.runCatching {
-                Glide.with(context).asFile().load(File(path))
-            }.getOrElse {
-                Glide.with(context).asFile().load(path)
+            else -> {
+                val localF = resolveLocalFile(path)
+                if (localF != null) {
+                    Glide.with(context).asFile().load(localF)
+                } else {
+                    Glide.with(context).asFile().load(path)
+                }
             }
         }
     }
@@ -105,5 +125,4 @@ object ImageLoader {
     fun load(context: Context, bytes: ByteArray?): RequestBuilder<Drawable> {
         return Glide.with(context).load(bytes)
     }
-
 }

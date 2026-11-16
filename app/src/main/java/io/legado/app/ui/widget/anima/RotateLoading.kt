@@ -1,228 +1,63 @@
 package io.legado.app.ui.widget.anima
 
-import android.animation.Animator
-import android.animation.AnimatorListenerAdapter
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
-import io.legado.app.R
-import io.legado.app.lib.theme.accentColor
-import io.legado.app.utils.dpToPx
 
 /**
- * RotateLoading
- * Created by Victor on 2015/4/28.
+ * 墨水屏静态 1-Bit 线性加载指示框（已彻底移除旋转重绘动画与灰色阴影，防止墨水屏残影）
  */
-@Suppress("MemberVisibilityCanBePrivate")
+@Suppress("MemberVisibilityCanBePrivate", "unused")
 class RotateLoading @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
 ) : View(context, attrs) {
 
-    private var mPaint: Paint
-
-    private var loadingRectF: RectF? = null
-    private var shadowRectF: RectF? = null
-
-    private var topDegree = 10
-    private var bottomDegree = 190
-
-    private var arc: Float = 0.toFloat()
-
-    private var thisWidth: Int = 0
-
-    private var changeBigger = true
-
-    private var shadowPosition: Int = 0
-
-    private var hideMode = GONE
-
     var isStarted = false
         private set
 
-    var loadingColor: Int = 0
-        set(value) {
-            field = value
-            invalidate()
-        }
+    var loadingColor: Int = Color.BLACK
 
-    private var speedOfDegree: Int = 0
-
-    private var speedOfArc: Float = 0.toFloat()
-
-    private val shown = Runnable { this.startInternal() }
-
-    private val hidden = Runnable { this.stopInternal() }
-
-    init {
-        loadingColor = context.accentColor
-        thisWidth = DEFAULT_WIDTH.dpToPx()
-        shadowPosition = DEFAULT_SHADOW_POSITION.dpToPx()
-        speedOfDegree = DEFAULT_SPEED_OF_DEGREE
-
-        if (null != attrs) {
-            val typedArray = context.obtainStyledAttributes(attrs, R.styleable.RotateLoading)
-            loadingColor =
-                typedArray.getColor(R.styleable.RotateLoading_loading_color, loadingColor)
-            thisWidth = typedArray.getDimensionPixelSize(
-                R.styleable.RotateLoading_loading_width,
-                DEFAULT_WIDTH.dpToPx()
-            )
-            shadowPosition = typedArray.getInt(
-                R.styleable.RotateLoading_shadow_position,
-                DEFAULT_SHADOW_POSITION
-            )
-            speedOfDegree =
-                typedArray.getInt(R.styleable.RotateLoading_loading_speed, DEFAULT_SPEED_OF_DEGREE)
-            typedArray.recycle()
-        }
-        speedOfArc = (speedOfDegree / 4).toFloat()
-        mPaint = Paint()
-        mPaint.color = loadingColor
-        mPaint.isAntiAlias = true
-        mPaint.style = Paint.Style.STROKE
-        mPaint.strokeWidth = thisWidth.toFloat()
-        mPaint.strokeCap = Paint.Cap.ROUND
+    private val borderPaint = Paint().apply {
+        isAntiAlias = false
+        color = Color.BLACK
+        style = Paint.Style.STROKE
+        strokeWidth = 2f
     }
 
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        super.onSizeChanged(w, h, oldw, oldh)
-
-        arc = 10f
-
-        loadingRectF =
-            RectF(
-                (2 * thisWidth).toFloat(),
-                (2 * thisWidth).toFloat(),
-                (w - 2 * thisWidth).toFloat(),
-                (h - 2 * thisWidth).toFloat()
-            )
-        shadowRectF = RectF(
-            (2 * thisWidth + shadowPosition).toFloat(),
-            (2 * thisWidth + shadowPosition).toFloat(),
-            (w - 2 * thisWidth + shadowPosition).toFloat(),
-            (h - 2 * thisWidth + shadowPosition).toFloat()
-        )
+    private val dotPaint = Paint().apply {
+        isAntiAlias = false
+        color = Color.BLACK
+        style = Paint.Style.FILL
     }
-
 
     override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-
-        if (!isStarted) {
-            return
-        }
-
-        mPaint.color = Color.parseColor("#1a000000")
-        shadowRectF?.let {
-            canvas.drawArc(it, topDegree.toFloat(), arc, false, mPaint)
-            canvas.drawArc(it, bottomDegree.toFloat(), arc, false, mPaint)
-        }
-
-        mPaint.color = loadingColor
-        loadingRectF?.let {
-            canvas.drawArc(it, topDegree.toFloat(), arc, false, mPaint)
-            canvas.drawArc(it, bottomDegree.toFloat(), arc, false, mPaint)
-        }
-
-        topDegree += speedOfDegree
-        bottomDegree += speedOfDegree
-        if (topDegree > 360) {
-            topDegree -= 360
-        }
-        if (bottomDegree > 360) {
-            bottomDegree -= 360
-        }
-
-        if (changeBigger) {
-            if (arc < 160) {
-                arc += speedOfArc
-                invalidate()
-            }
-        } else {
-            if (arc > speedOfDegree) {
-                arc -= 2 * speedOfArc
-                invalidate()
-            }
-        }
-        if (arc >= 160 || arc <= 10) {
-            changeBigger = !changeBigger
-            invalidate()
-        }
-    }
-
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-        if (visibility == VISIBLE) {
-            startInternal()
-        }
-    }
-
-    override fun onDetachedFromWindow() {
-        super.onDetachedFromWindow()
-        isStarted = false
-        animate().cancel()
-        removeCallbacks(shown)
-        removeCallbacks(hidden)
+        if (!isStarted) return
+        val w = width.toFloat()
+        val h = height.toFloat()
+        if (w <= 4f || h <= 4f) return
+        canvas.drawRect(2f, 2f, w - 2f, h - 2f, borderPaint)
+        val cx = w / 2f
+        val cy = h / 2f
+        canvas.drawRect(cx - 2f, cy - 2f, cx + 2f, cy + 2f, dotPaint)
     }
 
     fun visible() {
-        removeCallbacks(shown)
-        removeCallbacks(hidden)
-        post(shown)
+        isStarted = true
+        visibility = VISIBLE
+        invalidate()
     }
 
     fun inVisible() {
-        hideMode = INVISIBLE
-        removeCallbacks(shown)
-        removeCallbacks(hidden)
-        stopInternal()
+        isStarted = false
+        visibility = INVISIBLE
     }
 
     fun gone() {
-        hideMode = GONE
-        removeCallbacks(shown)
-        removeCallbacks(hidden)
-        stopInternal()
-    }
-
-    private fun startInternal() {
-        startAnimator()
-        isStarted = true
-        invalidate()
-    }
-
-    private fun stopInternal() {
-        stopAnimator()
-        invalidate()
-    }
-
-    private fun startAnimator() {
-        animate().cancel()
-        animate().scaleX(1.0f)
-            .scaleY(1.0f)
-            .setListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationStart(animation: Animator) {
-                    visibility = VISIBLE
-                }
-            })
-            .start()
-    }
-
-    private fun stopAnimator() {
-        animate().cancel()
         isStarted = false
-        this.visibility = hideMode
+        visibility = GONE
     }
-
-    companion object {
-        private const val DEFAULT_WIDTH = 6
-        private const val DEFAULT_SHADOW_POSITION = 2
-        private const val DEFAULT_SPEED_OF_DEGREE = 10
-    }
-
 }

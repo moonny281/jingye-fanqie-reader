@@ -34,8 +34,7 @@ class BooksAdapterList(
         item: Book,
         payloads: MutableList<Any>
     ) = binding.run {
-        // 0.4.3 微信读书墨水屏纯黑白线性风格：不显示图片封面与小图标
-        ivCover.gone()
+        ivCover.visible()
         ivAuthor.gone()
         ivRead.gone()
         ivLast.gone()
@@ -46,6 +45,7 @@ class BooksAdapterList(
             tvAuthor.text = "作者：${item.author.ifBlank { "未知" }}"
             tvRead.text = "读至：${item.durChapterTitle?.takeIf { it.isNotBlank() } ?: "尚未开始阅读"}"
             tvLast.text = "最新：${item.latestChapterTitle?.takeIf { it.isNotBlank() } ?: "无"}"
+            ivCover.load(item, false, fragment, lifecycle)
             upRefresh(binding, item)
             upLastUpdateTime(binding, item)
         } else {
@@ -57,6 +57,7 @@ class BooksAdapterList(
                         "author" -> tvAuthor.text = "作者：${item.author.ifBlank { "未知" }}"
                         "dur" -> tvRead.text = "读至：${item.durChapterTitle?.takeIf { s -> s.isNotBlank() } ?: "尚未开始阅读"}"
                         "last" -> tvLast.text = "最新：${item.latestChapterTitle?.takeIf { s -> s.isNotBlank() } ?: "无"}"
+                        "cover" -> ivCover.load(item, false, fragment, lifecycle)
                         "refresh" -> upRefresh(binding, item)
                         "lastUpdateTime" -> upLastUpdateTime(binding, item)
                     }

@@ -62,13 +62,14 @@ object BookCover {
         drawBookName = appCtx.getPrefBoolean(PreferKey.coverShowName, true)
         drawBookAuthor = appCtx.getPrefBoolean(PreferKey.coverShowAuthor, true)
         val path = appCtx.getPrefString(PreferKey.defaultCover)
+        // 默认占位图使用纯黑白线性装帧框 bg_eink_default_cover_linear，真实书籍封面正常通过 Glide 加载
         defaultDrawable = runCatching {
             BitmapUtils.decodeBitmap(path!!, 600, 900)!!.toDrawable(appCtx.resources)
-        }.getOrDefault(appCtx.resources.getDrawable(R.drawable.image_cover_default, null))
+        }.getOrDefault(appCtx.resources.getDrawable(R.drawable.bg_eink_default_cover_linear, null))
     }
 
     /**
-     * 加载封面（墨水屏模式禁用渐变淡入动画 dontAnimate）
+     * 加载图书封面（禁用渐变淡入动画 dontAnimate，无封面时回退到纯黑白线性占位框）
      */
     fun load(
         context: Context,
@@ -119,9 +120,6 @@ object BookCover {
             .centerCrop()
     }
 
-    /**
-     * 加载漫画图片（禁用动画）
-     */
     fun loadManga(
         context: Context,
         path: String?,
@@ -165,9 +163,6 @@ object BookCover {
             .load(path)
     }
 
-    /**
-     * 加载模糊封面（墨水屏模式移除 1500ms crossFade 渐变动画，避免连续刷屏残影）
-     */
     fun loadBlur(
         context: Context,
         path: String?,
@@ -254,5 +249,4 @@ object BookCover {
             return searchUrl
         }
     }
-
 }

@@ -24,6 +24,7 @@ import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.book.group.GroupEditDialog
 import io.legado.app.ui.book.info.BookInfoActivity
+import io.legado.app.eink.EinkRefreshHelper
 import io.legado.app.fanqie.FanqieUiHelper
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.fanqie.FanqieActivity
@@ -82,6 +83,7 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         binding.tvEinkQuickSearch.setOnClickListener { startActivity<FanqieActivity>() }
         binding.btnEinkFanqieStore.setOnClickListener { startActivity<FanqieActivity>() }
         binding.btnEinkShelfUpdate.setOnClickListener { FanqieUiHelper.checkAllShelfFanqieBooks(requireContext()) }
+        binding.btnEinkRefreshCfg.setOnClickListener { EinkRefreshHelper.showEinkSettingsDialog(requireContext(), view) }
         setSupportToolbar(binding.titleBar.toolbar)
         initRecyclerView()
         initBookGroupData()
@@ -248,7 +250,7 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         if (AppConfig.isEInkMode) {
             binding.rvBookshelf.scrollToPosition(0)
         } else {
-            binding.rvBookshelf.smoothScrollToPosition(0)
+            binding.rvBookshelf.scrollToPosition(0)
         }
     }
 
