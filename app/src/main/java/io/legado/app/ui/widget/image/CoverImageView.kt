@@ -277,8 +277,6 @@ class CoverImageView @JvmOverloads constructor(
                 .load(localFile)
                 .dontAnimate()
                 .centerCrop()
-                .placeholder(null)
-                .error(null)
                 .listener(listener)
                 .into(this)
             return
@@ -289,8 +287,6 @@ class CoverImageView @JvmOverloads constructor(
                 .load(normalizedPath)
                 .dontAnimate()
                 .centerCrop()
-                .placeholder(null)
-                .error(null)
                 .listener(listener)
                 .into(this)
             return
@@ -306,8 +302,6 @@ class CoverImageView @JvmOverloads constructor(
         builder.apply(options)
             .dontAnimate()
             .centerCrop()
-            .placeholder(null)
-            .error(null)
             .listener(listener)
             .into(this)
     }
