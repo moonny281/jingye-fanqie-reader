@@ -151,7 +151,7 @@
     </style>
 
     <style name="Style.DropDownListView.EInk" parent="Widget.AppCompat.ListView.DropDown">
-        <item name="android:divider">@drawable/bg_eink_divider_line</item>
+        <item name="android:divider">@color/black</item>
         <item name="android:dividerHeight">1px</item>
         <item name="android:listSelector">@drawable/selector_eink_list_item</item>
         <item name="android:background">@color/white</item>
@@ -224,13 +224,13 @@
     <style name="Style.Shadow.Top" parent="android:Widget">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">1px</item>
-        <item name="android:background">@drawable/bg_eink_divider_line</item>
+        <item name="android:background">@color/black</item>
     </style>
 
     <style name="Style.Shadow.Bottom" parent="android:Widget">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">1px</item>
-        <item name="android:background">@drawable/bg_eink_divider_line</item>
+        <item name="android:background">@color/black</item>
     </style>
 
     <style name="Style.Line" parent="android:Widget">
