@@ -135,19 +135,31 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
             ivChecked.gone()
 
             if (item.isVolume) {
-                // 分卷标题：纯黑底色 + 纯白粗体文字（1-bit 反转线性条）
+                // 一级目录（分卷标题）：纯黑底色 + 纯白粗体文字（1-bit 反转线性横幅）
                 tvChapterItem.setBackgroundColor(Color.BLACK)
                 tvChapterName.setTextColor(Color.WHITE)
                 tvChapterName.typeface = Typeface.DEFAULT_BOLD
-                tvChapterName.text = "◆ $rawTitle"
-                tvTag.gone()
-                tvWordCount.gone()
+                tvChapterName.text = "◆ [一级分卷] $rawTitle"
+                if (!item.tag.isNullOrEmpty()) {
+                    tvTag.setTextColor(Color.WHITE)
+                    tvTag.text = item.tag
+                    tvTag.visible()
+                } else {
+                    tvTag.gone()
+                }
+                if (!item.wordCount.isNullOrEmpty()) {
+                    tvWordCount.setTextColor(Color.WHITE)
+                    tvWordCount.text = item.wordCount
+                    tvWordCount.visible()
+                } else {
+                    tvWordCount.gone()
+                }
             } else {
-                // 普通章节：纯白底色 + 底部 1dp 线性黑线
+                // 二级目录（具体章节）：纯白底色 + 底部 1dp 线性黑线 + 树状二级缩进前缀
                 tvChapterItem.setBackgroundResource(R.drawable.bg_eink_border_bottom)
                 tvChapterName.setTextColor(Color.BLACK)
                 tvChapterName.typeface = if (isDur) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
-                tvChapterName.text = if (isDur) "【当前】$rawTitle" else rawTitle
+                tvChapterName.text = if (isDur) "  ├─ 【当前】$rawTitle" else "  ├─ $rawTitle"
 
                 if (!item.tag.isNullOrEmpty()) {
                     tvTag.setTextColor(Color.BLACK)

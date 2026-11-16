@@ -84,32 +84,53 @@ class FanqieCrawler(
             return ""
         }
 
+        private val HAS_CHAPTER_PREFIX_RE = Regex(
+            "^(?:第[零一二三四五六七八九十百千万〇两0-9]+[章节回集部篇幕卷]|Chapter\\s*\\d+|\\d+[.、\\s:：]|序[章言幕]?|楔子|引子|尾声|番外|后记|终章)",
+            RegexOption.IGNORE_CASE
+        )
+        private val DUP_CHAPTER_PREFIX_RE = Regex(
+            "^(第[零一二三四五六七八九十百千万〇两0-9]+[章节回集部篇幕])[\\s:：·—-]+\\1[\\s:：·—-]*"
+        )
+        private val HAS_VOLUME_PREFIX_RE = Regex(
+            "^第[零一二三四五六七八九十百千万〇两0-9]+[卷部集篇册][\\s:：·—-]*"
+        )
+
         /**
-         * 规范化原生章节标题：清除零宽字符与换行，补全空标题。
+         * 规范化二级章节标题：
+         * 1. 清除零宽字符、换行与多余空白；
+         * 2. 自动去重如「第1章 第1章 惊蛰」；
+         * 3. 若原始标题不含「第X章/节/回」或「序章/番外」前缀，自动补全「第{fallbackIndex}章 」，保证二级目录整齐清晰。
          */
         fun normalizeChapterTitle(rawTitle: String, fallbackIndex: Int): String {
-            val cleaned = ZERO_WIDTH_RE.replace(rawTitle, "")
+            var cleaned = ZERO_WIDTH_RE.replace(rawTitle, "")
                 .replace("\r", " ")
                 .replace("\n", " ")
                 .replace(WS_RE, " ")
                 .trim()
-            return cleaned.ifBlank { "第${fallbackIndex}章" }
+            if (cleaned.isEmpty()) return "第${fallbackIndex}章"
+            cleaned = DUP_CHAPTER_PREFIX_RE.replace(cleaned, "$1 ")
+            if (!HAS_CHAPTER_PREFIX_RE.containsMatchIn(cleaned)) {
+                cleaned = "第${fallbackIndex}章 $cleaned"
+            }
+            return cleaned
         }
 
         /**
-         * 规范化原生分卷标题：保留原有「第X卷」前缀，若无前缀且非默认卷则保持干净卷名。
+         * 规范化一级分卷标题（volumeIndex 统一为 0-based: 0, 1, 2...）：
+         * 保留原有「第X卷」前缀；若无前缀则自动补全「第{volumeIndex + 1}卷 」，确保一级目录层级清晰。
          */
         fun normalizeVolumeTitle(rawVolumeName: String, volumeIndex: Int): String {
+            val safeIdx = volumeIndex.coerceAtLeast(0)
             val cleaned = ZERO_WIDTH_RE.replace(rawVolumeName, "")
                 .replace("\r", " ")
                 .replace("\n", " ")
                 .replace(WS_RE, " ")
                 .trim()
-            if (cleaned.isEmpty()) return ""
-            return if (cleaned.startsWith("第") && ("卷" in cleaned || "部" in cleaned || "集" in cleaned || "篇" in cleaned)) {
+            if (cleaned.isEmpty()) return "第${safeIdx + 1}卷 正文卷"
+            return if (HAS_VOLUME_PREFIX_RE.containsMatchIn(cleaned)) {
                 cleaned
             } else {
-                "第${volumeIndex + 1}卷 $cleaned"
+                "第${safeIdx + 1}卷 $cleaned"
             }
         }
 
@@ -164,7 +185,7 @@ class FanqieCrawler(
                         sb.append("　　* * *")
                     }
                     p == "—— 作家的话 ——" -> {
-                        sb.append("　　────────────────────\n\n　　【作家的话】")
+                        sb.append("　　────────────────────\n\n　　〖作家的话〗")
                     }
                     p.startsWith("〖") && p.endsWith("〗") -> {
                         sb.append("　　").append(p)
@@ -180,16 +201,17 @@ class FanqieCrawler(
             return sb.toString()
         }
 
+        /**
+         * 二级章节标题采用 `### 标题 ###`，避免与网文正文中的 `【叮！系统面板】` 冲突。
+         */
         fun formatChapter(title: String, paragraphs: List<String>): String {
             val body = formatChapterBody(paragraphs)
-            return "【$title】\n\n$body\n\n"
+            return "### $title ###\n\n$body\n\n"
         }
 
         /**
-         * 核心构建器：合成含原生分卷目录与精排正文的 UTF-8 TXT 字节流，
-         * 同时精确计算每一卷（isVolume = true）与每一章在 UTF-8 文件中的起止字节偏移（startByte / endByte）。
-         *
-         * @param includeTocIndexInText 是否在 TXT 头部输出完整【原生目录索引】（用于导出文件；内部阅读通过 BookChapter 数据库直通展示目录）
+         * 核心构建器：合成含【一级分卷目录 + 二级章节目录】与精排正文的 UTF-8 TXT 字节流，
+         * 同时精确计算每个一级分卷（isVolume = true）与每个二级章节（isVolume = false）在 UTF-8 文件中的起止字节偏移（startByte / endByte）。
          */
         fun buildBookTxtWithToc(
             metadata: FanqieMetadata,
@@ -209,13 +231,24 @@ class FanqieCrawler(
                 out.write(bytes)
             }
 
+            // 建立按 index 兜底映射，兼容旧版缓存或首页预加载缓存
+            val cacheByIndex = HashMap<Int, CachedChapterEntry>(cacheMap.size * 2)
+            for (entry in cacheMap.values) {
+                if (entry.index > 0 && (entry.formattedText.isNotBlank() || entry.paragraphs.isNotEmpty())) {
+                    cacheByIndex.putIfAbsent(entry.index, entry)
+                }
+            }
+            fun resolveCached(ch: FanqieChapterItem): CachedChapterEntry? {
+                return cacheMap[ch.cacheKey()] ?: cacheByIndex[ch.index]
+            }
+
             val exported = if (failedCount > 0 && downloaded < total) {
                 "$downloaded/$total 章（$failedCount 章待续下）"
             } else {
                 "$downloaded/$total 章"
             }
 
-            // 头部书籍扉页信息（注意使用 〖...〗 避免与章节标记 【...】 冲突）
+            // 头部书籍扉页信息
             val headerLines = ArrayList<String>()
             headerLines += "=".repeat(46)
             headerLines += "书名：${metadata.title}"
@@ -225,7 +258,10 @@ class FanqieCrawler(
             }
             headerLines += "字数：${metadata.formattedWordCount()}"
             headerLines += "状态：${metadata.serialStatus}"
-            headerLines += "章节：共 $total 章，已缓存 $exported"
+            if (metadata.volumes.isNotEmpty()) {
+                headerLines += "一级分卷：共 ${metadata.volumes.size} 卷"
+            }
+            headerLines += "二级章节：共 $total 章，已缓存 $exported"
             if (metadata.effectiveLatestChapter().isNotBlank()) {
                 headerLines += "最新：${metadata.effectiveLatestChapter()}"
             }
@@ -244,38 +280,43 @@ class FanqieCrawler(
                 headerLines += ""
             }
 
-            // 筛选出已下载有正文的章节项
+            // 筛选出已下载有正文的二级章节项
             val availableEntries = ArrayList<Pair<FanqieChapterItem, CachedChapterEntry>>()
             for (ch in chapters) {
-                val cached = cacheMap[ch.cacheKey()]
+                val cached = resolveCached(ch)
                 if (cached != null && (cached.formattedText.isNotBlank() || cached.paragraphs.isNotEmpty())) {
                     availableEntries.add(ch to cached)
                 }
             }
 
-            val hasMultipleVolumes = availableEntries.map { (ch, cached) ->
-                ch.volumeName.ifBlank { cached.volumeName }.trim()
-            }.filter { it.isNotEmpty() }.distinct().size > 1 ||
-                availableEntries.any { (ch, cached) ->
-                    val vn = ch.volumeName.ifBlank { cached.volumeName }.trim()
-                    vn.isNotEmpty() && vn != "正文" && vn != "默认卷" && vn != "第一卷"
-                }
+            // 统计每个一级分卷下的章节总数与字数
+            val volChapterCounts = HashMap<Int, Int>()
+            val volWordCounts = HashMap<Int, Int>()
+            for ((ch, cached) in availableEntries) {
+                val vIdx = ch.volumeIndex.coerceAtLeast(0)
+                volChapterCounts[vIdx] = (volChapterCounts[vIdx] ?: 0) + 1
+                val wc = cached.resolvedWordCount().takeIf { it > 0 } ?: ch.wordCount
+                volWordCounts[vIdx] = (volWordCounts[vIdx] ?: 0) + wc
+            }
 
-            // 若为外部导出模式，生成完整的原生【分卷与章节目录索引】
+            // 若为外部导出模式，生成完整的原生【一级分卷 / 二级章节目录索引】
             if (includeTocIndexInText && availableEntries.isNotEmpty()) {
-                headerLines += "〖原生目录索引〗"
-                var lastIdxVol = ""
+                headerLines += "〖原生多级目录索引（一级分卷 / 二级章节）〗"
+                var lastIdxVol = -1
+                var lastIdxVolName = ""
                 for ((ch, cached) in availableEntries) {
-                    val rawVol = ch.volumeName.ifBlank { cached.volumeName }.trim()
-                    val volIdx = if (ch.volumeIndex > 0) ch.volumeIndex else cached.volumeIndex
-                    if (hasMultipleVolumes && rawVol.isNotEmpty() && rawVol != lastIdxVol) {
-                        lastIdxVol = rawVol
-                        val normVol = normalizeVolumeTitle(rawVol, volIdx)
+                    val vIdx = ch.volumeIndex.coerceAtLeast(0)
+                    val rawVol = ch.volumeName.ifBlank { cached.volumeName }.trim().ifEmpty { "正文卷" }
+                    val normVol = normalizeVolumeTitle(rawVol, vIdx)
+                    if (vIdx != lastIdxVol || normVol != lastIdxVolName) {
+                        lastIdxVol = vIdx
+                        lastIdxVolName = normVol
+                        val vCnt = volChapterCounts[vIdx] ?: 0
                         headerLines += ""
-                        headerLines += "◆ $normVol"
+                        headerLines += "◆ [一级目录] $normVol（共 $vCnt 章）"
                     }
                     val cTitle = normalizeChapterTitle(cached.title.ifBlank { ch.title }, ch.index)
-                    headerLines += "  · $cTitle"
+                    headerLines += "  ├─ $cTitle"
                 }
                 headerLines += ""
                 headerLines += "=".repeat(46)
@@ -285,29 +326,37 @@ class FanqieCrawler(
             writeUtf8(headerLines.joinToString("\n") + "\n")
 
             val builtToc = ArrayList<FanqieBuiltTocItem>(availableEntries.size + 16)
+            var currentVolIdx = -1
             var currentVolumeName = ""
 
             for ((ch, cached) in availableEntries) {
-                val rawVol = ch.volumeName.ifBlank { cached.volumeName }.trim()
-                val volIdx = if (ch.volumeIndex > 0) ch.volumeIndex else cached.volumeIndex
-                val normVol = if (rawVol.isNotEmpty()) normalizeVolumeTitle(rawVol, volIdx) else ""
+                val vIdx = ch.volumeIndex.coerceAtLeast(0)
+                val rawVol = ch.volumeName.ifBlank { cached.volumeName }.trim().ifEmpty { "正文卷" }
+                val normVol = normalizeVolumeTitle(rawVol, vIdx)
 
-                // 当进入新分卷时，写入分卷标题行并生成一条 isVolume = true 的原生分卷目录项
-                if (hasMultipleVolumes && normVol.isNotEmpty() && normVol != currentVolumeName) {
+                // 当进入新的一级分卷时，写入一级分卷标题块并生成 isVolume = true 的一级目录项（确保 startByte < endByte）
+                if (vIdx != currentVolIdx || normVol != currentVolumeName) {
+                    currentVolIdx = vIdx
                     currentVolumeName = normVol
-                    val volHeading = "【$normVol】\n"
-                    writeUtf8(volHeading)
-                    val volOffset = out.size().toLong()
+                    val vCnt = volChapterCounts[vIdx] ?: 0
+                    val vWords = volWordCounts[vIdx] ?: 0
+                    writeUtf8("=== $normVol ===\n")
+                    val volStart = out.size().toLong()
+                    writeUtf8("　　【本卷共 $vCnt 章】\n\n")
+                    val volEnd = out.size().toLong()
                     builtToc.add(
                         FanqieBuiltTocItem(
                             index = builtToc.size,
                             title = normVol,
                             isVolume = true,
-                            startByte = volOffset,
-                            endByte = volOffset,
-                            wordCount = 0,
-                            volumeName = normVol,
-                            itemId = null
+                            startByte = volStart,
+                            endByte = volEnd,
+                            wordCount = vWords,
+                            volumeIndex = vIdx,
+                            volumeName = "共${vCnt}章",
+                            chapterIndex = 0,
+                            indexInVolume = 0,
+                            itemId = "vol_$vIdx"
                         )
                     )
                 }
@@ -318,15 +367,17 @@ class FanqieCrawler(
                     formatChapterBody(paras)
                 } else {
                     cached.formattedText
+                        .removePrefix("### $cTitle ###")
+                        .removePrefix("### ${cached.title} ###")
                         .removePrefix("【$cTitle】")
                         .removePrefix("【${cached.title}】")
                         .trim()
                         .let { if (it.startsWith("　　")) it else "　　$it" }
                 }
 
-                // 写入章节标题行
-                writeUtf8("【$cTitle】\n\n")
-                // 记录章节正文起始字节偏移（紧跟在章节标题之后，避免阅读器正文重复渲染标题）
+                // 写入二级章节标题行
+                writeUtf8("### $cTitle ###\n\n")
+                // 记录二级章节正文起始字节偏移（紧跟在章节标题之后，避免阅读器正文重复渲染标题）
                 val startByte = out.size().toLong()
                 writeUtf8("$bodyText\n\n")
                 val endByte = out.size().toLong()
@@ -343,7 +394,10 @@ class FanqieCrawler(
                         startByte = startByte,
                         endByte = endByte,
                         wordCount = wordCnt,
+                        volumeIndex = vIdx,
                         volumeName = currentVolumeName,
+                        chapterIndex = ch.index,
+                        indexInVolume = ch.indexInVolume.coerceAtLeast(1),
                         itemId = ch.itemId
                     )
                 )
@@ -352,7 +406,7 @@ class FanqieCrawler(
             if (includeTocIndexInText) {
                 val footer = buildString {
                     append("=".repeat(46)).append("\n")
-                    append("全书导出完毕 · 共 $downloaded 章\n")
+                    append("全书导出完毕 · 共 ${metadata.volumes.size.coerceAtLeast(1)} 卷 $downloaded 章\n")
                     append("=".repeat(46)).append("\n")
                 }
                 writeUtf8(footer)
@@ -373,10 +427,12 @@ class FanqieCrawler(
         ): ByteArray {
             val dummyItems = chapters.mapIndexed { idx, raw ->
                 val firstLine = raw.lineSequence().firstOrNull()?.trim().orEmpty()
-                val title = if (firstLine.startsWith("【") && firstLine.endsWith("】")) {
-                    firstLine.removeSurrounding("【", "】")
-                } else {
-                    "第${idx + 1}章"
+                val title = when {
+                    firstLine.startsWith("###") && firstLine.endsWith("###") ->
+                        firstLine.removeSurrounding("###").trim()
+                    firstLine.startsWith("【") && firstLine.endsWith("】") ->
+                        firstLine.removeSurrounding("【", "】").trim()
+                    else -> "第${idx + 1}章"
                 }
                 FanqieChapterItem(index = idx + 1, itemId = "idx_${idx + 1}", title = title)
             }
@@ -598,17 +654,32 @@ class FanqieCrawler(
             }
         }
 
-        // 拉取完整原生分卷与章节目录
-        val (volumes, dirChapters) = try {
+        // 拉取完整原生一级分卷与二级章节目录
+        val (rawVolumes, dirChapters) = try {
             fetchDirectoryWithVolumes(bookId)
         } catch (_: Exception) {
             emptyList<FanqieVolume>() to emptyList()
         }
-        val totalChapterCount = maxOf(landingChapterCount, dirChapters.size, titles.size)
+
+        // 关键修复：当官方目录接口返回了真实可下载章节列表 (dirChapters) 时，
+        // 严格以 dirChapters.size 作为权威章节总数，剔除 serial_count 中已删除/未过审的幽灵章节！
+        val totalChapterCount = when {
+            dirChapters.isNotEmpty() -> dirChapters.size
+            titles.isNotEmpty() -> titles.size
+            else -> landingChapterCount
+        }
         val availableChapters = if (totalChapterCount > 0) totalChapterCount else firstCount
         val latestTitle = dirChapters.lastOrNull()?.title?.takeIf { it.isNotBlank() }
             ?: titles.lastOrNull()?.takeIf { it.isNotBlank() }
             ?: bookData.optString("last_chapter_title", "")
+
+        val resolvedVolumes = if (rawVolumes.isNotEmpty()) {
+            rawVolumes
+        } else if (dirChapters.isNotEmpty()) {
+            listOf(FanqieVolume(index = 0, name = normalizeVolumeTitle("正文卷", 0), chapterCount = dirChapters.size))
+        } else {
+            emptyList()
+        }
 
         val meta = FanqieMetadata(
             bookId = bookId,
@@ -638,7 +709,7 @@ class FanqieCrawler(
             pcAvailable = checkPcAvailable(bookId),
             chapterTitles = if (dirChapters.isNotEmpty()) dirChapters.map { it.title } else titles,
             latestChapterTitle = latestTitle,
-            volumes = volumes,
+            volumes = resolvedVolumes,
             structuredChapters = dirChapters
         )
         FanqieChapterCacheStore.saveMetadata(meta)
@@ -646,19 +717,21 @@ class FanqieCrawler(
     }
 
     /**
-     * 双通道抓取番茄原生分卷与章节目录：
+     * 双通道抓取番茄原生【一级目录（分卷）】与【二级目录（章节）】：
      * 1. 优先解析 Web 目录详情接口 `/api/reader/directory/detail` 中的 `volumeNameList` 与 `chapterListWithVolume`；
      * 2. 若 Web 接口受限或为空，自动调用 `FanqieAppApi.fetchAppDirectory` 原生 APP 目录接口兜底；
-     * 3. 完整保留每一章所属的分卷序号、分卷名、原生章节标题、字数与首次发布时间。
+     * 3. 完整保留每一章所属的一级分卷 0-based 序号、规范化分卷名、卷内二级序号、原生章节标题與字数。
      */
     fun fetchDirectoryWithVolumes(bookId: String): Pair<List<FanqieVolume>, List<FanqieChapterItem>> {
         val chapters = ArrayList<FanqieChapterItem>()
         val volumes = ArrayList<FanqieVolume>()
+        val seenItemIds = HashSet<String>()
 
         try {
             val (_, text) = httpGetText("$DIRECTORY_API?bookId=$bookId", mobile = false)
             val data = JSONObject(text).optJSONObject("data")
             val volNamesArr = data?.optJSONArray("volumeNameList")
+                ?: data?.optJSONArray("allVolumeNames")
             val volChaptersArr = data?.optJSONArray("chapterListWithVolume")
 
             if (volChaptersArr != null && volChaptersArr.length() > 0) {
@@ -666,20 +739,29 @@ class FanqieCrawler(
                     val volArr = volChaptersArr.optJSONArray(v) ?: continue
                     val listVolName = volNamesArr?.optString(v, "")?.trim().orEmpty()
                     var resolvedVolName = listVolName
+                    for (i in 0 until volArr.length()) {
+                        val item = volArr.optJSONObject(i) ?: continue
+                        val itemVolName = item.optString("volume_name", item.optString("volumeName", "")).trim()
+                        if (resolvedVolName.isEmpty() && itemVolName.isNotEmpty()) {
+                            resolvedVolName = itemVolName
+                            break
+                        }
+                    }
+                    val normVolName = normalizeVolumeTitle(
+                        resolvedVolName.ifEmpty { if (volChaptersArr.length() > 1) "第${v + 1}卷" else "正文卷" },
+                        v
+                    )
                     var volChapterCount = 0
 
                     for (i in 0 until volArr.length()) {
                         val item = volArr.optJSONObject(i) ?: continue
-                        val itemId = item.optString("itemId", "").ifBlank { item.optString("item_id", "") }
-                        if (itemId.isBlank()) continue
-                        val itemVolName = item.optString("volume_name", "").trim()
-                        if (resolvedVolName.isEmpty() && itemVolName.isNotEmpty()) {
-                            resolvedVolName = itemVolName
-                        }
+                        val itemId = item.optString("itemId", "").ifBlank { item.optString("item_id", "") }.trim()
+                        if (itemId.isBlank() || !seenItemIds.add(itemId)) continue
                         val locked = item.optBoolean("isChapterLock") ||
                             item.optBoolean("needPay") ||
                             item.optBoolean("isPaidPublication")
                         val cIdx = chapters.size + 1
+                        volChapterCount++
                         val rawTitle = item.optString("title", "")
                         val wordCnt = item.optInt("chapterWordNumber", item.optInt("wordCount", 0))
                         val passTime = item.optLong("firstPassTime", 0L)
@@ -691,19 +773,19 @@ class FanqieCrawler(
                                 title = normalizeChapterTitle(rawTitle, cIdx),
                                 locked = locked,
                                 volumeIndex = v,
-                                volumeName = resolvedVolName,
+                                volumeName = normVolName,
+                                indexInVolume = volChapterCount,
                                 wordCount = wordCnt,
                                 firstPassTime = passTime
                             )
                         )
-                        volChapterCount++
                     }
 
-                    if (volChapterCount > 0 && resolvedVolName.isNotEmpty()) {
+                    if (volChapterCount > 0) {
                         volumes.add(
                             FanqieVolume(
                                 index = v,
-                                name = normalizeVolumeTitle(resolvedVolName, v),
+                                name = normVolName,
                                 chapterCount = volChapterCount
                             )
                         )
@@ -715,18 +797,27 @@ class FanqieCrawler(
                 val allIds = data.optJSONArray("allItemIds")
                 val landing = bookCache[bookId]
                 val titles = landing?.optJSONArray("item_names")
+                val defaultVolName = normalizeVolumeTitle("正文卷", 0)
                 if (allIds != null && allIds.length() > 0) {
                     for (i in 0 until allIds.length()) {
-                        val idStr = allIds.optString(i)
-                        val t = if (titles != null && i < titles.length()) titles.optString(i) else "第${i + 1}章"
+                        val idStr = allIds.optString(i).trim()
+                        if (idStr.isBlank() || !seenItemIds.add(idStr)) continue
+                        val cIdx = chapters.size + 1
+                        val t = if (titles != null && i < titles.length()) titles.optString(i) else "第${cIdx}章"
                         chapters.add(
                             FanqieChapterItem(
-                                index = i + 1,
+                                index = cIdx,
                                 itemId = idStr,
-                                title = normalizeChapterTitle(t, i + 1),
-                                locked = false
+                                title = normalizeChapterTitle(t, cIdx),
+                                locked = false,
+                                volumeIndex = 0,
+                                volumeName = defaultVolName,
+                                indexInVolume = cIdx
                             )
                         )
+                    }
+                    if (chapters.isNotEmpty()) {
+                        volumes.add(FanqieVolume(index = 0, name = defaultVolName, chapterCount = chapters.size))
                     }
                 }
             }
@@ -753,10 +844,11 @@ class FanqieCrawler(
             }
         }
 
-        // 通道四：落地页 item_names 兜底
+        // 通道四：落地页 item_names 兜底（仅当所有目录接口均不可用时）
         if (chapters.isEmpty()) {
             val landing = fetchLandingData(bookId)
             val titles = landing.optJSONArray("item_names")
+            val defaultVolName = normalizeVolumeTitle("正文卷", 0)
             if (titles != null) {
                 for (i in 0 until titles.length()) {
                     val rawT = titles.optString(i, "第${i + 1}章")
@@ -765,9 +857,15 @@ class FanqieCrawler(
                             index = i + 1,
                             itemId = null,
                             title = normalizeChapterTitle(rawT, i + 1),
-                            locked = false
+                            locked = false,
+                            volumeIndex = 0,
+                            volumeName = defaultVolName,
+                            indexInVolume = i + 1
                         )
                     )
+                }
+                if (chapters.isNotEmpty()) {
+                    volumes.add(FanqieVolume(index = 0, name = defaultVolName, chapterCount = chapters.size))
                 }
             }
         }
@@ -794,10 +892,10 @@ class FanqieCrawler(
     }
 
     /**
-     * 支持断点续下、原生分卷目录还原与结构化 XHTML 排版的增量下载方法：
-     * - 自动跳过 existingCache 中已有的章节
-     * - 每完成一个批次（30章）实时触发 onCheckpoint 持久化断点并更新精确字节偏移目录
-     * - 支持 shouldStop 随时安全暂停并保留已下载章节
+     * 支持断点续下、原生一级分卷/二级章节目录还原与精确完成度检测的增量下载方法：
+     * - 严格以真实章节列表为准，绝不用 serial_count 填充无 itemId 的幽灵章节；
+     * - 同时兼容按 itemId 和按 index 匹配本地已缓存章节；
+     * - 对经过 AppAPI + Web 多轮拉取仍为空内容的章节（如作者空章/已撤回公告章）自动写入占位归档，彻底消除「实际已下载完但检测仍有更新却没东西可下」的问题。
      */
     fun downloadBookIncremental(
         bookId: String,
@@ -831,12 +929,11 @@ class FanqieCrawler(
             }
         }
 
-        val total = maxOf(chapters.size, landingChapters.size, metadata.chapterCount, 1)
-        if (chapters.size < total) {
+        // 仅当目录接口完全为空时，才用 landingChapters 构建章节列表；绝不用 serial_count 填充无 itemId 幽灵章节！
+        if (chapters.isEmpty() && landingChapters.isNotEmpty()) {
             val titles = bookData.optJSONArray("item_names")
-            val lastVolIdx = chapters.lastOrNull()?.volumeIndex ?: 0
-            val lastVolName = chapters.lastOrNull()?.volumeName.orEmpty()
-            for (i in chapters.size until total) {
+            val defaultVolName = normalizeVolumeTitle("正文卷", 0)
+            for (i in landingChapters.indices) {
                 val t = if (titles != null && i < titles.length()) titles.optString(i) else "第${i + 1}章"
                 chapters.add(
                     FanqieChapterItem(
@@ -844,33 +941,42 @@ class FanqieCrawler(
                         itemId = null,
                         title = normalizeChapterTitle(t, i + 1),
                         locked = false,
-                        volumeIndex = lastVolIdx,
-                        volumeName = lastVolName
+                        volumeIndex = 0,
+                        volumeName = defaultVolName,
+                        indexInVolume = i + 1
                     )
                 )
             }
         }
+
+        val total = chapters.size.coerceAtLeast(1)
         val latestTitle = chapters.lastOrNull()?.title?.takeIf { it.isNotBlank() }
             ?: metadata.effectiveLatestChapter()
 
-        // 工作缓存：复制已有断点缓存并同步最新的原生章节名与分卷名
-        val workingCache = LinkedHashMap<String, CachedChapterEntry>(existingCache)
+        // 工作缓存：同时支持按 cacheKey(itemId) 和按 index 迁移已有断点缓存，并同步最新一级分卷与二级章节标题
+        val workingCache = LinkedHashMap<String, CachedChapterEntry>(maxOf(existingCache.size, total))
+        val existingByIndex = HashMap<Int, CachedChapterEntry>(existingCache.size * 2)
+        for (entry in existingCache.values) {
+            if (entry.index > 0 && (entry.formattedText.isNotBlank() || entry.paragraphs.isNotEmpty())) {
+                existingByIndex.putIfAbsent(entry.index, entry)
+            }
+        }
         for (ch in chapters) {
             val key = ch.cacheKey()
-            val old = workingCache[key]
-            if (old != null && (old.volumeName != ch.volumeName || old.title != ch.title)) {
-                val paras = old.resolvedParagraphs()
-                val newTitle = ch.title.ifBlank { old.title }
-                workingCache[key] = old.copy(
-                    index = ch.index,
-                    title = newTitle,
-                    volumeIndex = ch.volumeIndex,
-                    volumeName = ch.volumeName,
-                    formattedText = if (paras.isNotEmpty()) formatChapter(newTitle, paras) else old.formattedText,
-                    paragraphs = paras,
-                    wordCount = if (ch.wordCount > 0) ch.wordCount else old.resolvedWordCount()
-                )
-            }
+            val old = existingCache[key] ?: existingByIndex[ch.index] ?: continue
+            if (old.formattedText.isBlank() && old.paragraphs.isEmpty()) continue
+            val paras = old.resolvedParagraphs()
+            val newTitle = normalizeChapterTitle(ch.title.ifBlank { old.title }, ch.index)
+            workingCache[key] = old.copy(
+                key = key,
+                index = ch.index,
+                title = newTitle,
+                volumeIndex = ch.volumeIndex.coerceAtLeast(0),
+                volumeName = ch.volumeName.ifBlank { old.volumeName },
+                formattedText = if (paras.isNotEmpty()) formatChapter(newTitle, paras) else old.formattedText,
+                paragraphs = paras,
+                wordCount = if (ch.wordCount > 0) ch.wordCount else old.resolvedWordCount()
+            )
         }
 
         // 先把 landingChapters 前几章如果还没缓存的补进去
@@ -885,7 +991,7 @@ class FanqieCrawler(
                         index = ch.index,
                         title = cTitle,
                         formattedText = formatChapter(cTitle, paras),
-                        volumeIndex = ch.volumeIndex,
+                        volumeIndex = ch.volumeIndex.coerceAtLeast(0),
                         volumeName = ch.volumeName,
                         paragraphs = paras,
                         wordCount = if (ch.wordCount > 0) ch.wordCount else paras.sumOf { it.length }
@@ -896,9 +1002,9 @@ class FanqieCrawler(
 
         val initialCachedCount = chapters.count { it.cacheKey() in workingCache }
         val startMsg = if (initialCachedCount > 0 && initialCachedCount < total) {
-            "断点续下《${metadata.title}》：已缓存 $initialCachedCount/$total 章，从第 ${initialCachedCount + 1} 章继续…"
+            "断点续下《${metadata.title}》：已缓存 $initialCachedCount/$total 章，继续拉取剩余章节…"
         } else {
-            "开始下载《${metadata.title}》（共 $total 章）"
+            "开始下载《${metadata.title}》（共 ${metadata.volumes.size.coerceAtLeast(1)} 卷 $total 章）"
         }
 
         onProgress(
@@ -908,7 +1014,7 @@ class FanqieCrawler(
                 current = initialCachedCount,
                 total = total,
                 title = metadata.title,
-                chapterTitle = if (initialCachedCount > 0) "从第 ${initialCachedCount + 1} 章续下…" else "正在准备原生目录与排版…",
+                chapterTitle = if (initialCachedCount > 0) "已命中缓存 $initialCachedCount/$total 章…" else "正在准备一级分卷与二级章节目录…",
                 percent = ((initialCachedCount * 100.0) / total).toInt().coerceIn(0, 100),
                 filename = null,
                 failed = 0,
@@ -924,6 +1030,7 @@ class FanqieCrawler(
         }
         val missingItemIds = missingChaptersWithItemId.map { it.itemId!! }
         val chapterById = chapters.filter { !it.itemId.isNullOrBlank() }.associateBy { it.itemId!! }
+        val attemptedIds = HashSet<String>()
 
         var appError: String? = null
 
@@ -935,6 +1042,7 @@ class FanqieCrawler(
                     bookId = bookId,
                     shouldStop = shouldStop,
                     onBatch = { batch, got ->
+                        attemptedIds.addAll(batch)
                         var lastChapterTitleInBatch = ""
                         for (itemId in batch) {
                             val ch = chapterById[itemId] ?: continue
@@ -951,7 +1059,7 @@ class FanqieCrawler(
                                 index = ch.index,
                                 title = cTitle,
                                 formattedText = formatChapter(cTitle, paras),
-                                volumeIndex = ch.volumeIndex,
+                                volumeIndex = ch.volumeIndex.coerceAtLeast(0),
                                 volumeName = ch.volumeName,
                                 paragraphs = paras,
                                 wordCount = if (ch.wordCount > 0) ch.wordCount else paras.sumOf { it.length }
@@ -1007,6 +1115,7 @@ class FanqieCrawler(
             if (key in workingCache) continue
             val itemId = ch.itemId
             if (itemId != null && metadata.pcAvailable && !ch.locked) {
+                attemptedIds.add(itemId)
                 try {
                     val paras = fetchChapterWeb(itemId, ch.title)
                     if (paras.isNotEmpty()) {
@@ -1016,7 +1125,7 @@ class FanqieCrawler(
                             index = ch.index,
                             title = cTitle,
                             formattedText = formatChapter(cTitle, paras),
-                            volumeIndex = ch.volumeIndex,
+                            volumeIndex = ch.volumeIndex.coerceAtLeast(0),
                             volumeName = ch.volumeName,
                             paragraphs = paras,
                             wordCount = if (ch.wordCount > 0) ch.wordCount else paras.sumOf { it.length }
@@ -1045,20 +1154,51 @@ class FanqieCrawler(
             }
         }
 
+        val wasStopped = shouldStop?.invoke() == true
+
+        // 关键修复：若未暂停且网络正常（appError == null），对经过多轮尝试仍为空内容的章节（如作者空章或下架通告章）
+        // 写入占位说明并归档至缓存，彻底杜绝「实际已经下载完了但检测仍然有更新却没东西可下」的死循环！
+        if (!wasStopped && appError == null && workingCache.isNotEmpty()) {
+            for (ch in chapters) {
+                val key = ch.cacheKey()
+                if (key in workingCache) continue
+                val id = ch.itemId
+                if (id.isNullOrBlank() || id in attemptedIds) {
+                    val cTitle = normalizeChapterTitle(ch.title, ch.index)
+                    val placeholderParas = listOf("（本章为作者空章或已调整章节，暂无正文内容）")
+                    workingCache[key] = CachedChapterEntry(
+                        key = key,
+                        index = ch.index,
+                        title = cTitle,
+                        formattedText = formatChapter(cTitle, placeholderParas),
+                        volumeIndex = ch.volumeIndex.coerceAtLeast(0),
+                        volumeName = ch.volumeName,
+                        paragraphs = placeholderParas,
+                        wordCount = 0
+                    )
+                }
+            }
+        }
+
         val downloaded = chapters.count {
             val cached = workingCache[it.cacheKey()]
             cached != null && (cached.formattedText.isNotBlank() || cached.paragraphs.isNotEmpty())
         }
-        val failedCount = (total - downloaded).coerceAtLeast(0)
-        val wasStopped = shouldStop?.invoke() == true
 
         if (downloaded == 0) {
             val reason = if (appError != null) "APP 接口不可用（$appError），网页端也未获取到正文" else "未抓取到任何章节正文"
             throw FanqieException(reason)
         }
 
+        val remainingDownloadable = chapters.count {
+            it.cacheKey() !in workingCache && it.hasDownloadableId()
+        }
+        val isPartial = wasStopped || remainingDownloadable > 0
+        val effectiveTotal = if (!isPartial) downloaded else total
+        val failedCount = if (isPartial) remainingDownloadable else 0
+
         val updatedMeta = metadata.copy(
-            chapterCount = total,
+            chapterCount = effectiveTotal,
             latestChapterTitle = latestTitle,
             structuredChapters = chapters
         )
@@ -1069,18 +1209,17 @@ class FanqieCrawler(
             chapters = chapters,
             cacheMap = workingCache,
             downloaded = downloaded,
-            total = total,
+            total = effectiveTotal,
             failedCount = failedCount,
             includeTocIndexInText = false
         )
-        val isPartial = wasStopped || downloaded < total
 
         val finalStatus = if (wasStopped) "paused" else "done"
         val doneMsg = when {
-            wasStopped -> "已暂停并保存断点：已下载 $downloaded/$total 章（下次可从第 ${downloaded + 1} 章接着下）"
-            failedCount > 0 -> "已下载 $downloaded/$total 章（剩余 $failedCount 章可点击断点续下）"
-            initialCachedCount > 0 -> "增量续下完成：共 $downloaded 章（新增 ${downloaded - initialCachedCount} 章）"
-            else -> "全本下载完成：共 $downloaded 章（含原生分卷目录与排版）"
+            wasStopped -> "已暂停并保存断点：已下载 $downloaded/$effectiveTotal 章（下次可从第 ${downloaded + 1} 章接着下）"
+            failedCount > 0 -> "已下载 $downloaded/$effectiveTotal 章（剩余 $failedCount 章可点击断点续下）"
+            initialCachedCount > 0 && downloaded > initialCachedCount -> "增量续下完成：共 $downloaded 章（新增 ${downloaded - initialCachedCount} 章）"
+            else -> "全本已下载完成：共 ${updatedMeta.volumes.size.coerceAtLeast(1)} 卷 $downloaded 章（含原生一级/二级目录与排版）"
         }
 
         onProgress(
@@ -1088,10 +1227,10 @@ class FanqieCrawler(
                 bookId = bookId,
                 status = finalStatus,
                 current = downloaded,
-                total = total,
+                total = effectiveTotal,
                 title = metadata.title,
                 chapterTitle = latestTitle,
-                percent = ((downloaded * 100.0) / total).toInt().coerceIn(0, 100),
+                percent = if (!isPartial) 100 else ((downloaded * 100.0) / effectiveTotal).toInt().coerceIn(0, 99),
                 filename = "${metadata.title}.txt",
                 failed = failedCount,
                 message = doneMsg,
@@ -1105,7 +1244,7 @@ class FanqieCrawler(
             txtBytes = txtBytes,
             builtToc = builtToc,
             downloadedChapters = downloaded,
-            remoteTotalChapters = total,
+            remoteTotalChapters = effectiveTotal,
             latestChapterTitle = latestTitle,
             isPartial = isPartial,
             updatedCache = workingCache

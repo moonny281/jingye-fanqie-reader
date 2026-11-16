@@ -1,140 +1,120 @@
-name: Android E-Ink Legado + Fanqie Auto Build & Release
+name: Build Android APK & Release
 
 on:
   workflow_dispatch:
     inputs:
-      version_override:
-        description: '自定义版本号（留空则自动读取根目录 VERSION 文件）'
+      release_tag:
+        description: "自定义发布版本号 (留空则读取 VERSION 文件并自动避免冲突)"
         required: false
-        default: ''
-      create_release:
-        description: '构建完成后是否自动发布到 GitHub Releases'
-        required: false
-        type: boolean
-        default: true
+        default: ""
 
 permissions:
   contents: write
 
 jobs:
-  build-and-release:
-    name: Build Legado-E + Fanqie E-Ink APK
+  build-apk:
+    name: Build Legado + Fanqie Integrated APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Clean Legacy Standalone Files (If Upgrading In-Place)
-        run: |
-          rm -rf app/src/main/java/com/jingye
-          rm -rf app/src/test
-
-      - name: Read Version from Input or VERSION File
-        id: get_version
-        shell: bash
-        run: |
-          INPUT_VER="${{ github.event.inputs.version_override }}"
-          if [ -n "$INPUT_VER" ]; then
-            RAW_VERSION=$(echo "$INPUT_VER" | tr -d '[:space:]')
-          elif [ -f "VERSION" ]; then
-            RAW_VERSION=$(head -n 1 VERSION | tr -d '[:space:]')
-          else
-            RAW_VERSION="0.4.2"
-          fi
-          CLEAN_VERSION="${RAW_VERSION#v}"
-          echo "$CLEAN_VERSION" > VERSION
-          echo "version=${CLEAN_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "tag=v${CLEAN_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Detected Version: ${CLEAN_VERSION}"
-
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: "temurin"
+          java-version: "17"
+          cache: "gradle"
 
-      - name: Configure Android SDK & Licenses
-        shell: bash
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK Licenses & Install Build Tools
         run: |
-          set -e
-          SDK_DIR="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
-          export ANDROID_HOME="$SDK_DIR"
-          export ANDROID_SDK_ROOT="$SDK_DIR"
-          echo "ANDROID_HOME=$SDK_DIR" >> $GITHUB_ENV
-          echo "ANDROID_SDK_ROOT=$SDK_DIR" >> $GITHUB_ENV
-          mkdir -p "$SDK_DIR/licenses"
-          printf "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$SDK_DIR/licenses/android-sdk-license"
-          printf "\n84831b9409646a918e30573bab4c9c91346d8abd" > "$SDK_DIR/licenses/android-sdk-preview-license"
-          printf "\nd975f751698a77b662f1254ddbeed3901e976f5a" > "$SDK_DIR/licenses/intel-android-extra-license"
-          echo "sdk.dir=$SDK_DIR" > local.properties
+          yes | sdkmanager --licenses || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Download Bundled Open-Source E-Ink Fonts (Optional)
-        shell: bash
+      - name: Resolve Version & Update Gradle Version Info
+        id: version
         run: |
-          mkdir -p app/src/main/assets/fonts
-          curl -L --fail --retry 3 -o app/src/main/assets/fonts/LXGWWenKai-Regular.ttf \
-            "https://github.com/lxgw/LxgwWenKai/releases/download/v1.500/LXGWWenKai-Regular.ttf" || true
+          BASE_VER=$(cat VERSION | tr -d '[:space:]')
+          if [ -n "${{ github.event.inputs.release_tag }}" ]; then
+            BASE_VER="${{ github.event.inputs.release_tag }}"
+            BASE_VER="${BASE_VER#v}"
+          fi
+          if [ -z "$BASE_VER" ]; then
+            BASE_VER="0.4.4"
+          fi
 
-      - name: Configure APK Signing
-        shell: bash
-        run: |
-          cp .github/workflows/legado.jks app/legado.jks
-          cat >> gradle.properties << 'EOF'
+          TAG_NAME="v${BASE_VER}"
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            TAG_NAME="v${BASE_VER}.${GITHUB_RUN_NUMBER}"
+            FINAL_VER="${BASE_VER}.${GITHUB_RUN_NUMBER}"
+          else
+            FINAL_VER="${BASE_VER}"
+          fi
 
-          RELEASE_STORE_FILE=./legado.jks
-          RELEASE_KEY_ALIAS=legado
-          RELEASE_STORE_PASSWORD=gedoor_legado
-          RELEASE_KEY_PASSWORD=gedoor_legado
-          EOF
+          VERSION_CODE=$((14200 + ${GITHUB_RUN_NUMBER:-4}))
+          echo "Resolved Version: ${FINAL_VER} (Tag: ${TAG_NAME}, Code: ${VERSION_CODE})"
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+          sed -i "s/versionCode [0-9]\+/versionCode ${VERSION_CODE}/g" app/build.gradle
+          sed -i "s/versionName \"[^\"]*\"/versionName \"${FINAL_VER}\"/g" app/build.gradle
 
-      - name: Build AppRelease APK
-        shell: bash
+          echo "version=${FINAL_VER}" >> $GITHUB_OUTPUT
+          echo "tag=${TAG_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Build Release APK (appRelease)
         run: |
           chmod +x gradlew
-          ./gradlew assembleAppRelease --stacktrace
+          ./gradlew assembleAppRelease --no-daemon --stacktrace
 
-      - name: Collect & Rename Release APK
-        id: collect_apk
-        shell: bash
+      - name: Collect & Rename APK Artifact
+        id: collect
         run: |
-          mkdir -p release-dist
-          APK_PATH=$(find app/build/outputs/apk -name "*.apk" | head -n 1)
-          if [ -z "$APK_PATH" ]; then
-            echo "No APK found!"
+          mkdir -p dist-apk
+          APK_FILE=$(find app/build/outputs/apk -name "*.apk" | head -n 1)
+          if [ -z "$APK_FILE" ]; then
+            echo "No APK generated!"
             exit 1
           fi
-          OUT_NAME="Legado-E-Fanqie-EInk-v${{ steps.get_version.outputs.version }}.apk"
-          cp "$APK_PATH" "release-dist/$OUT_NAME"
-          echo "apk_name=$OUT_NAME" >> "$GITHUB_OUTPUT"
-          ls -lh release-dist/
+          OUT_NAME="jingye-fanqie-reader-${{ steps.version.outputs.version }}.apk"
+          cp "$APK_FILE" "dist-apk/${OUT_NAME}"
+          sha256sum "dist-apk/${OUT_NAME}" > "dist-apk/${OUT_NAME}.sha256"
+          echo "apk_path=dist-apk/${OUT_NAME}" >> $GITHUB_OUTPUT
+          echo "apk_name=${OUT_NAME}" >> $GITHUB_OUTPUT
+          ls -lh dist-apk/
 
-      - name: Upload APK Artifact
+      - name: Upload APK to Workflow Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Legado-E-Fanqie-EInk-v${{ steps.get_version.outputs.version }}
-          path: release-dist/*.apk
+          name: ${{ steps.collect.outputs.apk_name }}
+          path: dist-apk/*
           if-no-files-found: error
 
-      - name: Automatic Tag & GitHub Release
-        if: ${{ github.event.inputs.create_release != 'false' }}
+      - name: Create GitHub Release & Upload APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.get_version.outputs.tag }}
-          name: "墨水屏阅读器 × 番茄小说原生纯净版 ${{ steps.get_version.outputs.tag }}"
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "敬业番茄墨水屏阅读器 ${{ steps.version.outputs.tag }}"
           body: |
-            ### 墨水屏阅读器 × 番茄小说原生纯净版 ${{ steps.get_version.outputs.tag }}
-            - **移除冗余声明与弹窗**：移除原作者声明、免责提示弹窗、更新日志弹窗、首次引导与本地密码提示。
-            - **锁定唯一原生墨水屏模式**：移除其余彩色/暗黑主题与切换开关，默认且唯一采用纯白高对比墨水屏模式。
-            - **全局零动画深度优化**：禁用 Activity 转场、弹窗动画、列表加载动画、封面淡入动画及翻页过渡动画。
-            - **自适应分辨率最大化阅读面积 + 进度可关闭**：根据屏幕物理分辨率动态分配最优边距，支持底栏/顶栏一键开关阅读进度以释放 100% 全屏阅读面积。
-            - **局部刷新清残影 + 全局全刷双引擎**：新增无黑闪正文区域局部刷新清残影与翻页双级防残影调度。
-          files: release-dist/*.apk
+            ## 敬业番茄墨水屏阅读器 ${{ steps.version.outputs.tag }} 发布说明
+
+            ### v0.4.4 核心更新亮点
+            - **重构一级/二级目录探测与层级展示**：
+              - 严格区分**一级目录（分卷：`FanqieVolume`）**与**二级目录（章节：`FanqieChapterItem`）**，彻底修复 `volumeIndex` 0/1 偏移混用导致第一卷丢失或卷名错位的问题；
+              - 章节标题自动规范化并补全序号前缀（如 `第X章`），同时采用无冲突标记（一级分卷 `=== 第X卷 卷名 ===`、二级章节 `### 第X章 章节名 ###`），彻底消除网文正文内 `【系统提示】` 触发误切章的问题；
+              - 阅读器目录页与番茄详情页新增 **1-bit 纯黑白线性【一级分卷 / 二级章节】可折叠目录树预览**（一级分卷纯黑底白字粗体横幅、二级章节纯白底缩进树状行），支持一键展开/收起分卷与点击章节直接跳读。
+            - **彻底修复「实际已下载完但检测仍提示有更新/待续却无内容可下」Bug**：
+              - 剔除番茄 `serial_count` 中因作者删章/审核未过产生的无 `itemId` 幽灵章节，全书总章数严格以目录 API 真实可下载章节列表为准；
+              - 更新检测（`checkBookUpdate`）升级为按真实 `itemId` 集合精确对账，并对经过多轮重试仍为空章的条目自动归档，同时对旧版遗留的「假待续」状态支持一键自动治愈（Auto-Heal）。
+            - **微信读书墨水屏 1-bit 纯黑白线性 UI + 封面保留 + 局刷/全刷独立控制**：
+              - 全面保留书架与番茄搜索/详情页真实图书封面（含自动修复与本地持久化缓存），其余 UI 与开关控件全部采用 1-bit 纯黑白线性绘制，零动画、零水波纹；
+              - 顶部栏「墨水屏刷新」内置**开启局部刷新清残影**、**开启全局刷新清残影**及**全刷间隔页数（1 / 3 / 5 / 8 / 10 / 15 / 20 页）**独立开关。
+          files: |
+            dist-apk/*
           draft: false
           prerelease: false
         env:

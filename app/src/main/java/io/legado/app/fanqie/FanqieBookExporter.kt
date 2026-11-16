@@ -97,8 +97,9 @@ object FanqieBookExporter {
                                 itemId = entry.key.takeUnless { it.startsWith("idx_") },
                                 title = entry.title,
                                 locked = false,
-                                volumeIndex = entry.volumeIndex,
+                                volumeIndex = entry.volumeIndex.coerceAtLeast(0),
                                 volumeName = entry.volumeName,
+                                indexInVolume = entry.index,
                                 wordCount = entry.resolvedWordCount()
                             )
                         }
@@ -160,7 +161,7 @@ object FanqieBookExporter {
 
             // 同步重建书架内的 TXT 与精确字节偏移目录表，确保阅读器内打开也有完整原生目录
             val downloadedCount = chapters.count { it.cacheKey() in syncedCache }
-            val totalCount = maxOf(chapters.size, resolvedMeta.chapterCount, downloadedCount)
+            val totalCount = if (chapters.isNotEmpty()) chapters.size else maxOf(resolvedMeta.chapterCount, downloadedCount)
             val (internalTxtBytes, builtToc) = FanqieCrawler.buildBookTxtWithToc(
                 metadata = resolvedMeta,
                 chapters = chapters,
@@ -198,7 +199,7 @@ object FanqieBookExporter {
     ): Pair<String, ByteArray> = withContext(Dispatchers.IO) {
         val (meta, chapters, cacheMap) = prepareBookData(fanqieBookId, metadataHint)
         val downloaded = chapters.count { it.cacheKey() in cacheMap }
-        val total = maxOf(chapters.size, meta.chapterCount, downloaded)
+        val total = if (chapters.isNotEmpty()) chapters.size else maxOf(meta.chapterCount, downloaded)
         val (txtBytes, _) = FanqieCrawler.buildBookTxtWithToc(
             metadata = meta,
             chapters = chapters,
@@ -441,13 +442,7 @@ $introParasHtml
                 val chapters: MutableList<EpubChapterNode> = ArrayList()
             )
 
-            val hasMultipleVolumes = availableEntries.map { (ch, cached) ->
-                ch.volumeName.ifBlank { cached.volumeName }.trim()
-            }.filter { it.isNotEmpty() }.distinct().size > 1 ||
-                availableEntries.any { (ch, cached) ->
-                    val vn = ch.volumeName.ifBlank { cached.volumeName }.trim()
-                    vn.isNotEmpty() && vn != "正文" && vn != "默认卷" && vn != "第一卷"
-                }
+            val hasMultipleVolumes = true
 
             val volumeGroups = ArrayList<EpubVolumeGroup>()
             var curGroup: EpubVolumeGroup? = null
@@ -456,7 +451,7 @@ $introParasHtml
             for ((seqIdx, pair) in availableEntries.withIndex()) {
                 val (ch, cached) = pair
                 val rawVol = ch.volumeName.ifBlank { cached.volumeName }.trim()
-                val volIdx = if (ch.volumeIndex > 0) ch.volumeIndex else cached.volumeIndex
+                val volIdx = ch.volumeIndex.coerceAtLeast(0)
                 val normVol = if (hasMultipleVolumes && rawVol.isNotEmpty()) {
                     FanqieCrawler.normalizeVolumeTitle(rawVol, volIdx)
                 } else ""

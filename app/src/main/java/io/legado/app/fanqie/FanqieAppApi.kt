@@ -589,28 +589,30 @@ class FanqieAppApi(
                 val volumeCounter = LinkedHashMap<String, Int>()
                 val volumeIndexMap = LinkedHashMap<String, Int>()
 
+                val seenIds = HashSet<String>()
                 for (i in 0 until itemList.length()) {
                     val item = itemList.optJSONObject(i) ?: continue
-                    val itemId = item.optString("item_id").ifBlank { item.optString("itemId") }
-                    if (itemId.isBlank()) continue
+                    val itemId = item.optString("item_id").ifBlank { item.optString("itemId") }.trim()
+                    if (itemId.isBlank() || !seenIds.add(itemId)) continue
+                    val cIdx = chapters.size + 1
                     val rawTitle = item.optString("title").trim()
-                    val volName = item.optString("volume_name", "").trim()
-                    val volIdx = if (volName.isNotEmpty()) {
-                        volumeIndexMap.getOrPut(volName) { volumeIndexMap.size }
-                    } else 0
-                    if (volName.isNotEmpty()) {
-                        volumeCounter[volName] = (volumeCounter[volName] ?: 0) + 1
-                    }
+                    val rawVolName = item.optString("volume_name", item.optString("volumeName", "")).trim()
+                        .ifEmpty { "正文卷" }
+                    val volIdx = volumeIndexMap.getOrPut(rawVolName) { volumeIndexMap.size }
+                    val normVolName = FanqieCrawler.normalizeVolumeTitle(rawVolName, volIdx)
+                    val inVolIdx = (volumeCounter[normVolName] ?: 0) + 1
+                    volumeCounter[normVolName] = inVolIdx
                     val wordCnt = item.optInt("chapter_word_number", item.optInt("word_count", 0))
                     val passTime = item.optLong("first_pass_time", 0L)
                     chapters.add(
                         FanqieChapterItem(
-                            index = chapters.size + 1,
+                            index = cIdx,
                             itemId = itemId,
-                            title = rawTitle.ifBlank { "第${chapters.size + 1}章" },
+                            title = FanqieCrawler.normalizeChapterTitle(rawTitle, cIdx),
                             locked = false,
                             volumeIndex = volIdx,
-                            volumeName = volName,
+                            volumeName = normVolName,
+                            indexInVolume = inVolIdx,
                             wordCount = wordCnt,
                             firstPassTime = passTime
                         )

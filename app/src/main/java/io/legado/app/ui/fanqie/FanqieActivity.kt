@@ -41,6 +41,7 @@ import io.legado.app.fanqie.FanqieMetadata
 import io.legado.app.fanqie.FanqieParser
 import io.legado.app.fanqie.FanqiePrefs
 import io.legado.app.fanqie.FanqieSearchItem
+import io.legado.app.fanqie.FanqieUiHelper
 import io.legado.app.ui.book.read.ReadBookActivity
 import kotlinx.coroutines.launch
 
@@ -62,6 +63,7 @@ class FanqieActivity : AppCompatActivity() {
     private lateinit var btnBackToSearch: Button
     private lateinit var downloadProgressBar: ProgressBar
     private lateinit var btnDownloadBook: Button
+    private lateinit var btnPreviewToc: Button
     private lateinit var btnExportBook: Button
     private lateinit var btnPauseDownload: Button
     private lateinit var btnOpenDownloadedBook: Button
@@ -157,6 +159,7 @@ class FanqieActivity : AppCompatActivity() {
         btnBackToSearch = findViewById(R.id.btnBackToSearch)
         downloadProgressBar = findViewById(R.id.downloadProgressBar)
         btnDownloadBook = findViewById(R.id.btnDownloadBook)
+        btnPreviewToc = findViewById(R.id.btnPreviewToc)
         btnExportBook = findViewById(R.id.btnExportBook)
         btnPauseDownload = findViewById(R.id.btnPauseDownload)
         btnOpenDownloadedBook = findViewById(R.id.btnOpenDownloadedBook)
@@ -277,6 +280,11 @@ class FanqieActivity : AppCompatActivity() {
                 coverUrl = meta.coverUrl
             )
             Toast.makeText(this, "已加入书架并转入后台全本离线（自动抓取封面、原生分卷目录与排版）", Toast.LENGTH_SHORT).show()
+        }
+
+        btnPreviewToc.setOnClickListener {
+            val meta = currentMetadata ?: return@setOnClickListener
+            FanqieUiHelper.showBookTwoLevelTocFromId(this, meta.bookId, meta.title, preloadedMeta = meta)
         }
 
         btnExportBook.setOnClickListener {
@@ -516,7 +524,7 @@ class FanqieActivity : AppCompatActivity() {
                 btnDownloadBook.isEnabled = true
                 btnPauseDownload.visibility = View.GONE
                 val cachedCount = FanqieLegadoBridge.getCachedChapterCount(curMeta.bookId)
-                val total = maxOf(state.total, curMeta.chapterCount, cachedCount)
+                val total = if (state.status == "done" && cachedCount > 0) cachedCount else maxOf(state.total, curMeta.downloadableChapterCount(), cachedCount)
                 if (cachedCount in 1 until total) {
                     btnDownloadBook.text = "断点续下 (${cachedCount}/$total)"
                     tvBookCheckpointInfo.text = "断点已保存：已下载 $cachedCount / $total 章（待续 ${total - cachedCount} 章 · 可直接导出或阅读）"
@@ -641,8 +649,9 @@ class FanqieActivity : AppCompatActivity() {
         }
 
         tvBookTitle.text = meta.title
-        val volSummary = if (meta.volumes.isNotEmpty()) "${meta.volumes.size} 卷" else ""
-        val chCountText = if (meta.chapterCount > 0) "共 ${meta.chapterCount} 章" else "支持全本拉取"
+        val volSummary = if (meta.volumes.isNotEmpty()) "一级分卷 ${meta.volumes.size} 卷" else ""
+        val realTotal = meta.downloadableChapterCount()
+        val chCountText = if (realTotal > 0) "二级章节 $realTotal 章" else "支持全本拉取"
         val wcText = meta.formattedWordCount()
         val extra = listOf(meta.author, meta.serialStatus, volSummary, chCountText, wcText).filter { it.isNotBlank() }
         tvBookAuthor.text = extra.joinToString(" · ")
@@ -656,7 +665,7 @@ class FanqieActivity : AppCompatActivity() {
 
         val cachedCount = FanqieLegadoBridge.getCachedChapterCount(meta.bookId)
         val shelfBook = FanqieLegadoBridge.findBookByFanqieId(meta.bookId)
-        val total = maxOf(meta.chapterCount, cachedCount)
+        val total = maxOf(meta.downloadableChapterCount(), cachedCount)
 
         btnOpenDownloadedBook.visibility = View.VISIBLE
         btnOpenDownloadedBook.text = if (shelfBook != null) "继续阅读" else "立即阅读（秒开）"

@@ -248,10 +248,14 @@ object FanqieLegadoBridge {
                         .put("index", item.index)
                         .put("title", item.title)
                         .put("is_volume", item.isVolume)
+                        .put("level", item.level)
                         .put("start", item.startByte)
                         .put("end", item.endByte)
                         .put("word_count", item.wordCount)
+                        .put("volume_index", item.volumeIndex)
                         .put("volume_name", item.volumeName)
+                        .put("chapter_index", item.chapterIndex)
+                        .put("index_in_volume", item.indexInVolume)
                         .put("item_id", item.itemId ?: "")
                 )
             }
@@ -315,7 +319,10 @@ object FanqieLegadoBridge {
                         startByte = startB,
                         endByte = endB,
                         wordCount = o.optInt("word_count", 0),
+                        volumeIndex = o.optInt("volume_index", 0),
                         volumeName = o.optString("volume_name", ""),
+                        chapterIndex = o.optInt("chapter_index", i),
+                        indexInVolume = o.optInt("index_in_volume", 0),
                         itemId = o.optString("item_id", "").ifBlank { null }
                     )
                 )
@@ -387,10 +394,31 @@ object FanqieLegadoBridge {
             ?: throw FanqieException("《${book.name}》不是番茄下载书籍，无法检测番茄更新")
         val crawler = newLocalCrawler()
         val meta = crawler.fetchMetadata(tagInfo.fanqieBookId, forceRefresh = true)
-        val cachedCount = FanqieChapterCacheStore.countCached(tagInfo.fanqieBookId)
-        val localCount = maxOf(cachedCount, tagInfo.downloadedChapters)
-        val remoteCount = maxOf(meta.chapterCount, localCount)
-        val newChapters = (remoteCount - localCount).coerceAtLeast(0)
+        val cacheMap = FanqieChapterCacheStore.loadCachedMap(tagInfo.fanqieBookId)
+        val cachedByIndex = cacheMap.values
+            .filter { it.formattedText.isNotBlank() || it.paragraphs.isNotEmpty() }
+            .map { it.index }
+            .toHashSet()
+
+        val validRemoteChapters = meta.structuredChapters.filter { it.hasDownloadableId() }
+        val localCount: Int
+        val remoteCount: Int
+        val newChapters: Int
+
+        if (validRemoteChapters.isNotEmpty()) {
+            // 精确比对远端有效章节集合（按 itemId 或章节序号）是否已在本地缓存中
+            val missingRemote = validRemoteChapters.count { ch ->
+                ch.cacheKey() !in cacheMap && ch.index !in cachedByIndex
+            }
+            remoteCount = validRemoteChapters.size
+            localCount = (remoteCount - missingRemote).coerceAtLeast(cacheMap.size.coerceAtMost(remoteCount))
+            newChapters = missingRemote
+        } else {
+            val rawCached = cacheMap.size
+            localCount = maxOf(rawCached, tagInfo.downloadedChapters)
+            remoteCount = maxOf(meta.downloadableChapterCount(), localCount)
+            newChapters = (remoteCount - localCount).coerceAtLeast(0)
+        }
         val latestTitle = meta.effectiveLatestChapter()
         val isPartial = tagInfo.isPartial && newChapters > 0
 
@@ -481,7 +509,7 @@ object FanqieLegadoBridge {
 
         // 设定 latestChapterTime 大于文件修改时间，彻底防止 Book.isLocalModified() 误判并重置目录规则
         val safeLatestTime = maxOf(System.currentTimeMillis(), txtFile.lastModified() + 5000L)
-        val defaultTocRule = "^【([^\\r\\n]+)】$"
+        val defaultTocRule = "^(?:===\\s*(.+?)\\s*===|###\\s*(.+?)\\s*###)$"
 
         // 若当前正在阅读器中打开了这本书，同步保留内存中的实时阅读章节与字偏移
         val activeReadingBook = ReadBook.book?.takeIf {
@@ -520,7 +548,8 @@ object FanqieLegadoBridge {
             }
         } else {
             val minOrder = try { appDb.bookDao.minOrder } catch (_: Throwable) { 0 }
-            val firstNonVolTitle = builtToc.firstOrNull { !it.isVolume }?.title
+            val firstNonVolIdx = builtToc.indexOfFirst { !it.isVolume }.coerceAtLeast(0)
+            val firstNonVolTitle = builtToc.getOrNull(firstNonVolIdx)?.title
                 ?: builtToc.firstOrNull()?.title
                 ?: "第 1 章"
             Book(
@@ -542,7 +571,7 @@ object FanqieLegadoBridge {
                 lastCheckCount = pendingCount,
                 totalChapterNum = maxOf(builtToc.size, downloadedChapters, 1),
                 durChapterTitle = firstNonVolTitle,
-                durChapterIndex = 0,
+                durChapterIndex = firstNonVolIdx,
                 durChapterPos = 0,
                 durChapterTime = System.currentTimeMillis(),
                 wordCount = wordCountStr.ifBlank { null },

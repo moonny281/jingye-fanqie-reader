@@ -25,7 +25,7 @@ data class CachedChapterEntry(
         for ((idx, rawLine) in lines.withIndex()) {
             val trimmed = rawLine.trim()
             if (trimmed.isEmpty()) continue
-            if (idx == 0 && trimmed.startsWith("【") && trimmed.endsWith("】")) continue
+            if (idx == 0 && ((trimmed.startsWith("【") && trimmed.endsWith("】")) || (trimmed.startsWith("###") && trimmed.endsWith("###")) || (trimmed.startsWith("===") && trimmed.endsWith("===")))) continue
             result.add(trimmed.removePrefix("　　").trim())
         }
         return result
@@ -152,6 +152,7 @@ object FanqieChapterCacheStore {
                         .put("locked", ch.locked)
                         .put("volume_index", ch.volumeIndex)
                         .put("volume_name", ch.volumeName)
+                        .put("index_in_volume", ch.indexInVolume)
                         .put("word_count", ch.wordCount)
                         .put("first_pass_time", ch.firstPassTime)
                 )
@@ -218,6 +219,7 @@ object FanqieChapterCacheStore {
                             locked = c.optBoolean("locked", false),
                             volumeIndex = c.optInt("volume_index", 0),
                             volumeName = c.optString("volume_name", ""),
+                            indexInVolume = c.optInt("index_in_volume", i + 1),
                             wordCount = c.optInt("word_count", 0),
                             firstPassTime = c.optLong("first_pass_time", 0L)
                         )
