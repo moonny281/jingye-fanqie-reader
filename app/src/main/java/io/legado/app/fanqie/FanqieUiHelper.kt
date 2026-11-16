@@ -212,8 +212,7 @@ object FanqieUiHelper {
             setTextColor(Color.BLACK)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             typeface = Typeface.DEFAULT_BOLD
-            text = "一级分卷：${groups.size} 卷  |  二级章节：共 $totalChapters 章（已缓存 $cachedChapters 章）
-点击黑底【一级目录】可展开/收起该卷下的【二级章节】，点击章节可直接跳转阅读："
+            text = "一级分卷：${groups.size} 卷  |  二级章节：共 $totalChapters 章（已缓存 $cachedChapters 章）\n点击黑底【一级目录】可展开/收起该卷下的【二级章节】，点击章节可直接跳转阅读："
             setPadding(4.dp(), 2.dp(), 4.dp(), 8.dp())
         }
         rootLayout.addView(summaryTv)
@@ -406,13 +405,9 @@ object FanqieUiHelper {
                     AlertDialog.Builder(context)
                         .setTitle("《${res.title}》发现待下载章节")
                         .setMessage(
-                            "本地已缓存：${res.localChapters} 章
-" +
-                                "远端可下总章：${res.remoteChapters} 章（待下 ${res.newChaptersCount} 章）
-" +
-                                "最新章节：${res.latestChapterTitle.ifBlank { "未知" }}
-
-" +
+                            "本地已缓存：${res.localChapters} 章\n" +
+                                "远端可下总章：${res.remoteChapters} 章（待下 ${res.newChaptersCount} 章）\n" +
+                                "最新章节：${res.latestChapterTitle.ifBlank { "未知" }}\n\n" +
                                 "是否立即启动后台增量续下？"
                         )
                         .setPositiveButton(actionText) { _, _ ->
@@ -506,8 +501,7 @@ object FanqieUiHelper {
             if (hasUpdateBooks > 0) {
                 AlertDialog.Builder(context)
                     .setTitle("番茄书籍更新检测完成")
-                    .setMessage("共发现 $hasUpdateBooks 本书有未下完或新更新章节（合计 $totalPending 章）。
-是否立即在后台依次断点续下？")
+                    .setMessage("共发现 $hasUpdateBooks 本书有未下完或新更新章节（合计 $totalPending 章）。\n是否立即在后台依次断点续下？")
                     .setPositiveButton("全部后台续下") { _, _ ->
                         for (pb in pendingBooks) {
                             val t = FanqieLegadoBridge.parseTag(pb) ?: continue
