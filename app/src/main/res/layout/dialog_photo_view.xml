@@ -28,6 +28,16 @@
         app:layout_constraintBottom_toBottomOf="parent">
 
         <TextView
+            android:id="@+id/btn_photo_rotate"
+            style="@style/EinkPhotoBarButton"
+            android:text="旋转" />
+
+        <TextView
+            android:id="@+id/btn_photo_dither"
+            style="@style/EinkPhotoBarButton"
+            android:text="黑白点" />
+
+        <TextView
             android:id="@+id/btn_zoom_out"
             style="@style/EinkPhotoBarButton"
             android:text="缩小" />
