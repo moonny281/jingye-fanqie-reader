@@ -1068,6 +1068,15 @@ class FanqieCrawler(
                             val xhtml = got[itemId] ?: continue
                             val (titleText, paras) = FanqieAppApi.parseChapterXhtml(xhtml, ch.title)
                             if (paras.isEmpty()) continue
+                            // 0.4.7 诊断：原文里有图片线索但解析结果没有 <img> 行时，把线索片段写入 App 日志，便于确认真实标签格式
+                            if (paras.none { it.startsWith("<img ") }) {
+                                val hit = Regex("(<img\\b|<image\\b|novel-pic|byteimg|fqnovelpic)", RegexOption.IGNORE_CASE).find(xhtml)
+                                if (hit != null) {
+                                    val from = (hit.range.first - 60).coerceAtLeast(0)
+                                    val to = (hit.range.first + 260).coerceAtMost(xhtml.length)
+                                    io.legado.app.constant.AppLog.put("番茄章节「${ch.title}」含图片线索但未解析出插图：" + xhtml.substring(from, to))
+                                }
+                            }
                             val cTitle = normalizeChapterTitle(
                                 ch.title.ifBlank { titleText },
                                 ch.index

@@ -155,6 +155,9 @@ object FanqieLegadoBridge {
             list.add("https://p6-novel.byteimg.com/origin/$objKey.jpeg")
             list.add("https://p3-novel.byteimg.com/origin/$objKey")
             list.add("https://p6-novel.byteimg.com/large/$objKey.jpeg")
+            list.add("https://p3-novel.byteimg.com/large/$objKey.jpeg")
+            list.add("https://p9-novel.byteimg.com/origin/$objKey.jpeg")
+            list.add("https://p3-novel.byteimg.com/origin/$objKey.image")
         }
         return list.toList()
     }
@@ -163,61 +166,117 @@ object FanqieLegadoBridge {
      * 下载图片字节流并解码校验为标准可渲染的 JPEG 文件（兼容 JPEG/PNG/WebP/HEIC）：
      * 确保写入本地磁盘的图片文件 100% 能被 BitmapFactory 与阅读器 ImageColumn 直接解码绘制！
      */
+    /** 0.4.7：最近一次插图下载失败的原因（key = 原始 src），供阅读页图框显示与排查 */
+    val lastImageError = ConcurrentHashMap<String, String>()
+
+    private const val IMG_UA =
+        "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+
+    /** 先用 HttpURLConnection，失败再用 App 全局 OkHttpClient（带用户代理/DoH/自定义 DNS 配置）兜底 */
+    private fun fetchImageBytes(candidateUrl: String, errors: MutableList<String>): ByteArray? {
+        val host = runCatching { URL(candidateUrl).host }.getOrDefault(candidateUrl.take(40))
+        try {
+            val conn = (URL(candidateUrl).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 10000
+                readTimeout = 12000
+                instanceFollowRedirects = true
+                setRequestProperty("User-Agent", IMG_UA)
+                setRequestProperty("Accept", "image/jpeg,image/png,image/webp,image/*;q=0.8,*/*;q=0.5")
+                setRequestProperty("Referer", "https://fanqienovel.com/")
+            }
+            try {
+                val code = conn.responseCode
+                if (code in 200..299) {
+                    val b = conn.inputStream.use { it.readBytes() }
+                    if (b.size > 128) return b
+                    errors.add("$host 内容过小(${b.size}B)")
+                } else {
+                    errors.add("$host HTTP $code")
+                }
+            } finally {
+                conn.disconnect()
+            }
+        } catch (e: Throwable) {
+            errors.add("$host ${e.javaClass.simpleName}: ${e.message?.take(60)}")
+        }
+        try {
+            val req = okhttp3.Request.Builder()
+                .url(candidateUrl)
+                .header("User-Agent", IMG_UA)
+                .header("Referer", "https://fanqienovel.com/")
+                .build()
+            io.legado.app.help.http.okHttpClient.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val b = resp.body?.bytes()
+                    if (b != null && b.size > 128) return b
+                    errors.add("$host(okhttp) 内容过小")
+                } else {
+                    errors.add("$host(okhttp) HTTP ${resp.code}")
+                }
+            }
+        } catch (e: Throwable) {
+            errors.add("$host(okhttp) ${e.javaClass.simpleName}: ${e.message?.take(60)}")
+        }
+        return null
+    }
+
+    private fun saveBitmapAsJpeg(bmp: Bitmap, targetFile: File): Boolean {
+        targetFile.parentFile?.mkdirs()
+        val tmp = File(targetFile.parentFile, "${targetFile.name}.tmp")
+        FileOutputStream(tmp).use { fos ->
+            bmp.compress(Bitmap.CompressFormat.JPEG, 92, fos)
+        }
+        return if (tmp.length() > 128L) {
+            if (targetFile.exists()) targetFile.delete()
+            tmp.renameTo(targetFile)
+        } else {
+            tmp.delete()
+            false
+        }
+    }
+
+    /**
+     * 下载图片字节流并解码校验为标准可渲染的 JPEG 文件（兼容 JPEG/PNG/WebP/HEIC）。
+     * 0.4.7：记录每个候选 URL 的失败原因到 AppLog 与 [lastImageError]，不再静默吞掉。
+     */
     private fun downloadValidImageToFile(rawUrl: String?, targetFile: File): Boolean {
         val candidates = buildCandidateImageUrls(rawUrl)
-        if (candidates.isEmpty()) return false
+        val errKey = rawUrl.orEmpty()
+        if (candidates.isEmpty()) {
+            lastImageError[errKey] = "无法解析图片地址"
+            return false
+        }
+        val errors = ArrayList<String>()
 
         for (candidateUrl in candidates) {
-            try {
-                val conn = (URL(candidateUrl).openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 10000
-                    readTimeout = 12000
-                    instanceFollowRedirects = true
-                    setRequestProperty(
-                        "User-Agent",
-                        "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                    )
-                    setRequestProperty("Accept", "image/jpeg,image/png,image/webp,image/*;q=0.8,*/*;q=0.5")
-                    setRequestProperty("Referer", "https://fanqienovel.com/")
-                }
-                val bytes = try {
-                    if (conn.responseCode in 200..299) {
-                        conn.inputStream.use { it.readBytes() }
-                    } else null
-                } finally {
-                    conn.disconnect()
-                }
-                if (bytes != null && bytes.size > 128) {
-                    // 1. 尝试直接用 BitmapFactory 解码
-                    var bmp: Bitmap? = try {
-                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                    } catch (_: Throwable) {
-                        null
-                    }
-                    // 2. 若 BitmapFactory 无法直接解码（如特殊 WebP/HEIC），使用 Glide 解码器兜底转为 Bitmap
-                    if (bmp == null) {
-                        bmp = try {
-                            Glide.with(appCtx).asBitmap().load(bytes).submit().get()
-                        } catch (_: Throwable) {
-                            null
-                        }
-                    }
-                    if (bmp != null && bmp.width > 1 && bmp.height > 1) {
-                        targetFile.parentFile?.mkdirs()
-                        val tmp = File(targetFile.parentFile, "${targetFile.name}.tmp")
-                        FileOutputStream(tmp).use { fos ->
-                            bmp.compress(Bitmap.CompressFormat.JPEG, 92, fos)
-                        }
-                        if (tmp.length() > 128L) {
-                            if (targetFile.exists()) targetFile.delete()
-                            tmp.renameTo(targetFile)
-                            return true
-                        } else {
-                            tmp.delete()
-                        }
-                    }
-                }
+            val bytes = fetchImageBytes(candidateUrl, errors) ?: continue
+            // 1. 尝试直接用 BitmapFactory 解码
+            var bmp: Bitmap? = try {
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
             } catch (_: Throwable) {
+                null
+            }
+            // 2. 若 BitmapFactory 无法直接解码（如特殊 WebP/HEIC），使用 Glide 解码器兜底转为 Bitmap
+            if (bmp == null) {
+                bmp = try {
+                    Glide.with(appCtx).asBitmap().load(bytes).submit().get()
+                } catch (_: Throwable) {
+                    null
+                }
+            }
+            if (bmp != null && bmp.width > 1 && bmp.height > 1) {
+                try {
+                    if (saveBitmapAsJpeg(bmp, targetFile)) {
+                        lastImageError.remove(errKey)
+                        return true
+                    }
+                    errors.add("写入缓存失败 ${targetFile.name}")
+                } catch (e: Throwable) {
+                    errors.add("写入缓存异常 ${e.javaClass.simpleName}: ${e.message?.take(60)}")
+                }
+            } else {
+                val head = bytes.take(4).joinToString("") { "%02x".format(it) }
+                errors.add("解码失败(${bytes.size}B, 头=$head)")
             }
         }
 
@@ -225,23 +284,17 @@ object FanqieLegadoBridge {
         for (candidateUrl in candidates.take(2)) {
             try {
                 val bmp = Glide.with(appCtx).asBitmap().load(candidateUrl).submit().get()
-                if (bmp != null && bmp.width > 1 && bmp.height > 1) {
-                    targetFile.parentFile?.mkdirs()
-                    val tmp = File(targetFile.parentFile, "${targetFile.name}.tmp")
-                    FileOutputStream(tmp).use { fos ->
-                        bmp.compress(Bitmap.CompressFormat.JPEG, 92, fos)
-                    }
-                    if (tmp.length() > 128L) {
-                        if (targetFile.exists()) targetFile.delete()
-                        tmp.renameTo(targetFile)
-                        return true
-                    } else {
-                        tmp.delete()
-                    }
+                if (bmp != null && bmp.width > 1 && bmp.height > 1 && saveBitmapAsJpeg(bmp, targetFile)) {
+                    lastImageError.remove(errKey)
+                    return true
                 }
-            } catch (_: Throwable) {
+            } catch (e: Throwable) {
+                errors.add("Glide ${e.javaClass.simpleName}")
             }
         }
+        val summary = errors.distinct().take(4).joinToString("；").ifBlank { "未知原因" }
+        lastImageError[errKey] = summary
+        io.legado.app.constant.AppLog.put("番茄插图下载失败：${errKey.take(120)}\n$summary")
         return false
     }
 

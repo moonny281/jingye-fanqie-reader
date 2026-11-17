@@ -33,6 +33,12 @@ data class ImageColumn(
             style = Paint.Style.STROKE
             strokeWidth = 1.5f
         }
+        private val hintPaint = Paint().apply {
+            isAntiAlias = true
+            color = Color.BLACK
+            textSize = 13f.dpToPx()
+            textAlign = Paint.Align.CENTER
+        }
     }
 
     override var textLine: TextLine = emptyTextLine
@@ -76,6 +82,24 @@ data class ImageColumn(
         }
 
         if (ImageProvider.isErrorOrMissing(bitmap)) {
+            // 0.4.7：图片未就绪/失败时在图框内给出明确提示（含失败原因），不再只是一个空框
+            if (textLine.isImage && rectF.width() > 120f) {
+                kotlin.runCatching {
+                    val reason = io.legado.app.fanqie.FanqieLegadoBridge.lastImageError[src]
+                    val msg = if (reason == null) "插图加载中…" else "插图加载失败（稍后自动重试）"
+                    val cx = rectF.centerX()
+                    var cy = rectF.centerY()
+                    canvas.drawText(msg, cx, cy, hintPaint)
+                    if (reason != null) {
+                        val small = Paint(hintPaint).apply { textSize = 10f.dpToPx() }
+                        val maxChars = ((rectF.width() - 16f) / small.textSize).toInt().coerceAtLeast(8)
+                        reason.chunked(maxChars).take(3).forEach { line ->
+                            cy += small.textSize * 1.3f
+                            canvas.drawText(line, cx, cy, small)
+                        }
+                    }
+                }
+            }
             ImageProvider.triggerAsyncReloadIfNeeded(book, src, view)
         }
     }

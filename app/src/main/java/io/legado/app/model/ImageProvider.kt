@@ -313,11 +313,14 @@ object ImageProvider {
     fun triggerAsyncReloadIfNeeded(book: Book, src: String, view: android.view.View) {
         if (src.isBlank()) return
         val key = "${book.bookUrl}_$src"
+        val last = failedAt[key]
+        if (last != null && System.currentTimeMillis() - last < RETRY_COOLDOWN_MS) return
         if (!asyncLoadingSet.add(key)) return
         asyncScope.launch {
             try {
                 val file = cacheImage(book, src, ReadBook.bookSource)
                 if (file.isFile && file.length() > 128L) {
+                    failedAt.remove(key)
                     remove(file.absolutePath)
                     onImageFetched(book, src, key, file)
                     view.post {
@@ -326,8 +329,13 @@ object ImageProvider {
                         }
                         view.invalidate()
                     }
+                } else {
+                    failedAt[key] = System.currentTimeMillis()
+                    // 失败后刷新一次，让图框显示失败原因
+                    view.post { view.invalidate() }
                 }
             } catch (_: Throwable) {
+                failedAt[key] = System.currentTimeMillis()
             } finally {
                 asyncLoadingSet.remove(key)
             }

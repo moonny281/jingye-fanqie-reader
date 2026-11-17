@@ -53,9 +53,9 @@ class FanqieAppApi(
             "<div\\b[^>]*class\\s*=\\s*[\"'][^\"']*(?:author-say|author-words|writer-say|author_say)[^\"']*[\"'][^>]*>(.*?)</div>",
             setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
         )
-        private val IMG_TAG_RE = Regex("<img\\b[^>]*>", RegexOption.IGNORE_CASE)
+        private val IMG_TAG_RE = Regex("<(?:img|image)\\b[^>]*>", RegexOption.IGNORE_CASE)
         private val IMG_SRC_ATTR_RE = Regex(
-            "\\b(data-original|data-src|data-url|src|data-uri|uri)\\s*=\\s*[\"']([^\"']+)[\"']",
+            "(?<![\\w-])(data-original|data-src|data-url|src|data-uri|uri|xlink:href|href)\\s*=\\s*[\"']([^\"']+)[\"']",
             RegexOption.IGNORE_CASE
         )
         private val IMG_ALT_ATTR_RE = Regex(
@@ -112,7 +112,7 @@ class FanqieAppApi(
             }
             if (candidates.isEmpty()) return ""
             // 优先返回原本就是 http/https/双斜杠 的属性（如 data-src / data-original / src）
-            candidates.firstOrNull { (name, _) -> name in listOf("data-original", "data-src", "data-url", "src") }?.let {
+            candidates.firstOrNull { (name, _) -> name in listOf("data-original", "data-src", "data-url", "src", "xlink:href", "href") }?.let {
                 return it.second
             }
             return candidates.first().second
