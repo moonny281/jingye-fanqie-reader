@@ -13,7 +13,7 @@ import io.legado.app.ui.book.read.page.entities.TextLine.Companion.emptyTextLine
 import io.legado.app.utils.dpToPx
 
 /**
- * 阅读页正文插图渲染列 (v0.4.6 修复版)：
+ * 阅读页正文插图渲染列 (v0.4.7)：
  * 1. 加载并绘制真实章节插图 Bitmap（解决之前只画空心黑框不显示图片内容的问题）；
  * 2. 按图片原始宽高比居中绘制，并在外围绘制 1px 1-bit 细黑线边框；
  * 3. 若图片尚未完成本地落盘，自动触发异步补抓并在完成后自动刷新当前阅读页。

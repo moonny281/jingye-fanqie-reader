@@ -13,8 +13,20 @@ data class CachedChapterEntry(
     val volumeIndex: Int = 0,
     val volumeName: String = "",
     val paragraphs: List<String> = emptyList(),
-    val wordCount: Int = 0
+    val wordCount: Int = 0,
+    /**
+     * 缓存 schema 版本：0 = 0.4.6 及以前（解析时已丢弃 `<img>`，无插图 URL）；
+     * 1 = 0.4.7+（保留 `<img>` 行）。从 JSON 读取旧缓存时缺省为 0，新构造的条目默认为当前版本。
+     */
+    val imgSchema: Int = IMG_SCHEMA
 ) {
+    companion object {
+        const val IMG_SCHEMA = 1
+    }
+
+    /** 旧版缓存（不含插图 URL），需重新抓取才能显示正文插图 */
+    fun isLegacyNoImage(): Boolean = imgSchema < IMG_SCHEMA
+
     /**
      * 若旧版缓存仅保存了 formattedText，自动从中拆出干净的正文段落列表，保证导出 EPUB/TXT 时兼容旧断点。
      */
@@ -67,6 +79,7 @@ object FanqieChapterCacheStore {
                 val volIdx = o.optInt("volume_index", 0)
                 val volName = o.optString("volume_name", "")
                 val wc = o.optInt("word_count", 0)
+                val imgV = o.optInt("img_v", 0)
                 val pArr = o.optJSONArray("paragraphs")
                 val paras = ArrayList<String>()
                 if (pArr != null) {
@@ -85,7 +98,8 @@ object FanqieChapterCacheStore {
                         volumeIndex = volIdx,
                         volumeName = volName,
                         paragraphs = paras,
-                        wordCount = wc
+                        wordCount = wc,
+                        imgSchema = imgV
                     )
                 }
             }
@@ -94,6 +108,10 @@ object FanqieChapterCacheStore {
             out
         }
     }
+
+    /** 该书缓存中是否存在 0.4.6 及以前生成的、不含插图 URL 的旧章节 */
+    fun countLegacyNoImageChapters(fanqieBookId: String): Int =
+        loadCachedMap(fanqieBookId).values.count { it.isLegacyNoImage() }
 
     @Synchronized
     fun saveCachedMap(fanqieBookId: String, map: Map<String, CachedChapterEntry>) {
@@ -112,6 +130,7 @@ object FanqieChapterCacheStore {
                         .put("volume_index", entry.volumeIndex)
                         .put("volume_name", entry.volumeName)
                         .put("word_count", entry.resolvedWordCount())
+                        .put("img_v", entry.imgSchema)
                         .put("paragraphs", pArr)
                 )
             }

@@ -237,7 +237,7 @@ class TextChapterLayout(
                     val urlMatcher = paramPattern.matcher(titleImg)
                     var click: String? = null
                     var style: String? = null
-                    var imgSize = ImageProvider.getImageSize(book, titleImg, ReadBook.bookSource)
+                    var imgSize = ImageProvider.getImageSizeFast(book, titleImg, ReadBook.bookSource)
                     if (urlMatcher.find()) {
                         var width: String? = null
                         val urlOptionStr = titleImg.substring(urlMatcher.end())
@@ -383,7 +383,7 @@ class TextChapterLayout(
                         val imgSrc = matcher.group(1)!!
                         var style: String? = null
                         var click: String? = null
-                        var imgSize = ImageProvider.getImageSize(book, imgSrc, ReadBook.bookSource)
+                        var imgSize = ImageProvider.getImageSizeFast(book, imgSrc, ReadBook.bookSource)
                         val urlMatcher = paramPattern.matcher(imgSrc)
                         if (urlMatcher.find()) {
                             var width: String? = null
@@ -676,7 +676,7 @@ class TextChapterLayout(
                         var iStyle = urlOption["style"]
                         val width = urlOption["width"]
                         val click = urlOption["click"]
-                        var imgSize = ImageProvider.getImageSize(book, source, ReadBook.bookSource)
+                        var imgSize = ImageProvider.getImageSizeFast(book, source, ReadBook.bookSource)
                         width?.let {
                             if (width.endsWith("%")) {
                                 width.dropLast(1).toIntOrNull()?.let { percentage ->
@@ -722,7 +722,7 @@ class TextChapterLayout(
                             }
                         }
                     } else {
-                        val imgSize = ImageProvider.getImageSize(book, source, ReadBook.bookSource)
+                        val imgSize = ImageProvider.getImageSizeFast(book, source, ReadBook.bookSource)
                         setTypeImage(
                             book,
                             source,

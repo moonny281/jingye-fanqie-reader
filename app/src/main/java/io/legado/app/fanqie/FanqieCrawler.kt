@@ -965,10 +965,23 @@ class FanqieCrawler(
                 existingByIndex.putIfAbsent(entry.index, entry)
             }
         }
+        // 0.4.7：0.4.6 及以前的缓存在解析时已丢弃 <img>，无法靠复用补出插图；
+        // 对仍可重新抓取的章节(有 itemId 且未锁定)视为“待重抓”，先暂存旧正文作兜底，抓取失败时回填，避免丢书。
+        val staleOld = LinkedHashMap<String, CachedChapterEntry>()
         for (ch in chapters) {
             val key = ch.cacheKey()
             val old = existingCache[key] ?: existingByIndex[ch.index] ?: continue
             if (old.formattedText.isBlank() && old.paragraphs.isEmpty()) continue
+            if (old.isLegacyNoImage() && !ch.itemId.isNullOrBlank() && ch.hasDownloadableId() && !ch.locked) {
+                staleOld[key] = old.copy(
+                    key = key,
+                    index = ch.index,
+                    title = normalizeChapterTitle(ch.title.ifBlank { old.title }, ch.index),
+                    volumeIndex = ch.volumeIndex.coerceAtLeast(0),
+                    volumeName = ch.volumeName.ifBlank { old.volumeName }
+                )
+                continue
+            }
             val paras = old.resolvedParagraphs()
             val newTitle = normalizeChapterTitle(ch.title.ifBlank { old.title }, ch.index)
             workingCache[key] = old.copy(
@@ -986,7 +999,7 @@ class FanqieCrawler(
         // 先把 landingChapters 前几章如果还没缓存的补进去
         for (ch in chapters) {
             val key = ch.cacheKey()
-            if (key !in workingCache && ch.index <= landingChapters.size) {
+            if (key !in workingCache && key !in staleOld && ch.index <= landingChapters.size) {
                 val paras = landingChapters[ch.index - 1]
                 if (paras.isNotEmpty()) {
                     val cTitle = normalizeChapterTitle(ch.title, ch.index)
@@ -1005,7 +1018,9 @@ class FanqieCrawler(
         }
 
         val initialCachedCount = chapters.count { it.cacheKey() in workingCache }
-        val startMsg = if (initialCachedCount > 0 && initialCachedCount < total) {
+        val startMsg = if (staleOld.isNotEmpty()) {
+            "检测到旧版缓存不含正文插图，正在重新抓取 ${staleOld.size} 章以补全插图（失败章节会保留旧正文）…"
+        } else if (initialCachedCount > 0 && initialCachedCount < total) {
             "断点续下《${metadata.title}》：已缓存 $initialCachedCount/$total 章，继续拉取剩余章节…"
         } else {
             "开始下载《${metadata.title}》（共 ${metadata.volumes.size.coerceAtLeast(1)} 卷 $total 章）"
@@ -1091,19 +1106,25 @@ class FanqieCrawler(
 
                         // 每批次实时保存断点与书籍 TXT + 原生目录偏移表
                         if (onCheckpoint != null && doneNow > 0) {
+                            // 待重抓的旧章节仍写入断点，保证中途被杀进程时 TXT/缓存不缺章
+                            val ckMap: Map<String, CachedChapterEntry> = if (staleOld.isEmpty()) {
+                                workingCache
+                            } else {
+                                LinkedHashMap<String, CachedChapterEntry>(staleOld).also { it.putAll(workingCache) }
+                            }
                             val (checkpointBytes, checkpointToc) = buildBookTxtWithToc(
                                 metadata = metadata.copy(
                                     latestChapterTitle = latestTitle,
                                     structuredChapters = chapters
                                 ),
                                 chapters = chapters,
-                                cacheMap = workingCache,
+                                cacheMap = ckMap,
                                 downloaded = doneNow,
                                 total = total,
                                 failedCount = (total - doneNow).coerceAtLeast(0),
                                 includeTocIndexInText = false
                             )
-                            onCheckpoint(doneNow, total, latestTitle, checkpointBytes, checkpointToc, workingCache)
+                            onCheckpoint(doneNow, total, latestTitle, checkpointBytes, checkpointToc, ckMap)
                         }
                     }
                 )
@@ -1159,6 +1180,11 @@ class FanqieCrawler(
         }
 
         val wasStopped = shouldStop?.invoke() == true
+
+        // 重抓失败/被暂停而仍缺失的旧章节：回填旧正文（仍为 legacy，下次续下会继续尝试补插图）
+        for ((k, v) in staleOld) {
+            if (k !in workingCache) workingCache[k] = v
+        }
 
         // 关键修复：若未暂停且网络正常（appError == null），对经过多轮尝试仍为空内容的章节（如作者空章或下架通告章）
         // 写入占位说明并归档至缓存，彻底杜绝「实际已经下载完了但检测仍然有更新却没东西可下」的死循环！

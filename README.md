@@ -1,8 +1,20 @@
-# 净页番茄墨水屏阅读器 (jingye-fanqie-reader) · v0.4.6
+# 净页番茄墨水屏阅读器 (jingye-fanqie-reader) · v0.4.7
 
 专为墨水屏（E-Ink）设备与极简阅读爱好者深度定制的 **番茄小说全本离线下载（含正文插图渲染） + 仿番茄 App 原生可折叠多级目录 + 微信读书风 1-bit 纯黑白线框阅读器** 一体化 Android 客户端（附带可选 Python 后端服务）。
 
 ---
+
+## v0.4.7 版本核心更新说明 (Release Notes)
+
+### 1. 旧版缓存补全正文插图（根因修复）
+- 0.4.6 及以前下载的章节在解析时已丢弃 `<img>`，增量续传复用旧缓存，因此阅读器里永远没有插图。
+- `CachedChapterEntry` 新增 `imgSchema`（缓存 JSON 字段 `img_v`，旧缓存缺省为 0）；`downloadBookIncremental` 遇到旧版章节（有 itemId 且未锁定）时不再复用，而是重新抓取并保留插图 `<img>`。
+- 重抓失败/暂停时回填旧正文（断点与 TXT 不缺章），下次续下会继续尝试，不会丢书。
+- 番茄书城详情页检测到旧缓存时弹出「补全正文插图」提示，可一键重新抓取（无需清空缓存重下）。
+
+### 2. 排版期插图尺寸获取改为非阻塞
+- 排版时不再在协程里同步下载图片（原先多候选 URL × 10s/12s 超时，慢网会卡住排版，失败后还会退化为行内小占位）。
+- 新增 `ImageProvider.getImageSizeFast`：番茄书插图本地已缓存则直接读尺寸；未缓存则先用 4:3 占位尺寸排版并后台异步下载，下载完成后若真实比例与占位不同则防抖(800ms)重排；失败后 60 秒内不重复请求。
 
 ## v0.4.6 版本核心更新说明 (Release Notes)
 
@@ -45,4 +57,4 @@ chmod +x gradlew
 ### 2. GitHub Actions 手动构建与发布
 1. 进入 GitHub 仓库的 **Actions** 页面；
 2. 选择 **Android E-Ink Legado + Fanqie Auto Build & Release** 工作流并点击 **Run workflow**；
-3. 留空版本号将自动读取根目录 `VERSION` 文件（`0.4.6`），自动完成 APK 签名构建与 GitHub Release 发布。
+3. 留空版本号将自动读取根目录 `VERSION` 文件（`0.4.7`），自动完成 APK 签名构建与 GitHub Release 发布。

@@ -185,6 +185,10 @@ object ImageProvider {
         bookSource: BookSource?
     ): Size {
         val file = cacheImage(book, src, bookSource)
+        return decodeFileSize(file, src)
+    }
+
+    private fun decodeFileSize(file: File, src: String): Size {
         val op = BitmapFactory.Options()
         // inJustDecodeBounds如果设置为true,仅仅返回图片实际的宽和高,宽和高是赋值给opts.outWidth,opts.outHeight;
         op.inJustDecodeBounds = true
@@ -198,6 +202,102 @@ object ImageProvider {
             return Size(errorBitmap.width, errorBitmap.height)
         }
         return Size(op.outWidth, op.outHeight)
+    }
+
+    // ---------------------------------------------------------------------
+    // 0.4.7：番茄书正文插图排版期“非阻塞”取尺寸
+    // 旧逻辑在排版协程里同步下载(多候选 URL × 10s/12s 超时)，慢网时排版被卡死、翻页取消后插图位置空白，
+    // 下载失败还会退化为 <80px 的行内小占位。现改为：本地已有 → 直接读尺寸；没有 → 先用占位尺寸排版，
+    // 后台异步抓取，抓完若真实比例与占位不同则防抖重排当前书。
+    // ---------------------------------------------------------------------
+
+    /** 占位排版尺寸（4:3 横图，宽高均 ≥ 80，保证走独立图框而不是行内小占位） */
+    private val placeholderSize = Size(800, 600)
+    private const val RETRY_COOLDOWN_MS = 60_000L
+    private val placeholderSrcs = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val failedAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    @Volatile
+    private var relayoutJob: kotlinx.coroutines.Job? = null
+
+    private fun isFanqieRemoteImage(book: Book, src: String): Boolean {
+        if (io.legado.app.fanqie.FanqieLegadoBridge.extractFanqieBookId(book).isBlank()) return false
+        return src.startsWith("http", ignoreCase = true) || src.startsWith("//") ||
+            src.contains("novel-pic") || src.contains("byteimg")
+    }
+
+    private fun findLocalImage(book: Book, src: String): File? {
+        val v = BookHelp.getImage(book, src)
+        if (v.isFile && v.length() > 128L) return v
+        val fq = io.legado.app.fanqie.FanqieLegadoBridge.findCachedInlineImage(book, src)
+        if (fq != null && fq.isFile && fq.length() > 128L) return fq
+        return null
+    }
+
+    /**
+     * 排版期取图片尺寸：番茄书远程插图不再阻塞网络，其余书籍行为不变。
+     */
+    suspend fun getImageSizeFast(
+        book: Book,
+        src: String,
+        bookSource: BookSource?
+    ): Size {
+        if (!isFanqieRemoteImage(book, src)) return getImageSize(book, src, bookSource)
+        val local = withContext(IO) { findLocalImage(book, src) }
+        if (local != null) {
+            placeholderSrcs.remove("${book.bookUrl}_$src")
+            return withContext(IO) { decodeFileSize(local, src) }
+        }
+        val key = "${book.bookUrl}_$src"
+        placeholderSrcs.add(key)
+        val last = failedAt[key]
+        if (last == null || System.currentTimeMillis() - last > RETRY_COOLDOWN_MS) {
+            fetchInBackground(book, src, key)
+        }
+        return placeholderSize
+    }
+
+    private fun fetchInBackground(book: Book, src: String, key: String) {
+        if (!asyncLoadingSet.add(key)) return
+        asyncScope.launch {
+            try {
+                val file = cacheImage(book, src, ReadBook.bookSource)
+                if (file.isFile && file.length() > 128L) {
+                    failedAt.remove(key)
+                    remove(file.absolutePath)
+                    onImageFetched(book, src, key, file)
+                } else {
+                    failedAt[key] = System.currentTimeMillis()
+                }
+            } catch (_: Throwable) {
+                failedAt[key] = System.currentTimeMillis()
+            } finally {
+                asyncLoadingSet.remove(key)
+            }
+        }
+    }
+
+    /**
+     * 图片抓取完成：若排版时用的是占位尺寸且真实宽高比与占位差异明显，则防抖后重排当前阅读内容。
+     */
+    private fun onImageFetched(book: Book, src: String, key: String, file: File) {
+        if (!placeholderSrcs.remove(key)) return
+        val real = decodeFileSize(file, src)
+        if (real.width < 1 || real.height < 1) return
+        val ratioReal = real.height.toFloat() / real.width
+        val ratioHolder = placeholderSize.height.toFloat() / placeholderSize.width
+        val needRelayout = kotlin.math.abs(ratioReal - ratioHolder) / ratioHolder > 0.03f ||
+            (real.width < 80 && real.height < 80)
+        if (!needRelayout) {
+            ReadBook.curTextChapter?.pages?.forEach { it.invalidateAll() }
+            return
+        }
+        relayoutJob?.cancel()
+        relayoutJob = asyncScope.launch {
+            kotlinx.coroutines.delay(800) // 防抖：同一章多张图陆续到达只重排一次
+            if (ReadBook.book?.bookUrl == book.bookUrl) {
+                ReadBook.loadContent(resetPageOffset = false)
+            }
+        }
     }
 
     private val asyncLoadingSet = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
@@ -219,6 +319,7 @@ object ImageProvider {
                 val file = cacheImage(book, src, ReadBook.bookSource)
                 if (file.isFile && file.length() > 128L) {
                     remove(file.absolutePath)
+                    onImageFetched(book, src, key, file)
                     view.post {
                         io.legado.app.model.ReadBook.curTextChapter?.pages?.forEach { page ->
                             page.invalidateAll()

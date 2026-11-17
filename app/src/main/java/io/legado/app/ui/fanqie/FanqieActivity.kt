@@ -35,6 +35,7 @@ import io.legado.app.R
 import io.legado.app.eink.EinkRefreshHelper
 import io.legado.app.fanqie.DownloadTaskState
 import io.legado.app.fanqie.FanqieBookExporter
+import io.legado.app.fanqie.FanqieChapterCacheStore
 import io.legado.app.fanqie.FanqieDownloadManager
 import io.legado.app.fanqie.FanqieLegadoBridge
 import io.legado.app.fanqie.FanqieMetadata
@@ -74,6 +75,8 @@ class FanqieActivity : AppCompatActivity() {
     private lateinit var searchRecyclerView: RecyclerView
 
     private var currentMetadata: FanqieMetadata? = null
+    /** 0.4.7：本次会话已提示过「旧缓存无插图」的书，避免反复弹窗 */
+    private val legacyImagePromptedIds = HashSet<String>()
     private var lastSearchResults: List<FanqieSearchItem> = emptyList()
     private var isQueryBusy = false
     private var pendingExportBytes: ByteArray? = null
@@ -746,6 +749,41 @@ class FanqieActivity : AppCompatActivity() {
 
         FanqieDownloadManager.getState(meta.bookId)?.let { onDownloadStateChanged(it) }
         EinkRefreshHelper.scrubAfterOverlayDismiss(rootView)
+        checkLegacyImageCache(meta)
+    }
+
+    /**
+     * 0.4.7：0.4.6 及以前下载的章节缓存在解析时已丢弃 <img>，增量续传不会补抓；
+     * 检测到此类旧缓存时提示用户一键重抓（失败章节保留旧正文，不会丢书）。
+     */
+    private fun checkLegacyImageCache(meta: FanqieMetadata) {
+        if (!legacyImagePromptedIds.add(meta.bookId)) return
+        lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val legacy = FanqieChapterCacheStore.countLegacyNoImageChapters(meta.bookId)
+            if (legacy <= 0) return@launch
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                if (isFinishing || isDestroyed || currentMetadata?.bookId != meta.bookId) return@withContext
+                val dlg = AlertDialog.Builder(this@FanqieActivity)
+                    .setTitle("补全正文插图")
+                    .setMessage("《${meta.title}》有 $legacy 章是旧版本下载的缓存，当时未保存插图地址，因此阅读时不会显示插图。\n\n是否现在重新抓取这些章节以补全插图？（抓取失败的章节会保留原有正文，可随时再次续下）")
+                    .setPositiveButton("重新抓取") { _, _ ->
+                        btnDownloadBook.isEnabled = false
+                        btnDownloadBook.text = "后台离线中 (0%)"
+                        FanqieDownloadManager.startBackgroundDownload(
+                            ctx = this@FanqieActivity,
+                            fanqieBookId = meta.bookId,
+                            title = meta.title,
+                            author = meta.author,
+                            coverUrl = meta.coverUrl
+                        )
+                        Toast.makeText(this@FanqieActivity, "已开始重新抓取旧章节以补全插图", Toast.LENGTH_SHORT).show()
+                    }
+                    .setNegativeButton("暂不", null)
+                    .create()
+                EinkRefreshHelper.applyEinkDialogStyle(dlg, rootView)
+                dlg.show()
+            }
+        }
     }
 
     private inner class SearchAdapter(
