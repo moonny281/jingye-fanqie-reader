@@ -123,7 +123,7 @@ jobs:
 
       - name: Automatic Tag & GitHub Release
         if: ${{ github.event.inputs.create_release != 'false' }}
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.get_version.outputs.tag }}
           name: "墨水屏阅读器 × 番茄小说原生纯净版 ${{ steps.get_version.outputs.tag }}"
