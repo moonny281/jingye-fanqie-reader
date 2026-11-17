@@ -93,7 +93,7 @@ class FanqieCrawler(
             val urls = ArrayList<String>()
             for (p in paragraphs) {
                 val m = INLINE_IMG_LINE_RE.find(p)
-                if (m != null) {
+                if (m != null && !FanqieAppApi.isBogusImgLine(p)) {
                     val u = FanqieAppApi.normalizeImageUrl(m.groupValues[1])
                     if (u.isNotEmpty() && u !in urls) {
                         urls.add(u)
@@ -178,7 +178,9 @@ class FanqieCrawler(
          */
         fun formatChapterBody(paragraphs: List<String>): String {
             val sb = StringBuilder()
-            val cleanList = paragraphs.map { it.trim() }.filter { it.isNotEmpty() }
+            // 0.4.8：丢弃脚注标记等无效 <img>（含旧缓存里已存在的），避免排版出无法加载的空图框
+            val cleanList = paragraphs.map { it.trim() }
+                .filter { it.isNotEmpty() && !FanqieAppApi.isBogusImgLine(it) }
             for ((idx, p) in cleanList.withIndex()) {
                 when {
                     p.startsWith("<img ") && p.contains("src=") -> {

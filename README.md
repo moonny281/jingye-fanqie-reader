@@ -6,6 +6,11 @@
 
 ## v0.4.8 版本核心更新说明 (Release Notes)
 
+### 根因：脚注标记被当成图片（日志 `.../origin/SbdFootnote` HTTP 400）
+- 番茄 XHTML 里的 `<img src="SbdFootnote">` 是脚注/图标标记而非图片，旧逻辑把裸 token 拼成 byteimg 地址下载，CDN 必然返回 400。
+- 新增 `FanqieAppApi.isLikelyImageUrl / isBogusImgLine`：解析时不再把此类标记当图片；生成 TXT、统计待下载图片时一并丢弃（含旧缓存里已有的）；阅读排版时对番茄书直接剔除旧 TXT 中的此类 `<img>` 行，不再出现“插图加载失败”空框。
+- 真实插图（路径带目录/扩展名的 URL）不受影响。
+
 ### 修复插图下载 HTTP 400（“插图加载失败 HTTP 400”）
 - 带缩略图模板 `~tplv-resize:…` / 签名查询串的原始链接在部分 CDN 节点会直接返回 400。下载候选改为多级回退：原链接 → 去模板/去查询串的同域名链接 → p3/p6/p9-novel.byteimg.com 的 `origin`/`large` 路径（带/不带 `.jpeg`）→ `.image` / `~tplv-noop.image`。
 - 对象 Key 提取失败时，改用 URL 路径通用兜底。

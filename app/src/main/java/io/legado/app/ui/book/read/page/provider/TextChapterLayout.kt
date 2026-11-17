@@ -381,6 +381,16 @@ class TextChapterLayout(
                     while (matcher.find()) {
                         currentCoroutineContext().ensureActive()
                         val imgSrc = matcher.group(1)!!
+                        // 0.4.8：番茄脚注标记等伪图片（如 SbdFootnote）直接从正文剔除，兼容已生成的旧 TXT
+                        if (io.legado.app.fanqie.FanqieLegadoBridge.extractFanqieBookId(book).isNotBlank() &&
+                            io.legado.app.fanqie.FanqieAppApi.isBogusImgLine("<img src=\"$imgSrc\">")
+                        ) {
+                            if (start < matcher.start()) {
+                                sb.append(text.subSequence(start, matcher.start()))
+                            }
+                            start = matcher.end()
+                            continue
+                        }
                         var style: String? = null
                         var click: String? = null
                         var imgSize = ImageProvider.getImageSizeFast(book, imgSrc, ReadBook.bookSource)

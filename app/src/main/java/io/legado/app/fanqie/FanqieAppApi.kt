@@ -69,6 +69,31 @@ class FanqieAppApi(
         )
         private val UNSIGNED_HEIC_RE = Regex("\\.heic(\\b|$)", RegexOption.IGNORE_CASE)
 
+        /**
+         * 0.4.8：判断规范化后的地址是否像一张真实图片。
+         * 番茄 XHTML 里的 `<img src="SbdFootnote">` 之类是脚注/图标标记，不是图片；旧逻辑会把这种裸 token
+         * 拼成 https://p3-novel.byteimg.com/origin/SbdFootnote 去下载，CDN 必然返回 HTTP 400。
+         */
+        fun isLikelyImageUrl(url: String?): Boolean {
+            val u = (url ?: "").trim()
+            if (!u.startsWith("http", ignoreCase = true)) return false
+            val path = runCatching { java.net.URL(u).path }.getOrDefault("")
+            val key = path.trim('/').removePrefix("origin/").removePrefix("large/").removePrefix("img/")
+            if (key.isEmpty()) return false
+            if (key.contains('/') || key.contains('.')) return true
+            // 无目录、无扩展名的裸 token：只有足够长的纯十六进制/哈希样式才当作对象 Key
+            return key.length >= 24 && key.all { it.isLetterOrDigit() || it == '_' || it == '-' } &&
+                !key.contains("footnote", ignoreCase = true)
+        }
+
+        /** 段落行 `<img src="...">` 是否为无效图片（脚注标记等） */
+        fun isBogusImgLine(line: String): Boolean {
+            val t = line.trim()
+            if (!t.startsWith("<img", ignoreCase = true)) return false
+            val src = Regex("src\\s*=\\s*\"([^\"]*)\"", RegexOption.IGNORE_CASE).find(t)?.groupValues?.get(1).orEmpty()
+            return !isLikelyImageUrl(normalizeImageUrl(src))
+        }
+
         fun normalizeImageUrl(rawUrl: String?): String {
             var u = (rawUrl ?: "").trim()
                 .replace("\\/", "/")
@@ -106,7 +131,7 @@ class FanqieAppApi(
                 val rawVal = m.groupValues[2].trim()
                 if (rawVal.isEmpty() || rawVal.startsWith("data:", ignoreCase = true)) continue
                 val norm = normalizeImageUrl(rawVal)
-                if (norm.isNotEmpty()) {
+                if (norm.isNotEmpty() && isLikelyImageUrl(norm)) {
                     candidates.add(attrName to norm)
                 }
             }
