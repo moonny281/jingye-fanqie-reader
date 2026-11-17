@@ -1,8 +1,16 @@
-# 净页番茄墨水屏阅读器 (jingye-fanqie-reader) · v0.4.7
+# 净页番茄墨水屏阅读器 (jingye-fanqie-reader) · v0.4.8
 
 专为墨水屏（E-Ink）设备与极简阅读爱好者深度定制的 **番茄小说全本离线下载（含正文插图渲染） + 仿番茄 App 原生可折叠多级目录 + 微信读书风 1-bit 纯黑白线框阅读器** 一体化 Android 客户端（附带可选 Python 后端服务）。
 
 ---
+
+## v0.4.8 版本核心更新说明 (Release Notes)
+
+### 修复插图下载 HTTP 400（“插图加载失败 HTTP 400”）
+- 带缩略图模板 `~tplv-resize:…` / 签名查询串的原始链接在部分 CDN 节点会直接返回 400。下载候选改为多级回退：原链接 → 去模板/去查询串的同域名链接 → p3/p6/p9-novel.byteimg.com 的 `origin`/`large` 路径（带/不带 `.jpeg`）→ `.image` / `~tplv-noop.image`。
+- 对象 Key 提取失败时，改用 URL 路径通用兜底。
+- 4xx 不再用 OkHttp 重试同一 URL；超时/DNS 失败的主机在本次下载中后续候选直接跳过，避免白等。
+- 错误信息更详细：每个候选以 `主机/路径[?q][~tpl].扩展名 HTTP 状态 [服务端返回前80字节]` 记录，写入 App 日志，并在阅读页图框内显示最多 6 行。
 
 ## v0.4.7 版本核心更新说明 (Release Notes)
 
@@ -62,4 +70,4 @@ chmod +x gradlew
 ### 2. GitHub Actions 手动构建与发布
 1. 进入 GitHub 仓库的 **Actions** 页面；
 2. 选择 **Android E-Ink Legado + Fanqie Auto Build & Release** 工作流并点击 **Run workflow**；
-3. 留空版本号将自动读取根目录 `VERSION` 文件（`0.4.7`），自动完成 APK 签名构建与 GitHub Release 发布。
+3. 留空版本号将自动读取根目录 `VERSION` 文件（`0.4.8`），自动完成 APK 签名构建与 GitHub Release 发布。

@@ -146,38 +146,70 @@ object FanqieLegadoBridge {
             list.add(norm.replace(Regex("\\.heic(\\b|$)", RegexOption.IGNORE_CASE), ".webp$1"))
         }
 
+        // 0.4.8：带缩略图模板(~tplv-resize:200:260 等)的链接在部分节点会直接返回 HTTP 400，
+        // 先尝试去掉模板/查询串的“干净”同域名链接
+        val noQuery = norm.substringBefore("?")
+        val noTpl = noQuery.substringBefore("~tplv")
+        if (noTpl.startsWith("http") && noTpl != norm) {
+            list.add(noTpl)
+            list.add("$noTpl.jpeg")
+        }
+
         // 从链接中提取底层对象存储 Key（如 novel-pic-r/xxx 或 novel-pic/xxx 或 tos-cn-i-xxx/yyy）
-        val pathPart = norm.substringBefore("?").substringBefore("~tplv")
-        val keyMatch = BYTEIMG_KEY_RE.find(pathPart)
-        if (keyMatch != null) {
-            val objKey = keyMatch.groupValues[1].trim('/')
-            list.add("https://p3-novel.byteimg.com/origin/$objKey.jpeg")
-            list.add("https://p6-novel.byteimg.com/origin/$objKey.jpeg")
-            list.add("https://p3-novel.byteimg.com/origin/$objKey")
-            list.add("https://p6-novel.byteimg.com/large/$objKey.jpeg")
-            list.add("https://p3-novel.byteimg.com/large/$objKey.jpeg")
-            list.add("https://p9-novel.byteimg.com/origin/$objKey.jpeg")
+        val pathPart = noTpl
+        var objKey = BYTEIMG_KEY_RE.find(pathPart)?.groupValues?.get(1)?.trim('/').orEmpty()
+        if (objKey.isEmpty()) {
+            // 通用兜底：取 URL 路径部分，去掉 origin/large 前缀
+            objKey = runCatching { URL(pathPart).path }.getOrDefault("")
+                .trim('/')
+                .removePrefix("origin/").removePrefix("large/").removePrefix("img/")
+                .substringBefore(".")
+        }
+        if (objKey.isNotEmpty()) {
+            val hosts = listOf("p3-novel.byteimg.com", "p6-novel.byteimg.com", "p9-novel.byteimg.com")
+            for (kind in listOf("origin", "large")) {
+                for (host in hosts) {
+                    list.add("https://$host/$kind/$objKey.jpeg")
+                    list.add("https://$host/$kind/$objKey")
+                }
+            }
             list.add("https://p3-novel.byteimg.com/origin/$objKey.image")
+            list.add("https://p3-novel.byteimg.com/origin/$objKey~tplv-noop.image")
         }
         return list.toList()
     }
 
-    /**
-     * 下载图片字节流并解码校验为标准可渲染的 JPEG 文件（兼容 JPEG/PNG/WebP/HEIC）：
-     * 确保写入本地磁盘的图片文件 100% 能被 BitmapFactory 与阅读器 ImageColumn 直接解码绘制！
-     */
     /** 0.4.7：最近一次插图下载失败的原因（key = 原始 src），供阅读页图框显示与排查 */
     val lastImageError = ConcurrentHashMap<String, String>()
 
     private const val IMG_UA =
         "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 
+    /** 当前一次下载过程中判定为不可达(超时/DNS失败)的主机，后续候选直接跳过，避免白等超时 */
+    private fun isDeadHostError(e: Throwable): Boolean =
+        e is java.net.SocketTimeoutException || e is java.net.UnknownHostException || e is java.net.ConnectException
+
+    /** 简短标注候选来源：host(去 novel 域后缀)/路径首段，用于错误摘要 */
+    private fun shortTag(url: String): String = runCatching {
+        val u = URL(url)
+        val h = u.host.substringBefore(".")
+        val seg = u.path.trim('/').substringBefore("/")
+        val ext = u.path.substringAfterLast('.', "").take(5)
+        "$h/$seg" + (if (u.query != null) "?q" else "") + (if (url.contains("~tplv")) "~tpl" else "") + (if (ext.isNotEmpty() && ext.length <= 5 && !ext.contains("/")) ".$ext" else "")
+    }.getOrDefault(url.take(30))
+
     /** 先用 HttpURLConnection，失败再用 App 全局 OkHttpClient（带用户代理/DoH/自定义 DNS 配置）兜底 */
-    private fun fetchImageBytes(candidateUrl: String, errors: MutableList<String>): ByteArray? {
+    private fun fetchImageBytes(
+        candidateUrl: String,
+        errors: MutableList<String>,
+        deadHosts: MutableSet<String>
+    ): ByteArray? {
         val host = runCatching { URL(candidateUrl).host }.getOrDefault(candidateUrl.take(40))
+        if (host in deadHosts) return null
+        val tag = shortTag(candidateUrl)
         try {
             val conn = (URL(candidateUrl).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 10000
+                connectTimeout = 8000
                 readTimeout = 12000
                 instanceFollowRedirects = true
                 setRequestProperty("User-Agent", IMG_UA)
@@ -189,15 +221,25 @@ object FanqieLegadoBridge {
                 if (code in 200..299) {
                     val b = conn.inputStream.use { it.readBytes() }
                     if (b.size > 128) return b
-                    errors.add("$host 内容过小(${b.size}B)")
+                    errors.add("$tag 内容过小(${b.size}B)")
                 } else {
-                    errors.add("$host HTTP $code")
+                    // 4xx 时带上服务端返回的前 80 字节，便于判断是签名问题还是路径问题
+                    val body = runCatching {
+                        conn.errorStream?.use { it.readBytes() }?.let { String(it, Charsets.UTF_8).take(80).replace(Regex("\\s+"), " ") }
+                    }.getOrNull().orEmpty()
+                    errors.add("$tag HTTP $code" + if (body.isNotBlank()) " [$body]" else "")
+                    // 明确的客户端错误：OkHttp 重试同一 URL 没有意义
+                    if (code in 400..499) return null
                 }
             } finally {
                 conn.disconnect()
             }
         } catch (e: Throwable) {
-            errors.add("$host ${e.javaClass.simpleName}: ${e.message?.take(60)}")
+            errors.add("$tag ${e.javaClass.simpleName}")
+            if (isDeadHostError(e)) {
+                deadHosts.add(host)
+                return null
+            }
         }
         try {
             val req = okhttp3.Request.Builder()
@@ -209,13 +251,14 @@ object FanqieLegadoBridge {
                 if (resp.isSuccessful) {
                     val b = resp.body?.bytes()
                     if (b != null && b.size > 128) return b
-                    errors.add("$host(okhttp) 内容过小")
+                    errors.add("$tag(okhttp) 内容过小")
                 } else {
-                    errors.add("$host(okhttp) HTTP ${resp.code}")
+                    errors.add("$tag(okhttp) HTTP ${resp.code}")
                 }
             }
         } catch (e: Throwable) {
-            errors.add("$host(okhttp) ${e.javaClass.simpleName}: ${e.message?.take(60)}")
+            errors.add("$tag(okhttp) ${e.javaClass.simpleName}")
+            if (isDeadHostError(e)) deadHosts.add(host)
         }
         return null
     }
@@ -247,9 +290,10 @@ object FanqieLegadoBridge {
             return false
         }
         val errors = ArrayList<String>()
+        val deadHosts = HashSet<String>()
 
         for (candidateUrl in candidates) {
-            val bytes = fetchImageBytes(candidateUrl, errors) ?: continue
+            val bytes = fetchImageBytes(candidateUrl, errors, deadHosts) ?: continue
             // 1. 尝试直接用 BitmapFactory 解码
             var bmp: Bitmap? = try {
                 BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
@@ -292,7 +336,7 @@ object FanqieLegadoBridge {
                 errors.add("Glide ${e.javaClass.simpleName}")
             }
         }
-        val summary = errors.distinct().take(4).joinToString("；").ifBlank { "未知原因" }
+        val summary = errors.distinct().take(8).joinToString("；").ifBlank { "未知原因" }
         lastImageError[errKey] = summary
         io.legado.app.constant.AppLog.put("番茄插图下载失败：${errKey.take(120)}\n$summary")
         return false

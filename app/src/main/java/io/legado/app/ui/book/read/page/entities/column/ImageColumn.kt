@@ -13,7 +13,7 @@ import io.legado.app.ui.book.read.page.entities.TextLine.Companion.emptyTextLine
 import io.legado.app.utils.dpToPx
 
 /**
- * 阅读页正文插图渲染列 (v0.4.7)：
+ * 阅读页正文插图渲染列 (v0.4.8)：
  * 1. 加载并绘制真实章节插图 Bitmap（解决之前只画空心黑框不显示图片内容的问题）；
  * 2. 按图片原始宽高比居中绘制，并在外围绘制 1px 1-bit 细黑线边框；
  * 3. 若图片尚未完成本地落盘，自动触发异步补抓并在完成后自动刷新当前阅读页。
@@ -93,7 +93,7 @@ data class ImageColumn(
                     if (reason != null) {
                         val small = Paint(hintPaint).apply { textSize = 10f.dpToPx() }
                         val maxChars = ((rectF.width() - 16f) / small.textSize).toInt().coerceAtLeast(8)
-                        reason.chunked(maxChars).take(3).forEach { line ->
+                        reason.chunked(maxChars).take(6).forEach { line ->
                             cy += small.textSize * 1.3f
                             canvas.drawText(line, cx, cy, small)
                         }
