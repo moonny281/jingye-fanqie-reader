@@ -45,18 +45,7 @@ class FanqieCrawler(
             TAG_RE.replace(raw, "").replace("《", "").replace("》", "").trim()
 
         fun normalizeCoverUrl(rawUrl: String?): String {
-            var u = (rawUrl ?: "").trim()
-                .replace("\\/", "/")
-                .replace("\\u0026", "&")
-            if (u.isEmpty() || u == "null") return ""
-            if (u.startsWith("//")) {
-                u = "https:$u"
-            } else if (u.startsWith("http://")) {
-                u = "https://" + u.removePrefix("http://")
-            } else if (!u.startsWith("http") && !u.startsWith("/") && (u.contains("novel-pic") || u.contains("tos-cn") || u.contains("byteimg"))) {
-                u = "https://p3-novel.byteimg.com/origin/$u"
-            }
-            return u
+            return FanqieAppApi.normalizeImageUrl(rawUrl)
         }
 
         fun extractCoverUrl(obj: JSONObject?): String {

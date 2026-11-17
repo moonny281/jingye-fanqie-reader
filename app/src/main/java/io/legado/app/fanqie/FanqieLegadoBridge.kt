@@ -1,6 +1,11 @@
 package io.legado.app.fanqie
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
+import com.bumptech.glide.Glide
+import java.io.ByteArrayOutputStream
+import java.io.FileOutputStream
 import android.os.Handler
 import android.os.Looper
 import kotlinx.coroutines.CoroutineScope
@@ -76,12 +81,12 @@ object FanqieLegadoBridge {
         if (norm.isBlank()) return null
         if (norm.startsWith("/")) {
             val f = File(norm)
-            if (f.isFile && f.length() > 128L) return f
+            if (isValidImageFile(f)) return f
         }
         val tag = book?.let { parseTag(it) }
         if (tag != null && tag.fanqieBookId.isNotBlank()) {
             val f = localInlineImageFile(tag.fanqieBookId, norm)
-            if (f.isFile && f.length() > 128L) return f
+            if (isValidImageFile(f)) return f
         }
         val rootImgDir = File(booksDir, "images")
         if (rootImgDir.isDirectory) {
@@ -103,40 +108,15 @@ object FanqieLegadoBridge {
     fun downloadAndCacheInlineImage(fanqieBookId: String, rawSrc: String): File? {
         val normUrl = FanqieAppApi.normalizeImageUrl(rawSrc)
         if (normUrl.isBlank()) return null
-        val targetFile = localInlineImageFile(fanqieBookId, normUrl)
-        if (targetFile.isFile && targetFile.length() > 128L) {
+        val safeBookId = fanqieBookId.ifBlank { "common" }
+        val targetFile = localInlineImageFile(safeBookId, normUrl)
+        if (isValidImageFile(targetFile)) {
             return targetFile
         }
-        return try {
-            val conn = (URL(normUrl).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 12000
-                readTimeout = 15000
-                instanceFollowRedirects = true
-                setRequestProperty(
-                    "User-Agent",
-                    "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                )
-                setRequestProperty("Referer", "https://fanqienovel.com/")
-            }
-            try {
-                if (conn.responseCode in 200..299) {
-                    val bytes = conn.inputStream.use { it.readBytes() }
-                    if (bytes.size > 128) {
-                        targetFile.parentFile?.mkdirs()
-                        val tmp = File(targetFile.parentFile, "${targetFile.name}.tmp")
-                        tmp.writeBytes(bytes)
-                        if (targetFile.exists()) targetFile.delete()
-                        tmp.renameTo(targetFile)
-                        return targetFile
-                    }
-                }
-            } finally {
-                conn.disconnect()
-            }
-            null
-        } catch (_: Throwable) {
-            null
+        if (downloadValidImageToFile(rawSrc, targetFile)) {
+            return targetFile
         }
+        return null
     }
 
     fun localCoverFileForBook(book: Book): File {
@@ -148,38 +128,142 @@ object FanqieLegadoBridge {
         return File(booksDir, "shelf_${key}_cover.jpg")
     }
 
+    private val BYTEIMG_KEY_RE = Regex("((?:novel-pic[a-z0-9_-]*|tos-cn-[a-z0-9_-]+)/[a-zA-Z0-9_/-]+)")
+
+    /**
+     * 为番茄封面或正文插图生成多候选下载链接列表：
+     * 解决 fqnovelpic 签名过期、.heic 硬件解码不支持、或单 CDN 节点受限导致图片下载/解码失败的问题。
+     */
+    fun buildCandidateImageUrls(rawUrl: String?): List<String> {
+        val norm = FanqieAppApi.normalizeImageUrl(rawUrl)
+        if (norm.isBlank()) return emptyList()
+        val list = LinkedHashSet<String>()
+        list.add(norm)
+
+        // 若原链接包含 .heic，尝试替换为 .jpeg / .jpg / .webp
+        if (norm.contains(".heic", ignoreCase = true)) {
+            list.add(norm.replace(Regex("\\.heic(\\b|$)", RegexOption.IGNORE_CASE), ".jpeg$1"))
+            list.add(norm.replace(Regex("\\.heic(\\b|$)", RegexOption.IGNORE_CASE), ".webp$1"))
+        }
+
+        // 从链接中提取底层对象存储 Key（如 novel-pic-r/xxx 或 novel-pic/xxx 或 tos-cn-i-xxx/yyy）
+        val pathPart = norm.substringBefore("?").substringBefore("~tplv")
+        val keyMatch = BYTEIMG_KEY_RE.find(pathPart)
+        if (keyMatch != null) {
+            val objKey = keyMatch.groupValues[1].trim('/')
+            list.add("https://p3-novel.byteimg.com/origin/$objKey.jpeg")
+            list.add("https://p6-novel.byteimg.com/origin/$objKey.jpeg")
+            list.add("https://p3-novel.byteimg.com/origin/$objKey")
+            list.add("https://p6-novel.byteimg.com/large/$objKey.jpeg")
+        }
+        return list.toList()
+    }
+
+    /**
+     * 下载图片字节流并解码校验为标准可渲染的 JPEG 文件（兼容 JPEG/PNG/WebP/HEIC）：
+     * 确保写入本地磁盘的图片文件 100% 能被 BitmapFactory 与阅读器 ImageColumn 直接解码绘制！
+     */
+    private fun downloadValidImageToFile(rawUrl: String?, targetFile: File): Boolean {
+        val candidates = buildCandidateImageUrls(rawUrl)
+        if (candidates.isEmpty()) return false
+
+        for (candidateUrl in candidates) {
+            try {
+                val conn = (URL(candidateUrl).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 10000
+                    readTimeout = 12000
+                    instanceFollowRedirects = true
+                    setRequestProperty(
+                        "User-Agent",
+                        "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                    )
+                    setRequestProperty("Accept", "image/jpeg,image/png,image/webp,image/*;q=0.8,*/*;q=0.5")
+                    setRequestProperty("Referer", "https://fanqienovel.com/")
+                }
+                val bytes = try {
+                    if (conn.responseCode in 200..299) {
+                        conn.inputStream.use { it.readBytes() }
+                    } else null
+                } finally {
+                    conn.disconnect()
+                }
+                if (bytes != null && bytes.size > 128) {
+                    // 1. 尝试直接用 BitmapFactory 解码
+                    var bmp: Bitmap? = try {
+                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    } catch (_: Throwable) {
+                        null
+                    }
+                    // 2. 若 BitmapFactory 无法直接解码（如特殊 WebP/HEIC），使用 Glide 解码器兜底转为 Bitmap
+                    if (bmp == null) {
+                        bmp = try {
+                            Glide.with(appCtx).asBitmap().load(bytes).submit().get()
+                        } catch (_: Throwable) {
+                            null
+                        }
+                    }
+                    if (bmp != null && bmp.width > 1 && bmp.height > 1) {
+                        targetFile.parentFile?.mkdirs()
+                        val tmp = File(targetFile.parentFile, "${targetFile.name}.tmp")
+                        FileOutputStream(tmp).use { fos ->
+                            bmp.compress(Bitmap.CompressFormat.JPEG, 92, fos)
+                        }
+                        if (tmp.length() > 128L) {
+                            if (targetFile.exists()) targetFile.delete()
+                            tmp.renameTo(targetFile)
+                            return true
+                        } else {
+                            tmp.delete()
+                        }
+                    }
+                }
+            } catch (_: Throwable) {
+            }
+        }
+
+        // 终极兜底：直接通过 Glide 下载 URL 为 Bitmap 并编码保存为标准 JPEG
+        for (candidateUrl in candidates.take(2)) {
+            try {
+                val bmp = Glide.with(appCtx).asBitmap().load(candidateUrl).submit().get()
+                if (bmp != null && bmp.width > 1 && bmp.height > 1) {
+                    targetFile.parentFile?.mkdirs()
+                    val tmp = File(targetFile.parentFile, "${targetFile.name}.tmp")
+                    FileOutputStream(tmp).use { fos ->
+                        bmp.compress(Bitmap.CompressFormat.JPEG, 92, fos)
+                    }
+                    if (tmp.length() > 128L) {
+                        if (targetFile.exists()) targetFile.delete()
+                        tmp.renameTo(targetFile)
+                        return true
+                    } else {
+                        tmp.delete()
+                    }
+                }
+            } catch (_: Throwable) {
+            }
+        }
+        return false
+    }
+
+    private fun isValidImageFile(file: File?): Boolean {
+        if (file == null || !file.isFile || file.length() <= 128L) return false
+        return try {
+            val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(file.absolutePath, opts)
+            opts.outWidth > 1 && opts.outHeight > 1
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
     fun downloadAndCacheCover(targetFile: File, rawCoverUrl: String?): String {
         val normUrl = FanqieCrawler.normalizeCoverUrl(rawCoverUrl)
-        if (targetFile.isFile && targetFile.length() > 256L) {
+        if (isValidImageFile(targetFile)) {
             return targetFile.absolutePath
         }
         if (normUrl.isBlank()) return ""
-        try {
-            val conn = (URL(normUrl).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 10000
-                readTimeout = 10000
-                instanceFollowRedirects = true
-                setRequestProperty(
-                    "User-Agent",
-                    "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                )
-            }
-            try {
-                if (conn.responseCode in 200..299) {
-                    val bytes = conn.inputStream.use { it.readBytes() }
-                    if (bytes.size > 256) {
-                        targetFile.parentFile?.mkdirs()
-                        val tmp = File(targetFile.parentFile, "${targetFile.name}.tmp")
-                        tmp.writeBytes(bytes)
-                        if (targetFile.exists()) targetFile.delete()
-                        tmp.renameTo(targetFile)
-                        return targetFile.absolutePath
-                    }
-                }
-            } finally {
-                conn.disconnect()
-            }
-        } catch (_: Throwable) {
+        if (downloadValidImageToFile(rawCoverUrl, targetFile)) {
+            return targetFile.absolutePath
         }
         return normUrl
     }
@@ -192,10 +276,10 @@ object FanqieLegadoBridge {
         if (cur.isNotEmpty()) {
             if (cur.startsWith("http")) return FanqieCrawler.normalizeCoverUrl(cur)
             val f = if (cur.startsWith("file://")) File(Uri.parse(cur).path ?: "") else File(cur)
-            if (f.isFile && f.length() > 256L) return f.absolutePath
+            if (isValidImageFile(f)) return f.absolutePath
         }
         val localFile = localCoverFileForBook(book)
-        if (localFile.isFile && localFile.length() > 256L) {
+        if (isValidImageFile(localFile)) {
             return localFile.absolutePath
         }
         val tag = parseTag(book)

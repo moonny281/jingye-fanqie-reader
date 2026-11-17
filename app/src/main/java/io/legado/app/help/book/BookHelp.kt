@@ -278,7 +278,13 @@ object BookHelp {
     @Synchronized
     fun isImageExist(book: Book, src: String): Boolean {
         val f = getImage(book, src)
-        return f.isFile && f.length() > 128L
+        if (!f.isFile || f.length() <= 128L) return false
+        val op = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(f.absolutePath, op)
+        if (op.outWidth > 1 && op.outHeight > 1) return true
+        // 若文件损坏或为当前设备不支持的裸 HEIC，删除以便重新拉取转码为标准 JPEG
+        f.delete()
+        return false
     }
 
     fun getImageSuffix(src: String): String {

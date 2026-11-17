@@ -55,29 +55,67 @@ class FanqieAppApi(
         )
         private val IMG_TAG_RE = Regex("<img\\b[^>]*>", RegexOption.IGNORE_CASE)
         private val IMG_SRC_ATTR_RE = Regex(
-            "(?:data-original|data-src|data-url|data-uri|uri|src)\\s*=\\s*[\"']([^\"']+)[\"']",
+            "\\b(data-original|data-src|data-url|src|data-uri|uri)\\s*=\\s*[\"']([^\"']+)[\"']",
             RegexOption.IGNORE_CASE
         )
         private val IMG_ALT_ATTR_RE = Regex(
-            "alt\\s*=\\s*[\"']([^\"']+)[\"']",
+            "\\balt\\s*=\\s*[\"']([^\"']+)[\"']",
             RegexOption.IGNORE_CASE
         )
-        private val INLINE_IMG_TOKEN_RE = Regex("__FQ_INLINE_IMG::([^:]+)::([^_]*)__")
+        private val INLINE_IMG_TOKEN_RE = Regex("__FQ_INLINE_IMG::([A-Za-z0-9+/=]+)::([A-Za-z0-9+/=]*)__")
+        private val BLOCK_OR_IMG_RE = Regex(
+            "(__FQ_INLINE_IMG::[A-Za-z0-9+/=]+::[A-Za-z0-9+/=]*__)|<(p|blk)(\\s[^>]*)?>(.*?)</\\2>",
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
+        )
+        private val UNSIGNED_HEIC_RE = Regex("\\.heic(\\b|$)", RegexOption.IGNORE_CASE)
 
         fun normalizeImageUrl(rawUrl: String?): String {
             var u = (rawUrl ?: "").trim()
                 .replace("\\/", "/")
                 .replace("\\u0026", "&")
                 .replace("&amp;", "&")
-            if (u.isEmpty() || u == "null" || u.startsWith("data:")) return ""
+            if (u.isEmpty() || u == "null" || u.startsWith("data:", ignoreCase = true) || u.startsWith("javascript:", ignoreCase = true)) {
+                return ""
+            }
             if (u.startsWith("//")) {
                 u = "https:$u"
             } else if (u.startsWith("http://")) {
                 u = "https://" + u.removePrefix("http://")
+            } else if (u.startsWith("/origin/") || u.startsWith("/large/") || u.startsWith("/img/")) {
+                u = "https://p3-novel.byteimg.com$u"
             } else if (!u.startsWith("http") && !u.startsWith("/")) {
                 u = "https://p3-novel.byteimg.com/origin/$u"
             }
+            // 对于无签名参数的 byteimg/fqnovelpic HEIC 链接，自动转为兼容性最好的 .jpeg，防止 Android BitmapFactory 无法解码 HEIC
+            if (!u.contains("x-signature=", ignoreCase = true) &&
+                (u.contains("byteimg.com", ignoreCase = true) || u.contains("fqnovelpic.com", ignoreCase = true))
+            ) {
+                u = UNSIGNED_HEIC_RE.replace(u, ".jpeg$1")
+                u = u.replace("encode_type=heic", "encode_type=jpeg", ignoreCase = true)
+            }
             return u
+        }
+
+        /**
+         * 从 <img ...> 标签的所有候选属性中提取最优图片 URL（优先选择完整 http/https 链接，彻底规避 src="data:..." 占位符排在前面导致漏抓的问题）
+         */
+        fun extractBestImgUrlFromTag(tag: String): String {
+            val candidates = ArrayList<Pair<String, String>>()
+            for (m in IMG_SRC_ATTR_RE.findAll(tag)) {
+                val attrName = m.groupValues[1].lowercase()
+                val rawVal = m.groupValues[2].trim()
+                if (rawVal.isEmpty() || rawVal.startsWith("data:", ignoreCase = true)) continue
+                val norm = normalizeImageUrl(rawVal)
+                if (norm.isNotEmpty()) {
+                    candidates.add(attrName to norm)
+                }
+            }
+            if (candidates.isEmpty()) return ""
+            // 优先返回原本就是 http/https/双斜杠 的属性（如 data-src / data-original / src）
+            candidates.firstOrNull { (name, _) -> name in listOf("data-original", "data-src", "data-url", "src") }?.let {
+                return it.second
+            }
+            return candidates.first().second
         }
         private val P_OR_BLK_RE = Regex("<(p|blk)(\\s[^>]*)?>(.*?)</\\1>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
         private val STYLE_SCRIPT_RE = Regex("<(style|script|head)\\b[^>]*>.*?</\\1>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
@@ -177,14 +215,13 @@ class FanqieAppApi(
             }
             working = IMG_TAG_RE.replace(working) { m ->
                 val tag = m.value
-                val rawSrc = IMG_SRC_ATTR_RE.find(tag)?.groupValues?.getOrNull(1).orEmpty()
-                val normSrc = normalizeImageUrl(rawSrc)
+                val normSrc = extractBestImgUrlFromTag(tag)
                 val rawAlt = IMG_ALT_ATTR_RE.find(tag)?.groupValues?.getOrNull(1)?.let { cleanInlineText(it) }.orEmpty()
                 val cleanAlt = if (rawAlt.isNotEmpty() && rawAlt != "插图" && rawAlt != "image" && rawAlt != "图片") rawAlt else ""
                 if (normSrc.isNotEmpty()) {
                     val b64Src = Base64.encodeToString(normSrc.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
                     val b64Alt = Base64.encodeToString(cleanAlt.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
-                    "<br/>__FQ_INLINE_IMG::${b64Src}::${b64Alt}__<br/>"
+                    "\n<br/>__FQ_INLINE_IMG::${b64Src}::${b64Alt}__<br/>\n"
                 } else if (cleanAlt.isNotEmpty()) {
                     "<p>〖插图：$cleanAlt〗</p>"
                 } else {
@@ -192,12 +229,36 @@ class FanqieAppApi(
                 }
             }
 
+            fun appendDecodedImgToken(tokenMatch: MatchResult, targetList: MutableList<String>) {
+                val srcUrl = try {
+                    String(Base64.decode(tokenMatch.groupValues[1], Base64.NO_WRAP), Charsets.UTF_8)
+                } catch (_: Throwable) { "" }
+                val altText = try {
+                    String(Base64.decode(tokenMatch.groupValues[2], Base64.NO_WRAP), Charsets.UTF_8)
+                } catch (_: Throwable) { "" }
+                if (srcUrl.isNotBlank()) {
+                    targetList.add("<img src=\"$srcUrl\">")
+                    if (altText.isNotBlank()) {
+                        targetList.add("〖图：$altText〗")
+                    }
+                }
+            }
+
             val rawParagraphs = ArrayList<String>()
-            val matches = P_OR_BLK_RE.findAll(working).toList()
+            val matches = BLOCK_OR_IMG_RE.findAll(working).toList()
             if (matches.isNotEmpty()) {
                 for (m in matches) {
-                    val attrs = m.groupValues[2]
-                    val innerHtml = m.groupValues[3]
+                    val standaloneImgToken = m.groupValues[1]
+                    if (standaloneImgToken.isNotEmpty()) {
+                        // 捕获位于 <div> / <figure> / <body> 中（不在 <p> 内部）的独立正文插图
+                        INLINE_IMG_TOKEN_RE.find(standaloneImgToken)?.let { tm ->
+                            appendDecodedImgToken(tm, rawParagraphs)
+                        }
+                        continue
+                    }
+
+                    val attrs = m.groupValues[3]
+                    val innerHtml = m.groupValues[4]
                     if (innerHtml.contains("__FQ_SCENE_BREAK__")) {
                         rawParagraphs.add(SCENE_BREAK_MARKER)
                         continue
@@ -207,19 +268,25 @@ class FanqieAppApi(
                     val isTitleAttr = attrs.contains("chapter-title", ignoreCase = true) ||
                         attrs.contains("title", ignoreCase = true)
 
-                    // 保留段落内部 <br/> 多行结构（如系统面板、书信、诗句）
+                    // 保留段落内部 <br/> 多行结构（如系统面板、书信、诗句、段内插图）
                     val subLines = BR_RE.replace(innerHtml, "\n")
                         .split('\n')
                         .map { cleanInlineText(it) }
                         .filter { it.isNotEmpty() }
 
                     if (subLines.isEmpty()) {
-                        // 原生空段落 `<p><br/></p>` 或 `<p>&nbsp;</p>` 代表场景切换空行
                         if (rawParagraphs.isNotEmpty() && rawParagraphs.last() != SCENE_BREAK_MARKER) {
                             rawParagraphs.add(SCENE_BREAK_MARKER)
                         }
                     } else if (isAuthorSayAttr) {
-                        authorNotes.addAll(subLines)
+                        for (line in subLines) {
+                            val imgMatch = INLINE_IMG_TOKEN_RE.find(line)
+                            if (imgMatch != null) {
+                                appendDecodedImgToken(imgMatch, rawParagraphs)
+                            } else {
+                                authorNotes.add(line)
+                            }
+                        }
                     } else {
                         for ((idx, line) in subLines.withIndex()) {
                             if (isTitleAttr && idx == 0 && rawParagraphs.isEmpty() &&
@@ -227,21 +294,16 @@ class FanqieAppApi(
                             ) {
                                 continue
                             }
-                            val imgMatch = INLINE_IMG_TOKEN_RE.find(line)
-                            if (imgMatch != null) {
-                                val srcUrl = try {
-                                    String(Base64.decode(imgMatch.groupValues[1], Base64.NO_WRAP), Charsets.UTF_8)
-                                } catch (_: Throwable) { "" }
-                                val altText = try {
-                                    String(Base64.decode(imgMatch.groupValues[2], Base64.NO_WRAP), Charsets.UTF_8)
-                                } catch (_: Throwable) { "" }
-                                if (srcUrl.isNotBlank()) {
-                                    rawParagraphs.add("<img src=\"$srcUrl\">")
-                                    if (altText.isNotBlank()) {
-                                        rawParagraphs.add("〖图：$altText〗")
-                                    }
-                                    continue
+                            val imgMatches = INLINE_IMG_TOKEN_RE.findAll(line).toList()
+                            if (imgMatches.isNotEmpty()) {
+                                val remainingText = INLINE_IMG_TOKEN_RE.replace(line, "").trim()
+                                if (remainingText.isNotEmpty()) {
+                                    rawParagraphs.add(remainingText)
                                 }
+                                for (im in imgMatches) {
+                                    appendDecodedImgToken(im, rawParagraphs)
+                                }
+                                continue
                             }
                             rawParagraphs.add(line)
                         }

@@ -675,13 +675,35 @@ class FanqieActivity : AppCompatActivity() {
         btnBackToSearch.visibility = if (fromSearch) View.VISIBLE else View.GONE
         ivDetailCover.visibility = View.VISIBLE
 
-        if (meta.coverUrl.isNotBlank()) {
+        val localCover = FanqieLegadoBridge.localCoverFile(meta.bookId)
+        if (localCover.isFile && localCover.length() > 256L) {
             Glide.with(this)
-                .load(meta.coverUrl)
+                .load(localCover)
                 .dontAnimate()
                 .placeholder(R.drawable.bg_eink_default_cover_linear)
                 .error(R.drawable.bg_eink_default_cover_linear)
                 .into(ivDetailCover)
+        } else if (meta.coverUrl.isNotBlank()) {
+            val normCover = io.legado.app.fanqie.FanqieCrawler.normalizeCoverUrl(meta.coverUrl)
+            Glide.with(this)
+                .load(normCover)
+                .dontAnimate()
+                .placeholder(R.drawable.bg_eink_default_cover_linear)
+                .error(R.drawable.bg_eink_default_cover_linear)
+                .into(ivDetailCover)
+            lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                val cachedPath = FanqieLegadoBridge.downloadAndCacheCover(localCover, normCover)
+                if (cachedPath.startsWith("/")) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        if (!isFinishing && currentMetadata?.bookId == meta.bookId) {
+                            Glide.with(this@FanqieActivity)
+                                .load(java.io.File(cachedPath))
+                                .dontAnimate()
+                                .into(ivDetailCover)
+                        }
+                    }
+                }
+            }
         } else {
             ivDetailCover.setImageResource(R.drawable.bg_eink_default_cover_linear)
         }
@@ -751,9 +773,16 @@ class FanqieActivity : AppCompatActivity() {
             val item = items[position]
             holder.thumb.text = item.title.take(2)
             holder.cover.visibility = View.VISIBLE
-            if (item.coverUrl.isNotBlank()) {
+            val localCover = FanqieLegadoBridge.localCoverFile(item.bookId)
+            if (localCover.isFile && localCover.length() > 256L) {
                 Glide.with(holder.cover.context)
-                    .load(item.coverUrl)
+                    .load(localCover)
+                    .dontAnimate()
+                    .into(holder.cover)
+            } else if (item.coverUrl.isNotBlank()) {
+                val normCover = io.legado.app.fanqie.FanqieCrawler.normalizeCoverUrl(item.coverUrl)
+                Glide.with(holder.cover.context)
+                    .load(normCover)
                     .dontAnimate()
                     .into(holder.cover)
             } else {

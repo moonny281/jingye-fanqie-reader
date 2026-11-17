@@ -299,7 +299,7 @@ data class TextPage(
     }
 
     fun draw(view: ContentTextView, canvas: Canvas, relativeOffset: Float) {
-        if (AppConfig.optimizeRender) {
+        if (AppConfig.optimizeRender && !hasImageOrEmpty()) {
             render(view)
             canvas.withTranslation(0f, relativeOffset) {
                 canvasRecorder.draw(this)

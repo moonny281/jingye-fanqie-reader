@@ -141,10 +141,10 @@ object ImageProvider {
                     }
                     return@withContext vFile
                 }
-                // 2. 若为番茄书籍且尚未缓存该插图，立即在线拉取并写入双端缓存
-                val tag = io.legado.app.fanqie.FanqieLegadoBridge.parseTag(book)
-                if (tag != null && src.startsWith("http", ignoreCase = true)) {
-                    val downloaded = io.legado.app.fanqie.FanqieLegadoBridge.downloadAndCacheInlineImage(tag.fanqieBookId, src)
+                // 2. 只要是网络图片或番茄图片标识，优先通过多候选 JPEG 转码下载器拉取并写入双端缓存
+                val fqId = io.legado.app.fanqie.FanqieLegadoBridge.extractFanqieBookId(book).ifBlank { "common" }
+                if (src.startsWith("http", ignoreCase = true) || src.startsWith("//") || src.contains("novel-pic") || src.contains("byteimg")) {
+                    val downloaded = io.legado.app.fanqie.FanqieLegadoBridge.downloadAndCacheInlineImage(fqId, src)
                     if (downloaded != null && downloaded.isFile) {
                         val newFile = FileUtils.createFileIfNotExist(vFile.absolutePath)
                         downloaded.inputStream().use { input ->
@@ -220,9 +220,10 @@ object ImageProvider {
                 if (file.isFile && file.length() > 128L) {
                     remove(file.absolutePath)
                     view.post {
-                        io.legado.app.model.ReadBook.curTextChapter?.let {
-                            view.invalidate()
+                        io.legado.app.model.ReadBook.curTextChapter?.pages?.forEach { page ->
+                            page.invalidateAll()
                         }
+                        view.invalidate()
                     }
                 }
             } catch (_: Throwable) {

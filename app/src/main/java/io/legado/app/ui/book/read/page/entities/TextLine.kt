@@ -153,7 +153,7 @@ data class TextLine(
     }
 
     fun draw(view: ContentTextView, canvas: Canvas) {
-        if (AppConfig.optimizeRender) {
+        if (AppConfig.optimizeRender && !isImage && onlyTextColumn) {
             canvasRecorder.recordIfNeededThenDraw(canvas, view.width, height.toInt()) {
                 drawTextLine(view, this)
             }
