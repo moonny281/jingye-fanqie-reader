@@ -319,11 +319,14 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                             handled = true
                         }
                     }
-                    else -> { //默认点击
+                    else -> { //默认点击：有 click 脚本走脚本，否则点击图片放大预览（0.4.9）
                         if (!debounceClick) {
                             val click = column.click
                             if (!click.isNullOrBlank()) {
                                 callBack.clickImg(click, column.src)
+                                handled = true
+                            } else {
+                                activity?.showDialogFragment(PhotoDialog(column.src, isBook = true))
                                 handled = true
                             }
                         }

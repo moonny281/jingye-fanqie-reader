@@ -534,6 +534,7 @@ class TextChapterLayout(
             prepareNextPageIfNeed(durY)
             var height = size.height
             var width = size.width
+            var imageGap = 0f
             when (imageStyle?.uppercase()) {
                 Book.imgStyleFull -> {
                     width = visibleWidth
@@ -574,6 +575,9 @@ class TextChapterLayout(
                         width = width * visibleHeight / height
                         height = visibleHeight
                     }
+                    // 0.4.9：插图上下留白，避免图片紧贴上下文字/页边，墨水屏上更易分辨
+                    imageGap = textHeight * 0.5f
+                    if (durY > 0f && height + imageGap * 2 <= visibleHeight) durY += imageGap
                     prepareNextPageIfNeed(durY + height)
                 }
             }
@@ -582,6 +586,7 @@ class TextChapterLayout(
             textLine.lineTop = durY + paddingTop
             durY += height
             textLine.lineBottom = durY + paddingTop
+            if (imageGap > 0f && durY + imageGap < visibleHeight) durY += imageGap
             val (start, end) = if (visibleWidth > width) {
                 when (imageStyle?.uppercase()) {
                     "RIGHT" -> Pair(visibleWidth - width, visibleWidth)

@@ -42,7 +42,7 @@ jobs:
           elif [ -f "VERSION" ]; then
             RAW_VERSION=$(head -n 1 VERSION | tr -d '[:space:]')
           else
-            RAW_VERSION="0.4.8"
+            RAW_VERSION="0.4.9"
           fi
           CLEAN_VERSION="${RAW_VERSION#v}"
           echo "$CLEAN_VERSION" > VERSION

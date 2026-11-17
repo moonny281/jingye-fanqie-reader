@@ -1,15 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background">
+    android:background="#FFFFFFFF">
 
     <io.legado.app.ui.widget.image.PhotoView
         android:id="@+id/photo_view"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:scaleType="centerInside" />
+        android:layout_height="0dp"
+        android:scaleType="centerInside"
+        app:layout_constraintBottom_toTopOf="@id/photo_bar"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- 0.4.9 墨水屏图片预览操作栏：纯黑白线框大按钮，无水波纹 -->
+    <LinearLayout
+        android:id="@+id/photo_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_eink_border_top"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="8dp"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <TextView
+            android:id="@+id/btn_zoom_out"
+            style="@style/EinkPhotoBarButton"
+            android:text="缩小" />
+
+        <TextView
+            android:id="@+id/btn_zoom_fit"
+            style="@style/EinkPhotoBarButton"
+            android:text="适应" />
+
+        <TextView
+            android:id="@+id/btn_zoom_in"
+            style="@style/EinkPhotoBarButton"
+            android:text="放大" />
+
+        <TextView
+            android:id="@+id/btn_photo_close"
+            style="@style/EinkPhotoBarButton"
+            android:text="关闭" />
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
-
-

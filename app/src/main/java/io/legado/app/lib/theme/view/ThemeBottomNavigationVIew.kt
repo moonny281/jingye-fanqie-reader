@@ -30,6 +30,8 @@ class ThemeBottomNavigationVIew(context: Context, attrs: AttributeSet) :
         itemIconTintList = colorStateList
         itemTextColor = colorStateList
         itemRippleColor = null
+        // 0.4.9：始终显示文字标签（选中=实心图标，未选中=线框图标），墨水屏上无需依赖颜色/动画区分
+        labelVisibilityMode = LABEL_VISIBILITY_LABELED
         isItemHorizontalTranslationEnabled = false
         itemBackground = Color.TRANSPARENT.toDrawable()
 

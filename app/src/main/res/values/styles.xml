@@ -269,4 +269,20 @@
         <item name="android:windowAnimationStyle">@style/Animation.EInk.None</item>
     </style>
 
+
+    <!-- 0.4.9 墨水屏图片预览底栏按钮 -->
+    <style name="EinkPhotoBarButton">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">48dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_marginStart">4dp</item>
+        <item name="android:layout_marginEnd">4dp</item>
+        <item name="android:background">@drawable/bg_eink_button_outline</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">#FF000000</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
 </resources>

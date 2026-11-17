@@ -13,7 +13,7 @@ import io.legado.app.ui.book.read.page.entities.TextLine.Companion.emptyTextLine
 import io.legado.app.utils.dpToPx
 
 /**
- * 阅读页正文插图渲染列 (v0.4.8)：
+ * 阅读页正文插图渲染列 (v0.4.9)：
  * 1. 加载并绘制真实章节插图 Bitmap（解决之前只画空心黑框不显示图片内容的问题）；
  * 2. 按图片原始宽高比居中绘制，并在外围绘制 1px 1-bit 细黑线边框；
  * 3. 若图片尚未完成本地落盘，自动触发异步补抓并在完成后自动刷新当前阅读页。
@@ -32,6 +32,23 @@ data class ImageColumn(
             color = Color.BLACK
             style = Paint.Style.STROKE
             strokeWidth = 1.5f
+        }
+        /** 0.4.9 墨水屏插图画笔：转灰度 + 轻度提高对比度 + 抖动，避免彩色图在墨水屏上发灰发糊 */
+        private val einkImagePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG).apply {
+            val gray = android.graphics.ColorMatrix().apply { setSaturation(0f) }
+            val c = 1.18f
+            val t = (-0.5f * c + 0.5f) * 255f
+            gray.postConcat(
+                android.graphics.ColorMatrix(
+                    floatArrayOf(
+                        c, 0f, 0f, 0f, t,
+                        0f, c, 0f, 0f, t,
+                        0f, 0f, c, 0f, t,
+                        0f, 0f, 0f, 1f, 0f
+                    )
+                )
+            )
+            colorFilter = android.graphics.ColorMatrixColorFilter(gray)
         }
         private val hintPaint = Paint().apply {
             isAntiAlias = true
@@ -68,7 +85,7 @@ data class ImageColumn(
 
         kotlin.runCatching {
             if (!bitmap.isRecycled) {
-                canvas.drawBitmap(bitmap, null, rectF, view.imagePaint)
+                canvas.drawBitmap(bitmap, null, rectF, einkImagePaint)
             }
             if (textLine.isImage) {
                 val borderRect = RectF(

@@ -18,7 +18,7 @@
         <Button
             android:id="@+id/btnBack"
             android:layout_width="wrap_content"
-            android:layout_height="34dp"
+            android:layout_height="44dp"
             android:background="@drawable/selector_eink_button"
             android:gravity="center"
             android:includeFontPadding="false"
@@ -50,7 +50,7 @@
         <Button
             android:id="@+id/btnEinkClean"
             android:layout_width="wrap_content"
-            android:layout_height="34dp"
+            android:layout_height="44dp"
             android:layout_marginEnd="6dp"
             android:background="@drawable/selector_eink_button"
             android:gravity="center"
@@ -64,13 +64,13 @@
             android:text="清残影"
             android:textAllCaps="false"
             android:textColor="#FF000000"
-            android:textSize="12sp"
+            android:textSize="13sp"
             android:textStyle="bold" />
 
         <Button
             android:id="@+id/btnPasteClipboard"
             android:layout_width="wrap_content"
-            android:layout_height="34dp"
+            android:layout_height="44dp"
             android:layout_marginEnd="6dp"
             android:background="@drawable/selector_eink_button"
             android:gravity="center"
@@ -84,13 +84,13 @@
             android:text="粘贴链接"
             android:textAllCaps="false"
             android:textColor="#FF000000"
-            android:textSize="12sp"
+            android:textSize="13sp"
             android:textStyle="bold" />
 
         <Button
             android:id="@+id/btnToggleConfig"
             android:layout_width="wrap_content"
-            android:layout_height="34dp"
+            android:layout_height="44dp"
             android:background="@drawable/selector_eink_button"
             android:gravity="center"
             android:includeFontPadding="false"
@@ -103,7 +103,7 @@
             android:text="引擎"
             android:textAllCaps="false"
             android:textColor="#FF000000"
-            android:textSize="12sp"
+            android:textSize="13sp"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -135,7 +135,7 @@
             <EditText
                 android:id="@+id/etServerUrl"
                 android:layout_width="0dp"
-                android:layout_height="38dp"
+                android:layout_height="44dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_eink_card"
                 android:hint="留空=手机内置引擎；或填 http://IP:5000"
@@ -144,12 +144,12 @@
                 android:singleLine="true"
                 android:textColor="#FF000000"
                 android:textColorHint="#FF000000"
-                android:textSize="12sp" />
+                android:textSize="13sp" />
 
             <Button
                 android:id="@+id/btnSaveServer"
                 android:layout_width="wrap_content"
-                android:layout_height="38dp"
+                android:layout_height="44dp"
                 android:layout_marginStart="8dp"
                 android:background="@drawable/bg_eink_button_solid"
                 android:gravity="center"
@@ -180,7 +180,7 @@
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="40dp"
+            android:layout_height="44dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -265,7 +265,7 @@
                 <TextView
                     android:id="@+id/chipCat1"
                     android:layout_width="wrap_content"
-                    android:layout_height="30dp"
+                    android:layout_height="44dp"
                     android:layout_marginEnd="6dp"
                     android:background="@drawable/bg_eink_button_outline"
                     android:gravity="center"
@@ -273,13 +273,13 @@
                     android:paddingHorizontal="11dp"
                     android:text="十日终焉"
                     android:textColor="#FF000000"
-                    android:textSize="12sp"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/chipCat2"
                     android:layout_width="wrap_content"
-                    android:layout_height="30dp"
+                    android:layout_height="44dp"
                     android:layout_marginEnd="6dp"
                     android:background="@drawable/bg_eink_button_outline"
                     android:gravity="center"
@@ -287,13 +287,13 @@
                     android:paddingHorizontal="11dp"
                     android:text="玄幻仙侠"
                     android:textColor="#FF000000"
-                    android:textSize="12sp"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/chipCat3"
                     android:layout_width="wrap_content"
-                    android:layout_height="30dp"
+                    android:layout_height="44dp"
                     android:layout_marginEnd="6dp"
                     android:background="@drawable/bg_eink_button_outline"
                     android:gravity="center"
@@ -301,13 +301,13 @@
                     android:paddingHorizontal="11dp"
                     android:text="历史古代"
                     android:textColor="#FF000000"
-                    android:textSize="12sp"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/chipCat4"
                     android:layout_width="wrap_content"
-                    android:layout_height="30dp"
+                    android:layout_height="44dp"
                     android:layout_marginEnd="6dp"
                     android:background="@drawable/bg_eink_button_outline"
                     android:gravity="center"
@@ -315,13 +315,13 @@
                     android:paddingHorizontal="11dp"
                     android:text="悬疑脑洞"
                     android:textColor="#FF000000"
-                    android:textSize="12sp"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/chipCat5"
                     android:layout_width="wrap_content"
-                    android:layout_height="30dp"
+                    android:layout_height="44dp"
                     android:layout_marginEnd="6dp"
                     android:background="@drawable/bg_eink_button_outline"
                     android:gravity="center"
@@ -329,20 +329,20 @@
                     android:paddingHorizontal="11dp"
                     android:text="科幻末世"
                     android:textColor="#FF000000"
-                    android:textSize="12sp"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/chipCat6"
                     android:layout_width="wrap_content"
-                    android:layout_height="30dp"
+                    android:layout_height="44dp"
                     android:background="@drawable/bg_eink_button_outline"
                     android:gravity="center"
                     android:includeFontPadding="false"
                     android:paddingHorizontal="11dp"
                     android:text="都市高武"
                     android:textColor="#FF000000"
-                    android:textSize="12sp"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
             </LinearLayout>
         </HorizontalScrollView>
@@ -408,7 +408,7 @@
                     <Button
                         android:id="@+id/btnBackToSearch"
                         android:layout_width="wrap_content"
-                        android:layout_height="30dp"
+                        android:layout_height="44dp"
                         android:layout_marginStart="6dp"
                         android:background="@drawable/selector_eink_button"
                         android:gravity="center"
@@ -422,7 +422,7 @@
                         android:text="返回列表"
                         android:textAllCaps="false"
                         android:textColor="#FF000000"
-                        android:textSize="12sp"
+                        android:textSize="13sp"
                         android:textStyle="bold"
                         android:visibility="gone" />
                 </LinearLayout>
@@ -489,7 +489,7 @@
             <Button
                 android:id="@+id/btnOpenDownloadedBook"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="44dp"
                 android:layout_marginEnd="6dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_eink_button_solid"
@@ -511,7 +511,7 @@
             <Button
                 android:id="@+id/btnDownloadBook"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="44dp"
                 android:layout_weight="1.15"
                 android:background="@drawable/selector_eink_button"
                 android:ellipsize="end"
@@ -532,7 +532,7 @@
             <Button
                 android:id="@+id/btnPauseDownload"
                 android:layout_width="wrap_content"
-                android:layout_height="40dp"
+                android:layout_height="44dp"
                 android:layout_marginStart="6dp"
                 android:background="@drawable/selector_eink_button"
                 android:gravity="center"
@@ -562,7 +562,7 @@
             <Button
                 android:id="@+id/btnPreviewToc"
                 android:layout_width="0dp"
-                android:layout_height="36dp"
+                android:layout_height="44dp"
                 android:layout_marginEnd="6dp"
                 android:layout_weight="1"
                 android:background="@drawable/selector_eink_button"
@@ -578,13 +578,13 @@
                 android:text="目录预览"
                 android:textAllCaps="false"
                 android:textColor="#FF000000"
-                android:textSize="12sp"
+                android:textSize="13sp"
                 android:textStyle="bold" />
 
             <Button
                 android:id="@+id/btnExportBook"
                 android:layout_width="0dp"
-                android:layout_height="36dp"
+                android:layout_height="44dp"
                 android:layout_marginEnd="6dp"
                 android:layout_weight="1"
                 android:background="@drawable/selector_eink_button"
@@ -600,13 +600,13 @@
                 android:text="导出TXT/EPUB"
                 android:textAllCaps="false"
                 android:textColor="#FF000000"
-                android:textSize="12sp"
+                android:textSize="13sp"
                 android:textStyle="bold" />
 
             <Button
                 android:id="@+id/btnRedownloadBook"
                 android:layout_width="0dp"
-                android:layout_height="36dp"
+                android:layout_height="44dp"
                 android:layout_weight="1"
                 android:background="@drawable/selector_eink_button"
                 android:ellipsize="end"
@@ -621,7 +621,7 @@
                 android:text="重新下载"
                 android:textAllCaps="false"
                 android:textColor="#FF000000"
-                android:textSize="12sp"
+                android:textSize="13sp"
                 android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>

@@ -132,6 +132,37 @@ class PhotoView @JvmOverloads constructor(
         return ANIMA_DURING
     }
 
+    /** 当前缩放倍数（1 = 适应屏幕） */
+    fun currentScale(): Float = mScale
+
+    /**
+     * 0.4.9：程序化缩放到指定倍数（以图片中心为锚点），供阅读页图片预览的 放大/缩小 按钮使用。
+     * 墨水屏上双指缩放较难操作，提供按钮缩放。
+     */
+    fun zoomToScale(target: Float) {
+        val to = target.coerceIn(1f, mMaxScale)
+        mTranslate.stop()
+        val from = mScale
+        val imgCx = mImgRect.left + mImgRect.width() / 2
+        val imgCy = mImgRect.top + mImgRect.height() / 2
+        mScaleCenter[imgCx] = imgCy
+        mRotateCenter[imgCx] = imgCy
+        mTranslateX = 0
+        mTranslateY = 0
+        mTmpMatrix.reset()
+        mTmpMatrix.postTranslate(-mBaseRect.left, -mBaseRect.top)
+        mTmpMatrix.postTranslate(mRotateCenter.x, mRotateCenter.y)
+        mTmpMatrix.postTranslate(-mHalfBaseRectWidth, -mHalfBaseRectHeight)
+        mTmpMatrix.postRotate(mDegrees, mRotateCenter.x, mRotateCenter.y)
+        mTmpMatrix.postScale(to, to, mScaleCenter.x, mScaleCenter.y)
+        mTmpMatrix.postTranslate(mTranslateX.toFloat(), mTranslateY.toFloat())
+        mTmpMatrix.mapRect(mTmpRect, mBaseRect)
+        doTranslateReset(mTmpRect)
+        isZoonUp = to > 1.01f
+        mTranslate.withScale(from, to)
+        mTranslate.start()
+    }
+
     override fun setOnClickListener(l: OnClickListener?) {
         super.setOnClickListener(l)
         mClickListener = l

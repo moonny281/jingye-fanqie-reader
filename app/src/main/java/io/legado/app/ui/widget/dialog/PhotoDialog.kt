@@ -43,13 +43,15 @@ class PhotoDialog() : BaseDialogFragment(R.layout.dialog_photo_view) {
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         val arguments = arguments ?: return
         val src = arguments.getString("src") ?: return
+        val isBook = arguments.getBoolean("isBook")
+        setupZoomControls(isBook)
         ImageProvider.get(src)?.let {
             binding.photoView.setImageBitmap(it)
             return
         }
-        val isBook = arguments.getBoolean("isBook")
         val file = if (isBook) ReadBook.book?.let { book ->
-            BookHelp.getImage(book, src)
+            BookHelp.getImage(book, src).takeIf { it.isFile && it.length() > 128L }
+                ?: io.legado.app.fanqie.FanqieLegadoBridge.findCachedInlineImage(book, src)
         } else null
         if (file?.exists() == true) {
             ImageLoader.load(requireContext(), file)
@@ -68,6 +70,33 @@ class PhotoDialog() : BaseDialogFragment(R.layout.dialog_photo_view) {
                 .downsample(DownsampleStrategy.NONE)
                 .into(binding.photoView)
         }
+    }
+
+
+    /**
+     * 0.4.9：墨水屏友好的图片预览控制：放大/缩小/关闭按钮 + 灰度对比度增强，禁用动画。
+     * 双击仍可在 1 倍与最大倍数之间切换，双指缩放也保留。
+     */
+    private fun setupZoomControls(isBook: Boolean) {
+        val pv = binding.photoView
+        pv.setMaxScale(5f)
+        pv.setAnimDuring(120)
+        if (isBook) {
+            val cm = android.graphics.ColorMatrix().apply { setSaturation(0f) }
+            val c = 1.2f
+            val t = (-0.5f * c + 0.5f) * 255f
+            cm.postConcat(android.graphics.ColorMatrix(floatArrayOf(
+                c, 0f, 0f, 0f, t,
+                0f, c, 0f, 0f, t,
+                0f, 0f, c, 0f, t,
+                0f, 0f, 0f, 1f, 0f
+            )))
+            pv.colorFilter = android.graphics.ColorMatrixColorFilter(cm)
+        }
+        binding.btnZoomIn.setOnClickListener { pv.zoomToScale(pv.currentScale() * 1.6f) }
+        binding.btnZoomOut.setOnClickListener { pv.zoomToScale(pv.currentScale() / 1.6f) }
+        binding.btnZoomFit.setOnClickListener { pv.zoomToScale(1f) }
+        binding.btnPhotoClose.setOnClickListener { dismissAllowingStateLoss() }
     }
 
 }
