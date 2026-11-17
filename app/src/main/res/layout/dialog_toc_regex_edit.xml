@@ -10,7 +10,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:background="@drawable/shape_card_view"
+        android:background="@drawable/bg_eink_border_dialog"
         android:orientation="vertical"
         tools:ignore="UselessParent">
 
@@ -19,7 +19,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="@color/background_menu"
-            android:elevation="5dp"
+            android:elevation="0dp"
             android:theme="?attr/actionBarStyle"
             app:displayHomeAsUp="false"
             app:fitStatusBar="false"

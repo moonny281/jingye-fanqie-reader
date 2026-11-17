@@ -28,6 +28,7 @@ class SliderPopup(private val context: Context, private val name: Int) :
         isTouchable = true
         isOutsideTouchable = false
         isFocusable = true
+        io.legado.app.eink.EinkRefreshHelper.applyEinkPopupWindowStyle(this)
         setProcess()
         binding.seekBar.setOnSeekBarChangeListener(object : SeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {

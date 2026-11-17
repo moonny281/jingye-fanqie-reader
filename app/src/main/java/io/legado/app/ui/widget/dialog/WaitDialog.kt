@@ -1,9 +1,10 @@
 package io.legado.app.ui.widget.dialog
 
+import android.app.Activity
 import android.app.Dialog
 import android.content.Context
 import io.legado.app.databinding.DialogWaitBinding
-
+import io.legado.app.eink.EinkRefreshHelper
 
 @Suppress("unused")
 class WaitDialog(context: Context) : Dialog(context) {
@@ -13,6 +14,8 @@ class WaitDialog(context: Context) : Dialog(context) {
     init {
         setCanceledOnTouchOutside(false)
         setContentView(binding.root)
+        val hostDecor = (context as? Activity)?.window?.decorView
+        EinkRefreshHelper.applyEinkDialogStyle(this, hostDecor)
     }
 
     fun setText(text: String): WaitDialog {
@@ -24,5 +27,4 @@ class WaitDialog(context: Context) : Dialog(context) {
         binding.tvMsg.setText(res)
         return this
     }
-
 }

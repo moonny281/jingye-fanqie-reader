@@ -31,7 +31,9 @@ class PopupAction(private val context: Context) :
         elevation = 0f
         binding.root.setBackgroundResource(io.legado.app.R.drawable.bg_popup_menu)
 
+        binding.recyclerView.itemAnimator = null
         binding.recyclerView.adapter = adapter
+        io.legado.app.eink.EinkRefreshHelper.applyEinkPopupWindowStyle(this)
     }
 
     fun setItems(items: List<SelectItem<String>>) {

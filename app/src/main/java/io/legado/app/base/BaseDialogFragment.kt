@@ -37,33 +37,41 @@ abstract class BaseDialogFragment(
 
     override fun onStart() {
         super.onStart()
-        dialog?.window?.let {
-            it.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            val attr = it.attributes
+        dialog?.window?.let { win ->
+            win.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            val attr = win.attributes
             attr.dimAmount = 0.0f
-            attr.windowAnimations = 0
-            it.attributes = attr
+            attr.windowAnimations = R.style.Animation_EInk_None
+            win.attributes = attr
+            win.decorView.elevation = 0f
+            win.decorView.translationZ = 0f
             if (adaptationSoftKeyboard) {
-                it.setBackgroundDrawableResource(R.color.transparent)
+                win.setBackgroundDrawableResource(R.color.transparent)
             } else {
-                it.decorView.setBackgroundKeepPadding(R.color.transparent)
+                win.decorView.setBackgroundKeepPadding(R.color.transparent)
             }
         }
-        if (!adaptationSoftKeyboard) {
-            lifecycle.addObserver(LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_START) {
-                    when (dialog?.window?.attributes?.gravity) {
-                        Gravity.TOP -> view?.setBackgroundResource(R.drawable.bg_eink_border_bottom)
-                        Gravity.BOTTOM -> view?.setBackgroundResource(R.drawable.bg_eink_border_top)
-                        else -> {
-                            val padding = 2.dpToPx()
-                            view?.setPadding(padding, padding, padding, padding)
-                            view?.setBackgroundResource(R.drawable.bg_eink_border_dialog)
+        lifecycle.addObserver(LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START) {
+                val root = view
+                if (root != null) {
+                    if (!adaptationSoftKeyboard) {
+                        when (dialog?.window?.attributes?.gravity) {
+                            Gravity.TOP -> root.setBackgroundResource(R.drawable.bg_eink_border_bottom)
+                            Gravity.BOTTOM -> root.setBackgroundResource(R.drawable.bg_eink_border_top)
+                            else -> {
+                                val padding = 2.dpToPx()
+                                root.setPadding(padding, padding, padding, padding)
+                                root.setBackgroundResource(R.drawable.bg_eink_border_dialog)
+                            }
                         }
+                    } else if (root.background == null) {
+                        root.setBackgroundResource(R.drawable.bg_eink_border_dialog)
                     }
+                    EinkRefreshHelper.scrubDialogOnShow(root)
                 }
-            })
-        }
+            }
+        })
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -75,6 +83,7 @@ abstract class BaseDialogFragment(
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        EinkRefreshHelper.enforce1BitWireframeOnTree(view)
         if (adaptationSoftKeyboard) {
             view.findViewById<View>(R.id.vw_bg)?.setOnClickListener(null)
             view.setOnClickListener { dismiss() }
@@ -98,7 +107,7 @@ abstract class BaseDialogFragment(
         val hostDecor = activity?.window?.decorView
         super.onDismiss(dialog)
         onDismissListener?.onDismiss(dialog)
-        // 对话框关闭后立即对底层窗口执行一次白场擦除，彻底清除对话框黑框残影
+        // 对话框关闭后立即对底层窗口执行白场局刷擦除，彻底清除对话框线框残影
         EinkRefreshHelper.scrubAfterOverlayDismiss(hostDecor)
     }
 

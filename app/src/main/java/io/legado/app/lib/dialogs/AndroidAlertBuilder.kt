@@ -145,17 +145,10 @@ internal class AndroidAlertBuilder(override val ctx: Context) : AlertBuilder<Ale
     }
 
     private fun styleEinkAlert(dialog: AlertDialog) {
-        dialog.window?.run {
-            clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            val attr = attributes
-            attr.dimAmount = 0f
-            attr.windowAnimations = 0
-            attributes = attr
-            setBackgroundDrawableResource(R.drawable.bg_eink_border_dialog)
-        }
+        val hostDecor = (ctx as? Activity)?.window?.decorView
+        EinkRefreshHelper.applyEinkDialogStyle(dialog, hostDecor)
         dialog.setOnDismissListener { d ->
             userDismissHandler?.invoke(d)
-            val hostDecor = (ctx as? Activity)?.window?.decorView
             EinkRefreshHelper.scrubAfterOverlayDismiss(hostDecor)
         }
     }

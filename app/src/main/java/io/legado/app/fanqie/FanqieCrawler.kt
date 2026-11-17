@@ -95,11 +95,30 @@ class FanqieCrawler(
             "^第[零一二三四五六七八九十百千万〇两0-9]+[卷部集篇册][\\s:：·—-]*"
         )
 
+        private val INLINE_IMG_LINE_RE = Regex("<img\\s+[^>]*src\\s*=\\s*\"([^\"]+)\"[^>]*>", RegexOption.IGNORE_CASE)
+
         /**
-         * 规范化二级章节标题：
+         * 提取章节段落列表中的所有内嵌图片 URL
+         */
+        fun extractImageUrls(paragraphs: List<String>): List<String> {
+            val urls = ArrayList<String>()
+            for (p in paragraphs) {
+                val m = INLINE_IMG_LINE_RE.find(p)
+                if (m != null) {
+                    val u = FanqieAppApi.normalizeImageUrl(m.groupValues[1])
+                    if (u.isNotEmpty() && u !in urls) {
+                        urls.add(u)
+                    }
+                }
+            }
+            return urls
+        }
+
+        /**
+         * 严格还原番茄小说官方原生章节命名 (v0.4.5)：
          * 1. 清除零宽字符、换行与多余空白；
-         * 2. 自动去重如「第1章 第1章 惊蛰」；
-         * 3. 若原始标题不含「第X章/节/回」或「序章/番外」前缀，自动补全「第{fallbackIndex}章 」，保证二级目录整齐清晰。
+         * 2. 清理接口偶发的重复前缀（如「第1章 第1章 惊蛰」->「第1章 惊蛰」）；
+         * 3. 100% 保留番茄目录中的原始章节命名（如「楔子」「番外」「001 惊蛰」「第1章 惊蛰」），不再强行拼接前缀；仅在标题为空时以「第X章」兜底。
          */
         fun normalizeChapterTitle(rawTitle: String, fallbackIndex: Int): String {
             var cleaned = ZERO_WIDTH_RE.replace(rawTitle, "")
@@ -109,29 +128,21 @@ class FanqieCrawler(
                 .trim()
             if (cleaned.isEmpty()) return "第${fallbackIndex}章"
             cleaned = DUP_CHAPTER_PREFIX_RE.replace(cleaned, "$1 ")
-            if (!HAS_CHAPTER_PREFIX_RE.containsMatchIn(cleaned)) {
-                cleaned = "第${fallbackIndex}章 $cleaned"
-            }
             return cleaned
         }
 
         /**
-         * 规范化一级分卷标题（volumeIndex 统一为 0-based: 0, 1, 2...）：
-         * 保留原有「第X卷」前缀；若无前缀则自动补全「第{volumeIndex + 1}卷 」，确保一级目录层级清晰。
+         * 严格还原番茄小说官方原生分卷命名 (v0.4.5)：
+         * 100% 保留番茄目录中的原始分卷名（如「第一卷 灾厄降临」「正文卷」「番外卷」），仅当分卷名为空时默认使用「正文卷」。
          */
         fun normalizeVolumeTitle(rawVolumeName: String, volumeIndex: Int): String {
-            val safeIdx = volumeIndex.coerceAtLeast(0)
             val cleaned = ZERO_WIDTH_RE.replace(rawVolumeName, "")
                 .replace("\r", " ")
                 .replace("\n", " ")
                 .replace(WS_RE, " ")
                 .trim()
-            if (cleaned.isEmpty()) return "第${safeIdx + 1}卷 正文卷"
-            return if (HAS_VOLUME_PREFIX_RE.containsMatchIn(cleaned)) {
-                cleaned
-            } else {
-                "第${safeIdx + 1}卷 $cleaned"
-            }
+            if (cleaned.isEmpty()) return if (volumeIndex <= 0) "正文卷" else "第${volumeIndex + 1}卷"
+            return cleaned
         }
 
         /**
@@ -181,6 +192,10 @@ class FanqieCrawler(
             val cleanList = paragraphs.map { it.trim() }.filter { it.isNotEmpty() }
             for ((idx, p) in cleanList.withIndex()) {
                 when {
+                    p.startsWith("<img ") && p.contains("src=") -> {
+                        // 正文插图独立成段，不加全角缩进，供阅读器 TextChapterLayout 原生居中排版
+                        sb.append(p)
+                    }
                     p == FanqieAppApi.SCENE_BREAK_MARKER -> {
                         sb.append("　　* * *")
                     }
@@ -1196,6 +1211,18 @@ class FanqieCrawler(
         val isPartial = wasStopped || remainingDownloadable > 0
         val effectiveTotal = if (!isPartial) downloaded else total
         val failedCount = if (isPartial) remainingDownloadable else 0
+
+        // 离线下载并本地持久化所有章节内的正文插图 (<img src="...">)
+        for (entry in workingCache.values) {
+            val imgUrls = extractImageUrls(entry.resolvedParagraphs())
+            for (imgUrl in imgUrls) {
+                if (shouldStop?.invoke() == true) break
+                try {
+                    FanqieLegadoBridge.downloadAndCacheInlineImage(bookId, imgUrl)
+                } catch (_: Throwable) {
+                }
+            }
+        }
 
         val updatedMeta = metadata.copy(
             chapterCount = effectiveTotal,

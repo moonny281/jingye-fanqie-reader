@@ -111,7 +111,7 @@ object EinkRefreshHelper {
      * 独立开关 1：是否开启【局部刷新清残影】（默认 false，由用户通过按钮自主控制开启/关闭）
      */
     var partialRefreshEnabled: Boolean
-        get() = prefs.getBoolean(KEY_PARTIAL_REFRESH_ENABLED, false)
+        get() = prefs.getBoolean(KEY_PARTIAL_REFRESH_ENABLED, true)
         set(value) {
             prefs.edit().putBoolean(KEY_PARTIAL_REFRESH_ENABLED, value).apply()
         }
@@ -470,13 +470,71 @@ object EinkRefreshHelper {
      * 若用户开启了【局部刷新清残影开关】(partialRefreshEnabled)，自动执行局部刷新擦除弹窗残影；
      * 若未开启，仅通知视图树普通重绘，绝不闪烁。
      */
+    /**
+     * 弹窗/菜单关闭或界面切换后的无黑闪白场擦除：
+     * - 当【局部刷新清残影】开启（默认开启）时，执行 40ms 快速白场脉冲 + 硬件局刷 + 视图树重绘，彻底消除任何弹窗边框或菜单文字残影；
+     * - 当用户手动关闭局部刷新开关时，仅通知视图树普通重绘。
+     */
     fun scrubAfterOverlayDismiss(targetView: View?) {
         val v = targetView ?: return
         mainHandler.post {
+            val root = v.rootView ?: v
+            if (partialRefreshEnabled) {
+                val overlay = getOrAttachOverlay(root)
+                if (overlay != null) {
+                    overlay.visibility = View.VISIBLE
+                    overlay.bringToFront()
+                    overlay.phaseColor = Color.WHITE
+                    EpdSettings.applyPartialRefresh(overlay)
+                    mainHandler.postDelayed({
+                        overlay.phaseColor = Color.TRANSPARENT
+                        overlay.visibility = View.GONE
+                        EpdSettings.applyPartialRefresh(root)
+                        invalidateHierarchy(root)
+                    }, 42L)
+                } else {
+                    EpdSettings.applyPartialRefresh(root)
+                    invalidateHierarchy(root)
+                }
+            } else {
+                invalidateHierarchy(root)
+            }
+        }
+    }
+
+    /**
+     * 弹窗刚弹出显示时的墨水屏去残影刷新：
+     * 擦除弹窗白底下方原本页面文字留下的浅灰底影，使弹窗内部纯白底黑线框干净锐利。
+     */
+    fun scrubDialogOnShow(dialogView: View?) {
+        val v = dialogView ?: return
+        mainHandler.post {
+            enforce1BitWireframeOnTree(v)
             if (partialRefreshEnabled) {
                 EpdSettings.applyPartialRefresh(v)
             }
             invalidateHierarchy(v)
+        }
+    }
+
+    /**
+     * 递归将弹窗内部视图树统一规范为 1-bit 纯黑白线框无阴影样式：
+     * - 移除所有子 View 的 elevation / translationZ / outline 阴影与水波纹动画；
+     * - 关闭 ScrollView / RecyclerView 边缘晕影光效（overScrollMode = OVER_SCROLL_NEVER）。
+     */
+    fun enforce1BitWireframeOnTree(view: View?) {
+        val v = view ?: return
+        v.elevation = 0f
+        v.translationZ = 0f
+        v.stateListAnimator = null
+        v.overScrollMode = View.OVER_SCROLL_NEVER
+        if (v is androidx.recyclerview.widget.RecyclerView) {
+            v.itemAnimator = null
+        }
+        if (v is ViewGroup) {
+            for (i in 0 until v.childCount) {
+                enforce1BitWireframeOnTree(v.getChildAt(i))
+            }
         }
     }
 
@@ -489,7 +547,10 @@ object EinkRefreshHelper {
         }
     }
 
-    fun applyEinkDialogStyle(dialog: AlertDialog, hostView: View? = null) {
+    /**
+     * 通用 1-bit 纯黑白线框无动画弹窗样式（支持 android.app.Dialog / AlertDialog / AppCompat AlertDialog）
+     */
+    fun applyEinkDialogStyle(dialog: android.app.Dialog, hostView: View? = null) {
         dialog.window?.let { win ->
             win.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
             val attr = win.attributes
@@ -497,10 +558,60 @@ object EinkRefreshHelper {
             attr.windowAnimations = R.style.Animation_EInk_None
             win.attributes = attr
             win.setBackgroundDrawableResource(R.drawable.bg_eink_border_dialog)
+            win.decorView.elevation = 0f
+            win.decorView.translationZ = 0f
+        }
+        dialog.setOnShowListener {
+            val dec = dialog.window?.decorView
+            if (dialog is AlertDialog) {
+                listOf(
+                    AlertDialog.BUTTON_POSITIVE,
+                    AlertDialog.BUTTON_NEGATIVE,
+                    AlertDialog.BUTTON_NEUTRAL
+                ).forEach { which ->
+                    dialog.getButton(which)?.apply {
+                        setTextColor(Color.BLACK)
+                        typeface = Typeface.DEFAULT_BOLD
+                        stateListAnimator = null
+                        setBackgroundResource(R.drawable.selector_eink_button)
+                    }
+                }
+            } else if (dialog is androidx.appcompat.app.AlertDialog) {
+                listOf(
+                    androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE,
+                    androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE,
+                    androidx.appcompat.app.AlertDialog.BUTTON_NEUTRAL
+                ).forEach { which ->
+                    dialog.getButton(which)?.apply {
+                        setTextColor(Color.BLACK)
+                        typeface = Typeface.DEFAULT_BOLD
+                        stateListAnimator = null
+                        setBackgroundResource(R.drawable.selector_eink_button)
+                    }
+                }
+            }
+            scrubDialogOnShow(dec)
         }
         dialog.setOnDismissListener {
             val target = hostView ?: (dialog.context as? Activity)?.window?.decorView
             scrubAfterOverlayDismiss(target)
+        }
+    }
+
+    /**
+     * 通用 1-bit 纯黑白线框无动画 PopupWindow 样式
+     */
+    fun applyEinkPopupWindowStyle(popup: PopupWindow, anchorView: View? = null) {
+        popup.animationStyle = R.style.Animation_EInk_None
+        popup.elevation = 0f
+        popup.setBackgroundDrawable(ColorDrawable(Color.WHITE))
+        popup.contentView?.let { cv ->
+            cv.setBackgroundResource(R.drawable.bg_popup_menu)
+            enforce1BitWireframeOnTree(cv)
+        }
+        popup.setOnDismissListener {
+            val root = anchorView?.rootView ?: popup.contentView?.rootView
+            scrubAfterOverlayDismiss(root)
         }
     }
 

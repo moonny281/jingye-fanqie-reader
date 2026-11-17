@@ -42,7 +42,7 @@ jobs:
           elif [ -f "VERSION" ]; then
             RAW_VERSION=$(head -n 1 VERSION | tr -d '[:space:]')
           else
-            RAW_VERSION="0.4.4"
+            RAW_VERSION="0.4.5"
           fi
           CLEAN_VERSION="${RAW_VERSION#v}"
           echo "$CLEAN_VERSION" > VERSION
@@ -129,9 +129,10 @@ jobs:
           name: "墨水屏阅读器 × 番茄小说原生纯净版 ${{ steps.get_version.outputs.tag }}"
           body: |
             ### 墨水屏阅读器 × 番茄小说原生纯净版 ${{ steps.get_version.outputs.tag }}
-            - **重构一级/二级目录探测与层级展示**：严格区分**一级目录（分卷：`FanqieVolume`）**与**二级目录（章节：`FanqieChapterItem`）**，统一 0-based 分卷序号消除首卷错位；采用无冲突标记（一级分卷 `=== 第X卷 卷名 ===`、二级章节 `### 第X章 章节名 ###`）防止网文正文 `【系统提示】` 误切章；新增 1-bit 纯黑白线性可折叠一级/二级目录树预览与选章跳读。
-            - **彻底修复「实际已下载完但检测仍提示有更新/待续却无内容可下」Bug**：剔除番茄 `serial_count` 中无 `itemId` 的幽灵章节；`checkBookUpdate` 改为按真实可下载 `itemId` 集合精确对账，支持空章自动归档与旧版「假待续」状态一键自动治愈。
-            - **微信读书墨水屏 1-bit 纯黑白线性 UI + 封面保留 + 局刷/全刷独立控制**：保留书架与番茄搜索/详情页真实图书封面（含自动修复与本地持久化缓存），其余 UI 与开关控件全部重绘为 1-bit 纯黑白线性样式（零动画、零水波纹），并提供局刷清残影、全刷清残影及全刷页数间隔独立开关。
+            - **番茄小说正文插图离线下载与墨水屏自适应排版**：完整提取番茄原生 XHTML 与网页章节内的 `<img src>` 插图标签及图注，在秒开阅读与后台全本下载时自动离线缓存正文图片至本地并同步注入阅读器图片缓存与 EPUB 导出包，断网状态下也可原位居中渲染高清插图。
+            - **严格还原番茄小说原生分卷与章节目录命名**：100% 保留番茄官方目录中的原始分卷名与章节名（如「楔子」「番外」「001 惊蛰」「第一卷 灾厄降临」），不再强行拼接人工前缀。
+            - **仿番茄 App 的阅读器内分卷与子目录折叠/展开**：阅读器主目录页支持直接点击任意分卷标题行（`▼ / ▶`）原地秒级折叠或展开该卷下的全部子章节，并在底部栏提供「折叠分卷 / 展开分卷」一键切换按钮。
+            - **全局所有弹出窗口重绘为 1-bit 纯黑白线框 + 零动画 + 弹出/关闭双向防残影**：全面重绘 `BaseDialogFragment`、`BasePrefDialogFragment`、`AlertDialog`、`WaitDialog`、`PopupAction`、`SliderPopup` 及 65 个弹窗布局文件，移除一切半透明遮罩、阴影、圆角与过渡动画，并在弹窗弹出与关闭时自动执行白场局刷，彻底消除墨水屏弹窗残影。
           files: release-dist/*.apk
           draft: false
           prerelease: false

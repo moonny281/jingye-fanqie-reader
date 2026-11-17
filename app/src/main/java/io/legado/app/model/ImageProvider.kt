@@ -129,6 +129,32 @@ object ImageProvider {
         return withContext(IO) {
             val vFile = BookHelp.getImage(book, src)
             if (!BookHelp.isImageExist(book, src)) {
+                // 1. 优先检查番茄小说本地离线插图缓存
+                val fanqieCached = io.legado.app.fanqie.FanqieLegadoBridge.findCachedInlineImage(book, src)
+                if (fanqieCached != null && fanqieCached.isFile) {
+                    val newFile = FileUtils.createFileIfNotExist(vFile.absolutePath)
+                    fanqieCached.inputStream().use { input ->
+                        FileOutputStream(newFile).use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    return@withContext vFile
+                }
+                // 2. 若为番茄书籍且尚未缓存该插图，立即在线拉取并写入双端缓存
+                val tag = io.legado.app.fanqie.FanqieLegadoBridge.parseTag(book)
+                if (tag != null && src.startsWith("http", ignoreCase = true)) {
+                    val downloaded = io.legado.app.fanqie.FanqieLegadoBridge.downloadAndCacheInlineImage(tag.fanqieBookId, src)
+                    if (downloaded != null && downloaded.isFile) {
+                        val newFile = FileUtils.createFileIfNotExist(vFile.absolutePath)
+                        downloaded.inputStream().use { input ->
+                            FileOutputStream(newFile).use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        return@withContext vFile
+                    }
+                }
+                // 3. 原生 EPUB / PDF / MOBI / 常规书源下载通道
                 val inputStream = when {
                     book.isEpub -> EpubFile.getImage(book, src)
                     book.isPdf -> PdfFile.getImage(book, src)
@@ -187,8 +213,15 @@ object ImageProvider {
             book.setUseReplaceRule(false)
             appCtx.toastOnUi(R.string.error_image_url_empty)
         }
-        val vFile = BookHelp.getImage(book, src)
-        if (!vFile.exists()) return errorBitmap
+        var vFile = BookHelp.getImage(book, src)
+        if (!vFile.exists()) {
+            val fqImg = io.legado.app.fanqie.FanqieLegadoBridge.findCachedInlineImage(book, src)
+            if (fqImg != null && fqImg.exists()) {
+                vFile = fqImg
+            } else {
+                return errorBitmap
+            }
+        }
         //epub文件提供图片链接是相对链接，同时阅读多个epub文件，缓存命中错误
         //bitmapLruCache的key同一改成缓存文件的路径
         val cacheBitmap = getNotRecycled(vFile.absolutePath)

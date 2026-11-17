@@ -53,6 +53,92 @@ object FanqieLegadoBridge {
     fun localCoverFile(fanqieBookId: String): File =
         File(booksDir, "fanqie_${fanqieBookId}_cover.jpg")
 
+    fun inlineImagesDir(fanqieBookId: String): File =
+        File(booksDir, "images/fanqie_${fanqieBookId}").apply { mkdirs() }
+
+    fun localInlineImageFile(fanqieBookId: String, src: String): File {
+        val norm = FanqieAppApi.normalizeImageUrl(src).ifBlank { src.trim() }
+        val ext = when {
+            norm.contains(".png", ignoreCase = true) -> "png"
+            norm.contains(".webp", ignoreCase = true) -> "webp"
+            norm.contains(".gif", ignoreCase = true) -> "gif"
+            else -> "jpg"
+        }
+        val hash = MD5Utils.md5Encode16(norm)
+        return File(inlineImagesDir(fanqieBookId), "$hash.$ext")
+    }
+
+    /**
+     * 查找已缓存的正文插图文件（支持按书籍 fanqieBookId 查找或跨书目录查找）
+     */
+    fun findCachedInlineImage(book: Book?, src: String): File? {
+        val norm = FanqieAppApi.normalizeImageUrl(src).ifBlank { src.trim() }
+        if (norm.isBlank()) return null
+        if (norm.startsWith("/")) {
+            val f = File(norm)
+            if (f.isFile && f.length() > 128L) return f
+        }
+        val tag = book?.let { parseTag(it) }
+        if (tag != null && tag.fanqieBookId.isNotBlank()) {
+            val f = localInlineImageFile(tag.fanqieBookId, norm)
+            if (f.isFile && f.length() > 128L) return f
+        }
+        val rootImgDir = File(booksDir, "images")
+        if (rootImgDir.isDirectory) {
+            val hash = MD5Utils.md5Encode16(norm)
+            rootImgDir.listFiles()?.forEach { sub ->
+                if (sub.isDirectory) {
+                    sub.listFiles()?.firstOrNull { it.name.startsWith(hash) && it.length() > 128L }?.let {
+                        return it
+                    }
+                }
+            }
+        }
+        return null
+    }
+
+    /**
+     * 下载并缓存章节正文内的插图到本地持久化目录，返回本地文件（若已缓存则直接返回）
+     */
+    fun downloadAndCacheInlineImage(fanqieBookId: String, rawSrc: String): File? {
+        val normUrl = FanqieAppApi.normalizeImageUrl(rawSrc)
+        if (normUrl.isBlank()) return null
+        val targetFile = localInlineImageFile(fanqieBookId, normUrl)
+        if (targetFile.isFile && targetFile.length() > 128L) {
+            return targetFile
+        }
+        return try {
+            val conn = (URL(normUrl).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 12000
+                readTimeout = 15000
+                instanceFollowRedirects = true
+                setRequestProperty(
+                    "User-Agent",
+                    "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                )
+                setRequestProperty("Referer", "https://fanqienovel.com/")
+            }
+            try {
+                if (conn.responseCode in 200..299) {
+                    val bytes = conn.inputStream.use { it.readBytes() }
+                    if (bytes.size > 128) {
+                        targetFile.parentFile?.mkdirs()
+                        val tmp = File(targetFile.parentFile, "${targetFile.name}.tmp")
+                        tmp.writeBytes(bytes)
+                        if (targetFile.exists()) targetFile.delete()
+                        tmp.renameTo(targetFile)
+                        return targetFile
+                    }
+                }
+            } finally {
+                conn.disconnect()
+            }
+            null
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
     fun localCoverFileForBook(book: Book): File {
         val tag = parseTag(book)
         if (tag != null && tag.fanqieBookId.isNotBlank()) {
@@ -604,6 +690,23 @@ object FanqieLegadoBridge {
                 ReadBook.book?.customTag = book.customTag
                 ReadBook.book?.latestChapterTitle = book.latestChapterTitle
                 ReadBook.book?.latestChapterTime = book.latestChapterTime
+            }
+        } catch (_: Throwable) {
+        }
+
+        // 将本书已离线缓存的正文插图同步链接到阅读器 BookHelp 图片缓存目录，确保离线阅读秒开显示
+        try {
+            val cacheMap = FanqieChapterCacheStore.loadCachedMap(fanqieBookId)
+            for (entry in cacheMap.values) {
+                val urls = FanqieCrawler.extractImageUrls(entry.resolvedParagraphs())
+                for (u in urls) {
+                    val cachedImg = localInlineImageFile(fanqieBookId, u)
+                    if (cachedImg.isFile && cachedImg.length() > 128L) {
+                        if (!io.legado.app.help.book.BookHelp.isImageExist(book, u)) {
+                            io.legado.app.help.book.BookHelp.writeImage(book, u, cachedImg.readBytes())
+                        }
+                    }
+                }
             }
         } catch (_: Throwable) {
         }

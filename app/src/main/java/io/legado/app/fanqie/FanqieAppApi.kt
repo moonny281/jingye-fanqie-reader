@@ -53,7 +53,32 @@ class FanqieAppApi(
             "<div\\b[^>]*class\\s*=\\s*[\"'][^\"']*(?:author-say|author-words|writer-say|author_say)[^\"']*[\"'][^>]*>(.*?)</div>",
             setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
         )
-        private val IMG_ALT_RE = Regex("<img\\b[^>]*alt\\s*=\\s*[\"']([^\"']+)[\"'][^>]*>", RegexOption.IGNORE_CASE)
+        private val IMG_TAG_RE = Regex("<img\\b[^>]*>", RegexOption.IGNORE_CASE)
+        private val IMG_SRC_ATTR_RE = Regex(
+            "(?:data-original|data-src|data-url|src)\\s*=\\s*[\"']([^\"']+)[\"']",
+            RegexOption.IGNORE_CASE
+        )
+        private val IMG_ALT_ATTR_RE = Regex(
+            "alt\\s*=\\s*[\"']([^\"']+)[\"']",
+            RegexOption.IGNORE_CASE
+        )
+        private val INLINE_IMG_TOKEN_RE = Regex("__FQ_INLINE_IMG::([^:]+)::([^_]*)__")
+
+        fun normalizeImageUrl(rawUrl: String?): String {
+            var u = (rawUrl ?: "").trim()
+                .replace("\\/", "/")
+                .replace("\\u0026", "&")
+                .replace("&amp;", "&")
+            if (u.isEmpty() || u == "null" || u.startsWith("data:")) return ""
+            if (u.startsWith("//")) {
+                u = "https:$u"
+            } else if (u.startsWith("http://")) {
+                u = "https://" + u.removePrefix("http://")
+            } else if (!u.startsWith("http") && !u.startsWith("/")) {
+                u = "https://p3-novel.byteimg.com/origin/$u"
+            }
+            return u
+        }
         private val P_OR_BLK_RE = Regex("<(p|blk)(\\s[^>]*)?>(.*?)</\\1>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
         private val STYLE_SCRIPT_RE = Regex("<(style|script|head)\\b[^>]*>.*?</\\1>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
         private val ZERO_WIDTH_RE = Regex("[\\u200b\\u200c\\u200d\\u2060\\ufeff]")
@@ -150,9 +175,21 @@ class FanqieAppApi(
                 if (inner.isEmpty()) ""
                 else inner.joinToString("") { "<p>「$it」</p>" }
             }
-            working = IMG_ALT_RE.replace(working) { m ->
-                val alt = cleanInlineText(m.groupValues[1])
-                if (alt.isNotEmpty() && alt != "插图" && alt != "image") "<p>[插图：$alt]</p>" else ""
+            working = IMG_TAG_RE.replace(working) { m ->
+                val tag = m.value
+                val rawSrc = IMG_SRC_ATTR_RE.find(tag)?.groupValues?.getOrNull(1).orEmpty()
+                val normSrc = normalizeImageUrl(rawSrc)
+                val rawAlt = IMG_ALT_ATTR_RE.find(tag)?.groupValues?.getOrNull(1)?.let { cleanInlineText(it) }.orEmpty()
+                val cleanAlt = if (rawAlt.isNotEmpty() && rawAlt != "插图" && rawAlt != "image" && rawAlt != "图片") rawAlt else ""
+                if (normSrc.isNotEmpty()) {
+                    val b64Src = Base64.encodeToString(normSrc.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+                    val b64Alt = Base64.encodeToString(cleanAlt.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+                    "<p>__FQ_INLINE_IMG::${b64Src}::${b64Alt}__</p>"
+                } else if (cleanAlt.isNotEmpty()) {
+                    "<p>〖插图：$cleanAlt〗</p>"
+                } else {
+                    ""
+                }
             }
 
             val rawParagraphs = ArrayList<String>()
@@ -190,6 +227,22 @@ class FanqieAppApi(
                             ) {
                                 continue
                             }
+                            val imgMatch = INLINE_IMG_TOKEN_RE.find(line)
+                            if (imgMatch != null) {
+                                val srcUrl = try {
+                                    String(Base64.decode(imgMatch.groupValues[1], Base64.NO_WRAP), Charsets.UTF_8)
+                                } catch (_: Throwable) { "" }
+                                val altText = try {
+                                    String(Base64.decode(imgMatch.groupValues[2], Base64.NO_WRAP), Charsets.UTF_8)
+                                } catch (_: Throwable) { "" }
+                                if (srcUrl.isNotBlank()) {
+                                    rawParagraphs.add("<img src=\"$srcUrl\">")
+                                    if (altText.isNotBlank()) {
+                                        rawParagraphs.add("〖图：$altText〗")
+                                    }
+                                    continue
+                                }
+                            }
                             rawParagraphs.add(line)
                         }
                     }
@@ -200,7 +253,25 @@ class FanqieAppApi(
                     .lines()
                     .map { cleanInlineText(it) }
                     .filter { it.isNotEmpty() }
-                rawParagraphs.addAll(plainLines)
+                for (line in plainLines) {
+                    val imgMatch = INLINE_IMG_TOKEN_RE.find(line)
+                    if (imgMatch != null) {
+                        val srcUrl = try {
+                            String(Base64.decode(imgMatch.groupValues[1], Base64.NO_WRAP), Charsets.UTF_8)
+                        } catch (_: Throwable) { "" }
+                        val altText = try {
+                            String(Base64.decode(imgMatch.groupValues[2], Base64.NO_WRAP), Charsets.UTF_8)
+                        } catch (_: Throwable) { "" }
+                        if (srcUrl.isNotBlank()) {
+                            rawParagraphs.add("<img src=\"$srcUrl\">")
+                            if (altText.isNotBlank()) {
+                                rawParagraphs.add("〖图：$altText〗")
+                            }
+                            continue
+                        }
+                    }
+                    rawParagraphs.add(line)
+                }
             }
 
             // 去除首尾多余的场景分割符，以及正文首段与章节标题重复的行

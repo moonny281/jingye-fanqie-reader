@@ -4,12 +4,14 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="#FFFFFFFF"
     android:descendantFocusability="blocksDescendants">
 
     <io.legado.app.ui.widget.recycler.scroller.FastScrollRecyclerView
         android:id="@+id/recycler_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"
+        android:background="#FFFFFFFF"
         android:overScrollMode="never"
         app:layout_constraintBottom_toTopOf="@+id/ll_chapter_base_info"
         app:layout_constraintTop_toTopOf="parent" />
@@ -18,48 +20,66 @@
         android:id="@+id/ll_chapter_base_info"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/background"
-        android:elevation="5dp"
+        android:background="@drawable/bg_eink_border_top"
+        android:elevation="0dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingLeft="10dp"
         android:paddingRight="10dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
         app:layout_constraintBottom_toBottomOf="parent">
 
         <TextView
             android:id="@+id/tv_current_chapter_info"
             android:layout_width="0dp"
-            android:layout_height="36dp"
+            android:layout_height="34dp"
             android:layout_weight="1"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:background="@drawable/selector_eink_list_item"
             android:ellipsize="middle"
             android:gravity="center_vertical"
-            android:paddingLeft="10dp"
-            android:paddingRight="10dp"
+            android:paddingLeft="8dp"
+            android:paddingRight="8dp"
             android:singleLine="true"
-            android:textColor="@color/primaryText"
-            android:textSize="12sp" />
+            android:textColor="#FF000000"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tv_toggle_volumes"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:layout_marginStart="6dp"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/selector_eink_button"
+            android:gravity="center"
+            android:paddingHorizontal="10dp"
+            android:text="折叠分卷"
+            android:textColor="#FF000000"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
 
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/iv_chapter_top"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:background="@drawable/selector_eink_list_item"
             android:contentDescription="@string/go_to_top"
             android:src="@drawable/ic_arrow_drop_up"
             android:tooltipText="@string/go_to_top"
-            app:tint="@color/primaryText"
+            app:tint="#FF000000"
             tools:ignore="UnusedAttribute" />
 
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/iv_chapter_bottom"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:background="@drawable/selector_eink_list_item"
             android:contentDescription="@string/go_to_bottom"
             android:src="@drawable/ic_arrow_drop_down"
             android:tooltipText="@string/go_to_bottom"
-            app:tint="@color/primaryText"
+            app:tint="#FF000000"
             tools:ignore="UnusedAttribute" />
     </LinearLayout>
 

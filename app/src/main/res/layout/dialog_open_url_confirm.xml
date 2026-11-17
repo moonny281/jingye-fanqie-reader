@@ -3,14 +3,14 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@drawable/shape_card_view"
+    android:background="@drawable/bg_eink_border_dialog"
     android:orientation="vertical">
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/tool_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:elevation="5dp"
+        android:elevation="0dp"
         android:theme="?attr/actionBarStyle"
         app:popupTheme="@style/AppTheme.PopupOverlay"
         app:title="跳转确认"

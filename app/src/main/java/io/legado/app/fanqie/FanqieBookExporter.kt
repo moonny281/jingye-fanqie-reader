@@ -367,6 +367,23 @@ p.author-say-title {
   font-weight: bold;
   text-indent: 0;
   margin-bottom: 0.4em;
+}
+div.chapter-img {
+  text-align: center;
+  margin: 1.0em 0;
+  text-indent: 0;
+  page-break-inside: avoid;
+}
+div.chapter-img img {
+  max-width: 96%;
+  max-height: 86vh;
+  border: 1px solid #000000;
+}
+p.img-caption {
+  text-align: center;
+  font-size: 0.9em;
+  text-indent: 0;
+  margin: 0.2em 0 0.9em 0;
 }"""
             )
 
@@ -495,9 +512,29 @@ $introParasHtml
 
                 val bodyBuilder = StringBuilder()
                 var inAuthorSay = false
+                var inlineImgCounter = 0
                 for (p in paras) {
                     val trimmed = p.trim()
                     if (trimmed.isEmpty()) continue
+                    val imgUrls = FanqieCrawler.extractImageUrls(listOf(trimmed))
+                    if (imgUrls.isNotEmpty()) {
+                        for (imgUrl in imgUrls) {
+                            val imgFile = FanqieLegadoBridge.findCachedInlineImage(null, imgUrl)
+                                ?: FanqieLegadoBridge.downloadAndCacheInlineImage(meta.bookId, imgUrl)
+                            if (imgFile != null && imgFile.isFile && imgFile.length() > 128L) {
+                                inlineImgCounter++
+                                val imgId = String.format(Locale.US, "img_%04d_%02d", chNum, inlineImgCounter)
+                                val imgRelPath = "images/$imgId.jpg"
+                                val zEntry = ZipEntry("OEBPS/$imgRelPath")
+                                zos.putNextEntry(zEntry)
+                                zos.write(imgFile.readBytes())
+                                zos.closeEntry()
+                                manifestItems += """<item id="$imgId" href="$imgRelPath" media-type="image/jpeg"/>"""
+                                bodyBuilder.append("  <div class=\"chapter-img\"><img src=\"$imgRelPath\" alt=\"插图\"/></div>\n")
+                            }
+                        }
+                        continue
+                    }
                     when {
                         trimmed == FanqieAppApi.SCENE_BREAK_MARKER || trimmed == "* * *" -> {
                             bodyBuilder.append("  <hr class=\"scene-break\"/>\n")
@@ -508,6 +545,10 @@ $introParasHtml
                                 bodyBuilder.append("  <div class=\"author-say\">\n")
                                 bodyBuilder.append("    <p class=\"author-say-title\">作家的话</p>\n")
                             }
+                        }
+                        trimmed.startsWith("〖图：") && trimmed.endsWith("〗") -> {
+                            val cap = trimmed.removeSurrounding("〖", "〗")
+                            bodyBuilder.append("  <p class=\"img-caption\">${xmlEscape(cap)}</p>\n")
                         }
                         trimmed.startsWith("〖") && trimmed.endsWith("〗") -> {
                             val sub = trimmed.removeSurrounding("〖", "〗")

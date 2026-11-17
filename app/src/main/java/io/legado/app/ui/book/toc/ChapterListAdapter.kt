@@ -25,10 +25,10 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * 微信读书墨水屏风格纯黑白线性目录适配器 (v0.4.3)：
- * - 分卷标题行（isVolume = true）采用纯黑底白字粗体横幅（#000000 底 + #FFFFFF 字），层级一目了然；
- * - 普通章节行采用纯白底 + 1dp 纯黑底分割线，当前阅读章节自动加粗并标注「【当前】」前缀；
- * - 彻底移除灰阶背景、水波纹与多余小图标。
+ * 仿番茄小说 App 墨水屏 1-bit 纯黑白线性可折叠目录适配器 (v0.4.5)：
+ * 1. 严格还原番茄小说原生分卷名与章节名（不强加人工前缀）；
+ * 2. 一级分卷行（isVolume = true）支持点击原地折叠/展开该卷下的全部二级子章节，右侧直观显示「▼ 共N章」或「▶ 已折叠(N章)」；
+ * 3. 二级子章节行（isVolume = false）采用纯白底 + 1dp 黑线分割，当前阅读章节加粗突出显示。
  */
 class ChapterListAdapter(context: Context, val callback: Callback) :
     DiffRecyclerAdapter<BookChapter, ItemChapterListBinding>(context) {
@@ -82,8 +82,10 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
             val replaceBook = book.toReplaceBook()
             val useReplace = AppConfig.tocUiUseReplace && book.getUseReplaceRule()
             val items = getItems()
+            if (items.isEmpty()) return@async
+            val safeStart = startIndex.coerceIn(0, items.lastIndex)
             launch {
-                for (i in startIndex until items.size) {
+                for (i in safeStart until items.size) {
                     val item = items[i]
                     if (displayTitleMap[item.title] == null) {
                         ensureActive()
@@ -97,7 +99,7 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
                 }
             }
             launch {
-                for (i in startIndex downTo 0) {
+                for (i in safeStart downTo 0) {
                     val item = items[i]
                     if (displayTitleMap[item.title] == null) {
                         ensureActive()
@@ -135,18 +137,24 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
             ivChecked.gone()
 
             if (item.isVolume) {
-                // 一级目录（分卷标题）：纯黑底色 + 纯白粗体文字（1-bit 反转线性横幅）
+                val collapsed = callback.isVolumeCollapsed(item.index)
+                val subCount = callback.getVolumeSubChapterCount(item.index)
+                val arrow = if (collapsed) "▶" else "▼"
+                // 番茄 App 风格分卷横幅：1-bit 纯黑底白字粗体，支持点击折叠/展开子目录
                 tvChapterItem.setBackgroundColor(Color.BLACK)
                 tvChapterName.setTextColor(Color.WHITE)
                 tvChapterName.typeface = Typeface.DEFAULT_BOLD
-                tvChapterName.text = "◆ [一级分卷] $rawTitle"
-                if (!item.tag.isNullOrEmpty()) {
-                    tvTag.setTextColor(Color.WHITE)
-                    tvTag.text = item.tag
-                    tvTag.visible()
-                } else {
-                    tvTag.gone()
+                tvChapterName.text = "$arrow  $rawTitle"
+
+                tvTag.setTextColor(Color.WHITE)
+                tvTag.text = when {
+                    subCount > 0 && collapsed -> "已折叠 ($subCount 章)"
+                    subCount > 0 -> "共 $subCount 章"
+                    !item.tag.isNullOrEmpty() -> item.tag
+                    else -> "点击折叠/展开"
                 }
+                tvTag.visible()
+
                 if (!item.wordCount.isNullOrEmpty()) {
                     tvWordCount.setTextColor(Color.WHITE)
                     tvWordCount.text = item.wordCount
@@ -155,19 +163,13 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
                     tvWordCount.gone()
                 }
             } else {
-                // 二级目录（具体章节）：纯白底色 + 底部 1dp 线性黑线 + 树状二级缩进前缀
+                // 二级章节行：纯白底色 + 底部 1dp 线性黑线，保留番茄原生章节名
                 tvChapterItem.setBackgroundResource(R.drawable.bg_eink_border_bottom)
                 tvChapterName.setTextColor(Color.BLACK)
                 tvChapterName.typeface = if (isDur) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
-                tvChapterName.text = if (isDur) "  ├─ 【当前】$rawTitle" else "  ├─ $rawTitle"
+                tvChapterName.text = if (isDur) "●  $rawTitle" else "    $rawTitle"
 
-                if (!item.tag.isNullOrEmpty()) {
-                    tvTag.setTextColor(Color.BLACK)
-                    tvTag.text = item.tag
-                    tvTag.visible()
-                } else {
-                    tvTag.gone()
-                }
+                tvTag.gone()
 
                 if (AppConfig.tocCountWords && !item.wordCount.isNullOrEmpty()) {
                     tvWordCount.setTextColor(Color.BLACK)
@@ -182,8 +184,12 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
 
     override fun registerListener(holder: ItemViewHolder, binding: ItemChapterListBinding) {
         holder.itemView.setOnClickListener {
-            getItem(holder.layoutPosition)?.let {
-                callback.openChapter(it)
+            getItem(holder.layoutPosition)?.let { item ->
+                if (item.isVolume) {
+                    callback.onVolumeHeaderClick(item)
+                } else {
+                    callback.openChapter(item)
+                }
             }
         }
         holder.itemView.setOnLongClickListener {
@@ -199,6 +205,9 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
         val book: Book?
         val isLocalBook: Boolean
         fun openChapter(bookChapter: BookChapter)
+        fun onVolumeHeaderClick(volumeChapter: BookChapter)
+        fun isVolumeCollapsed(volumeIndex: Int): Boolean
+        fun getVolumeSubChapterCount(volumeIndex: Int): Int
         fun durChapterIndex(): Int
         fun onListChanged()
     }

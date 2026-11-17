@@ -18,18 +18,29 @@ fun AlertDialog.applyTint(): AlertDialog {
         clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
         val attr = attributes
         attr.dimAmount = 0f
-        attr.windowAnimations = 0
+        attr.windowAnimations = R.style.Animation_EInk_None
         attributes = attr
+        decorView.elevation = 0f
+        decorView.translationZ = 0f
         setBackgroundDrawableResource(R.drawable.bg_eink_border_dialog)
     }
     val colorStateList = Selector.colorBuild()
         .setDefaultColor(Color.BLACK)
-        .setPressedColor(Color.BLACK)
+        .setPressedColor(Color.WHITE)
         .create()
-    getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(colorStateList)
-    getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(colorStateList)
-    getButton(AlertDialog.BUTTON_NEUTRAL)?.setTextColor(colorStateList)
+    listOf(
+        AlertDialog.BUTTON_NEGATIVE,
+        AlertDialog.BUTTON_POSITIVE,
+        AlertDialog.BUTTON_NEUTRAL
+    ).forEach { which ->
+        getButton(which)?.apply {
+            setTextColor(colorStateList)
+            stateListAnimator = null
+            setBackgroundResource(R.drawable.selector_eink_button)
+        }
+    }
     window?.decorView?.post {
+        io.legado.app.eink.EinkRefreshHelper.scrubDialogOnShow(window?.decorView)
         listView?.forEach {
             it.applyTint(Color.BLACK)
         }
