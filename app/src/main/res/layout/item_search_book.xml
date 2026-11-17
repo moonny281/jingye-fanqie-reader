@@ -10,8 +10,8 @@
 
     <!-- 保留番茄搜索结果的书籍封面 + 纯黑白线性边框与文字首字回退 -->
     <FrameLayout
-        android:layout_width="62dp"
-        android:layout_height="84dp"
+        android:layout_width="64dp"
+        android:layout_height="88dp"
         android:background="@drawable/bg_eink_cover_border"
         android:padding="1dp">
 
@@ -52,6 +52,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:ellipsize="end"
+                android:includeFontPadding="false"
                 android:singleLine="true"
                 android:textColor="#FF000000"
                 android:textSize="16sp"
@@ -60,27 +61,37 @@
             <TextView
                 android:id="@+id/btnQuickReadItem"
                 android:layout_width="wrap_content"
-                android:layout_height="26dp"
+                android:layout_height="30dp"
                 android:layout_marginStart="6dp"
                 android:background="@drawable/bg_eink_button_solid"
                 android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
                 android:paddingHorizontal="10dp"
+                android:paddingVertical="0dp"
+                android:singleLine="true"
                 android:text="立即阅读"
                 android:textColor="#FFFFFFFF"
-                android:textSize="11sp"
+                android:textSize="12sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/btnDetailItem"
                 android:layout_width="wrap_content"
-                android:layout_height="26dp"
+                android:layout_height="30dp"
                 android:layout_marginStart="6dp"
                 android:background="@drawable/bg_eink_button_outline"
                 android:gravity="center"
-                android:paddingHorizontal="8dp"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="0dp"
+                android:singleLine="true"
                 android:text="详情/离线"
                 android:textColor="#FF000000"
-                android:textSize="11sp"
+                android:textSize="12sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -88,8 +99,9 @@
             android:id="@+id/tvSearchMeta"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
+            android:layout_marginTop="5dp"
             android:ellipsize="end"
+            android:includeFontPadding="false"
             android:singleLine="true"
             android:textColor="#FF000000"
             android:textSize="12sp" />

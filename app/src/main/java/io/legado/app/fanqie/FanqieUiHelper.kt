@@ -125,9 +125,10 @@ object FanqieUiHelper {
         val actions = arrayOf(
             "1. 查看一级/二级目录结构（支持折叠与选章跳读）",
             "2. 检测远端新章节更新（精确对账）",
-            "3. 导出标准 EPUB（含一级分卷+二级章节树状目录 + 封面）",
+            "3. 导出标准 EPUB（含多级目录 + 正文插图 + 封面）",
             "4. 导出精排 TXT（含一级/二级目录索引 + 精排正文）",
-            "5. 重新抓取并修复本书原生一级/二级目录"
+            "5. 重新抓取并修复本书原生一级/二级目录",
+            "6. 清空本书缓存并重新全本下载（含正文插图）"
         )
         AlertDialog.Builder(context)
             .setTitle("《${item.name}》目录管理与导出")
@@ -138,6 +139,16 @@ object FanqieUiHelper {
                     2 -> exportShelfBook(context, tagInfo.fanqieBookId, item.name, isEpub = true)
                     3 -> exportShelfBook(context, tagInfo.fanqieBookId, item.name, isEpub = false)
                     4 -> rebuildShelfBookToc(context, tagInfo.fanqieBookId, item.name)
+                    5 -> {
+                        FanqieLegadoBridge.purgeFanqieBookData(tagInfo.fanqieBookId, book = item, deleteShelfRecord = false)
+                        FanqieDownloadManager.startBackgroundDownload(
+                            ctx = context,
+                            fanqieBookId = tagInfo.fanqieBookId,
+                            title = item.name,
+                            author = item.author
+                        )
+                        Toast.makeText(context, "已清空《${item.name}》旧缓存并重新启动全本下载", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
             .setNegativeButton("取消", null)

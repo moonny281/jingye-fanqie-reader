@@ -251,6 +251,23 @@ object FanqieChapterCacheStore {
     @Synchronized
     fun countCached(fanqieBookId: String): Int = loadCachedMap(fanqieBookId).size
 
+    /**
+     * 彻底删除指定番茄书籍的本地章节缓存 (.json) 与目录元数据缓存 (.meta.json)
+     */
+    @Synchronized
+    fun deleteBookCache(fanqieBookId: String) {
+        if (fanqieBookId.isBlank()) return
+        try {
+            val f = fileFor(fanqieBookId)
+            if (f.exists()) f.delete()
+            val tmp = File(f.parentFile, "${f.name}.tmp")
+            if (tmp.exists()) tmp.delete()
+            val mf = metaFileFor(fanqieBookId)
+            if (mf.exists()) mf.delete()
+        } catch (_: Throwable) {
+        }
+    }
+
     @Synchronized
     fun removeCache(fanqieBookId: String) {
         if (fanqieBookId.isBlank()) return

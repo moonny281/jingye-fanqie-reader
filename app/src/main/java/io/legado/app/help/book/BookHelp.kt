@@ -277,7 +277,8 @@ object BookHelp {
 
     @Synchronized
     fun isImageExist(book: Book, src: String): Boolean {
-        return getImage(book, src).exists()
+        val f = getImage(book, src)
+        return f.isFile && f.length() > 128L
     }
 
     fun getImageSuffix(src: String): String {

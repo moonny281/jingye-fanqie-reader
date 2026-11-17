@@ -310,12 +310,117 @@ object FanqieLegadoBridge {
         }
     }
 
+    /**
+     * 寻找书架中的番茄书籍：不仅检查 customTag，还验证对应的本地 TXT 文件是否真实存在。
+     * 若书籍已从书架删除，返回 null。
+     */
+    fun findShelfBookVerified(fanqieBookId: String): Book? {
+        val cleanId = FanqieParser.resolveBookId(fanqieBookId)
+        if (cleanId.isBlank()) return null
+        val b = findBookByFanqieId(cleanId) ?: return null
+        val txtFile = File(booksDir, "fanqie_${cleanId}.txt")
+        if (!txtFile.isFile || txtFile.length() == 0L) {
+            return null
+        }
+        return b
+    }
+
+    /**
+     * 统计当前有效已下载章节数：
+     * 核心修复：若该书已不在书架上（用户已从书架删除该书）且当前未在后台下载中，
+     * 自动清理残留的孤儿缓存文件并返回 0，彻底解决「删掉的书籍在番茄书城仍显示已下载、无法重新下载」的问题！
+     */
     fun getCachedChapterCount(fanqieBookId: String): Int {
-        if (fanqieBookId.isBlank()) return 0
-        val cached = FanqieChapterCacheStore.countCached(fanqieBookId)
+        val cleanId = FanqieParser.resolveBookId(fanqieBookId)
+        if (cleanId.isBlank()) return 0
+        val shelfBook = findBookByFanqieId(cleanId)
+        val activeState = FanqieDownloadManager.getState(cleanId)
+        if (shelfBook == null && activeState?.isRunning != true) {
+            // 书架中已无此书，若有残留的旧缓存文件则自动彻底清理
+            val leftoverCount = FanqieChapterCacheStore.countCached(cleanId)
+            val txtFile = File(booksDir, "fanqie_${cleanId}.txt")
+            if (leftoverCount > 0 || txtFile.exists() || activeState != null) {
+                purgeFanqieBookData(cleanId, deleteShelfRecord = false)
+            }
+            return 0
+        }
+        val cached = FanqieChapterCacheStore.countCached(cleanId)
         if (cached > 0) return cached
-        val b = findBookByFanqieId(fanqieBookId) ?: return 0
-        return parseTag(b)?.downloadedChapters ?: b.totalChapterNum
+        if (shelfBook != null) {
+            return parseTag(shelfBook)?.downloadedChapters ?: shelfBook.totalChapterNum
+        }
+        return 0
+    }
+
+    /**
+     * 从书籍对象提取 fanqieBookId（兼容 customTag 与 fanqie_xxx.txt 文件名）
+     */
+    fun extractFanqieBookId(book: Book?): String {
+        if (book == null) return ""
+        parseTag(book)?.fanqieBookId?.takeIf { it.isNotBlank() }?.let { return it }
+        val url = book.bookUrl
+        val m = Regex("fanqie_(\\d{10,})\\.txt").find(url)
+        if (m != null) return m.groupValues[1]
+        return ""
+    }
+
+    /**
+     * 当用户在书架或详情页删除书籍时调用：彻底删除该番茄书籍的所有缓存、TXT、目录、封面与正文插图
+     */
+    fun purgeFanqieBookOnDelete(book: Book?, deleteShelfRecord: Boolean = false) {
+        val fqId = extractFanqieBookId(book)
+        if (fqId.isNotBlank()) {
+            purgeFanqieBookData(fqId, book = book, deleteShelfRecord = deleteShelfRecord)
+        }
+    }
+
+    /**
+     * 彻底清除指定番茄书籍的全部本地数据（章节缓存 JSON、元数据 JSON、合成 TXT、伴生 .toc.json、本地封面、正文插图文件夹、内存下载状态及可选书架记录）
+     */
+    @Synchronized
+    fun purgeFanqieBookData(
+        fanqieBookId: String,
+        book: Book? = null,
+        deleteShelfRecord: Boolean = true
+    ) {
+        val cleanId = FanqieParser.resolveBookId(fanqieBookId)
+        if (cleanId.isBlank()) return
+        try {
+            FanqieDownloadManager.clearState(cleanId)
+        } catch (_: Throwable) {
+        }
+        try {
+            FanqieChapterCacheStore.deleteBookCache(cleanId)
+        } catch (_: Throwable) {
+        }
+        try {
+            val txtFile = File(booksDir, "fanqie_${cleanId}.txt")
+            val tocFile = tocFileForTxt(txtFile)
+            val coverFile = localCoverFile(cleanId)
+            val imgDir = inlineImagesDir(cleanId)
+            if (txtFile.exists()) txtFile.delete()
+            if (tocFile.exists()) tocFile.delete()
+            if (coverFile.exists()) coverFile.delete()
+            if (imgDir.exists()) imgDir.deleteRecursively()
+        } catch (_: Throwable) {
+        }
+        val targetBook = book ?: findBookByFanqieId(cleanId)
+        if (targetBook != null) {
+            try {
+                appDb.bookChapterDao.delByBook(targetBook.bookUrl)
+            } catch (_: Throwable) {
+            }
+            if (deleteShelfRecord) {
+                try {
+                    if (ReadBook.book?.bookUrl == targetBook.bookUrl) {
+                        ReadBook.book = null
+                    }
+                    appDb.bookDao.delete(targetBook)
+                    postEvent(EventBus.UP_BOOKSHELF, targetBook.bookUrl)
+                } catch (_: Throwable) {
+                }
+            }
+        }
     }
 
     private fun tocFileForTxt(txtFile: File): File =

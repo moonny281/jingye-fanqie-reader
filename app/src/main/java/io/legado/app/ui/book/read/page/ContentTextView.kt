@@ -77,10 +77,12 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
     private var lastClickTime = 0L
     private var doubleClick = false
 
-    //绘制图片的paint
+    //绘制图片的paint（开启双线性过滤与抗锯齿，保证墨水屏正文插图缩放清晰）
     val imagePaint by lazy {
         Paint().apply {
-            isAntiAlias = AppConfig.useAntiAlias
+            isAntiAlias = true
+            isFilterBitmap = true
+            isDither = true
         }
     }
 

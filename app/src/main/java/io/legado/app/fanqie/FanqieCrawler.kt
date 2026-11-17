@@ -1300,11 +1300,22 @@ class FanqieCrawler(
     ): DownloadOutcome {
         val cleanId = FanqieParser.resolveBookId(bookId)
         var cachedCount = existingCache.size
-        return downloadBookIncremental(
+        val outcome = downloadBookIncremental(
             bookId = cleanId,
             existingCache = existingCache,
             shouldStop = { cachedCount >= quickCount },
             onProgress = { progress -> cachedCount = progress.current }
         )
+        // 为秒开的前几章立即同步缓存正文插图，保证首屏打开即可看到插图
+        for (entry in outcome.updatedCache.values.take(quickCount)) {
+            val urls = extractImageUrls(entry.resolvedParagraphs())
+            for (u in urls) {
+                try {
+                    FanqieLegadoBridge.downloadAndCacheInlineImage(cleanId, u)
+                } catch (_: Throwable) {
+                }
+            }
+        }
+        return outcome
     }
 }

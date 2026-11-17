@@ -94,6 +94,19 @@ object FanqieDownloadManager {
 
     fun getState(fanqieBookId: String): DownloadTaskState? = states[fanqieBookId]
 
+    /**
+     * 彻底清除指定书籍的内存下载状态与停止标志（书籍被删除或重置重下时调用）
+     */
+    fun clearState(fanqieBookId: String) {
+        if (fanqieBookId.isBlank()) return
+        stopFlags[fanqieBookId] = true
+        states.remove(fanqieBookId)
+        if (latestActiveBookId == fanqieBookId) {
+            latestActiveBookId = null
+        }
+        notifyListeners(null)
+    }
+
     fun getActiveOrLatestState(): DownloadTaskState? {
         val running = states.values.firstOrNull { it.isRunning }
         if (running != null) return running

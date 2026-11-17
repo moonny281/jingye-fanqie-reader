@@ -22,6 +22,7 @@ import io.legado.app.utils.FileUtils
 import io.legado.app.utils.SvgUtils
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import splitties.init.appCtx
 import java.io.File
@@ -199,6 +200,38 @@ object ImageProvider {
         return Size(op.outWidth, op.outHeight)
     }
 
+    private val asyncLoadingSet = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val asyncScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + IO)
+
+    fun isErrorOrMissing(bitmap: Bitmap?): Boolean {
+        return bitmap == null || bitmap === errorBitmap || bitmap.isRecycled
+    }
+
+    /**
+     * 当阅读页渲染时发现某张插图尚未缓存到本地，后台异步下载并自动刷新页面
+     */
+    fun triggerAsyncReloadIfNeeded(book: Book, src: String, view: android.view.View) {
+        if (src.isBlank()) return
+        val key = "${book.bookUrl}_$src"
+        if (!asyncLoadingSet.add(key)) return
+        asyncScope.launch {
+            try {
+                val file = cacheImage(book, src, ReadBook.bookSource)
+                if (file.isFile && file.length() > 128L) {
+                    remove(file.absolutePath)
+                    view.post {
+                        io.legado.app.model.ReadBook.curTextChapter?.let {
+                            view.invalidate()
+                        }
+                    }
+                }
+            } catch (_: Throwable) {
+            } finally {
+                asyncLoadingSet.remove(key)
+            }
+        }
+    }
+
     /**
      *获取bitmap 使用LruCache缓存
      */
@@ -208,33 +241,28 @@ object ImageProvider {
         width: Int,
         height: Int? = null
     ): Bitmap {
-        //src为空白时 可能被净化替换掉了 或者规则失效
         if (book.getUseReplaceRule() && src.isBlank()) {
             book.setUseReplaceRule(false)
             appCtx.toastOnUi(R.string.error_image_url_empty)
         }
         var vFile = BookHelp.getImage(book, src)
-        if (!vFile.exists()) {
+        if (!vFile.isFile || vFile.length() <= 128L) {
             val fqImg = io.legado.app.fanqie.FanqieLegadoBridge.findCachedInlineImage(book, src)
-            if (fqImg != null && fqImg.exists()) {
+            if (fqImg != null && fqImg.isFile && fqImg.length() > 128L) {
                 vFile = fqImg
             } else {
                 return errorBitmap
             }
         }
-        //epub文件提供图片链接是相对链接，同时阅读多个epub文件，缓存命中错误
-        //bitmapLruCache的key同一改成缓存文件的路径
         val cacheBitmap = getNotRecycled(vFile.absolutePath)
-        if (cacheBitmap != null) return cacheBitmap
+        if (cacheBitmap != null && cacheBitmap !== errorBitmap) return cacheBitmap
         return kotlin.runCatching {
             val bitmap = BitmapUtils.decodeBitmap(vFile.absolutePath, width, height)
+                ?: BitmapFactory.decodeFile(vFile.absolutePath)
                 ?: SvgUtils.createBitmap(vFile.absolutePath, width, height)
                 ?: throw NoStackTraceException(appCtx.getString(R.string.error_decode_bitmap))
             put(vFile.absolutePath, bitmap)
             bitmap
-        }.onFailure {
-            //错误图片占位,防止重复获取
-            put(vFile.absolutePath, errorBitmap)
         }.getOrDefault(errorBitmap)
     }
 

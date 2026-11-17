@@ -386,6 +386,7 @@ object LocalBook {
     }
 
     fun deleteBook(book: Book, deleteOriginal: Boolean) {
+        io.legado.app.fanqie.FanqieLegadoBridge.purgeFanqieBookOnDelete(book, deleteShelfRecord = false)
         kotlin.runCatching {
             BookHelp.clearCache(book)
             if (!book.coverUrl.isNullOrEmpty()) {

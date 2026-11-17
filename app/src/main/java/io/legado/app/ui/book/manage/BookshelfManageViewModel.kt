@@ -56,6 +56,7 @@ class BookshelfManageViewModel(application: Application) : BaseViewModel(applica
         execute {
             appDb.bookDao.delete(*books.toTypedArray())
             books.forEach {
+                io.legado.app.fanqie.FanqieLegadoBridge.purgeFanqieBookOnDelete(it, deleteShelfRecord = false)
                 if (it.isLocal) {
                     LocalBook.deleteBook(it, deleteOriginal)
                 } else {

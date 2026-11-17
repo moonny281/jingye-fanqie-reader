@@ -436,6 +436,7 @@ data class Book(
         if (ReadBook.book?.bookUrl == bookUrl) {
             ReadBook.book = null
         }
+        io.legado.app.fanqie.FanqieLegadoBridge.purgeFanqieBookOnDelete(this, deleteShelfRecord = false)
         appDb.bookDao.delete(this)
     }
 

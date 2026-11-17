@@ -55,7 +55,7 @@ class FanqieAppApi(
         )
         private val IMG_TAG_RE = Regex("<img\\b[^>]*>", RegexOption.IGNORE_CASE)
         private val IMG_SRC_ATTR_RE = Regex(
-            "(?:data-original|data-src|data-url|src)\\s*=\\s*[\"']([^\"']+)[\"']",
+            "(?:data-original|data-src|data-url|data-uri|uri|src)\\s*=\\s*[\"']([^\"']+)[\"']",
             RegexOption.IGNORE_CASE
         )
         private val IMG_ALT_ATTR_RE = Regex(
@@ -184,7 +184,7 @@ class FanqieAppApi(
                 if (normSrc.isNotEmpty()) {
                     val b64Src = Base64.encodeToString(normSrc.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
                     val b64Alt = Base64.encodeToString(cleanAlt.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
-                    "<p>__FQ_INLINE_IMG::${b64Src}::${b64Alt}__</p>"
+                    "<br/>__FQ_INLINE_IMG::${b64Src}::${b64Alt}__<br/>"
                 } else if (cleanAlt.isNotEmpty()) {
                     "<p>〖插图：$cleanAlt〗</p>"
                 } else {

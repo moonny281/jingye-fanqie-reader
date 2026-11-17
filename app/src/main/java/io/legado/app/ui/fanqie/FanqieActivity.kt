@@ -65,6 +65,7 @@ class FanqieActivity : AppCompatActivity() {
     private lateinit var btnDownloadBook: Button
     private lateinit var btnPreviewToc: Button
     private lateinit var btnExportBook: Button
+    private lateinit var btnRedownloadBook: Button
     private lateinit var btnPauseDownload: Button
     private lateinit var btnOpenDownloadedBook: Button
 
@@ -161,6 +162,7 @@ class FanqieActivity : AppCompatActivity() {
         btnDownloadBook = findViewById(R.id.btnDownloadBook)
         btnPreviewToc = findViewById(R.id.btnPreviewToc)
         btnExportBook = findViewById(R.id.btnExportBook)
+        btnRedownloadBook = findViewById(R.id.btnRedownloadBook)
         btnPauseDownload = findViewById(R.id.btnPauseDownload)
         btnOpenDownloadedBook = findViewById(R.id.btnOpenDownloadedBook)
 
@@ -292,6 +294,11 @@ class FanqieActivity : AppCompatActivity() {
             showExportOptionsDialog(meta)
         }
 
+        btnRedownloadBook.setOnClickListener {
+            val meta = currentMetadata ?: return@setOnClickListener
+            confirmAndRedownloadBook(meta)
+        }
+
         btnPauseDownload.setOnClickListener {
             val meta = currentMetadata
             FanqieDownloadManager.requestPause(this, meta?.bookId)
@@ -332,9 +339,40 @@ class FanqieActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // 若用户从书架删除了书籍后返回番茄书城，自动刷新当前详情卡片状态（清除残留已下载标记）
+        currentMetadata?.let { meta ->
+            if (bookInfoCard.visibility == View.VISIBLE) {
+                showBookDetailCard(meta, fromSearch = lastSearchResults.isNotEmpty())
+            }
+        }
         rootView.post {
             EinkRefreshHelper.scrubAfterOverlayDismiss(rootView)
         }
+    }
+
+    private fun confirmAndRedownloadBook(meta: FanqieMetadata) {
+        val dlg = AlertDialog.Builder(this)
+            .setTitle("重新全本下载《${meta.title}》")
+            .setMessage("将彻底清空本书旧的章节缓存与历史文件，并从第 1 章开始重新全本下载（包含正文插图与原生目录）。是否继续？")
+            .setPositiveButton("清空并重下") { _, _ ->
+                FanqieLegadoBridge.purgeFanqieBookData(meta.bookId, deleteShelfRecord = false)
+                downloadProgressBar.progress = 0
+                tvBookCheckpointInfo.text = "已清空旧缓存，正在重新启动全本后台离线…"
+                btnDownloadBook.text = "后台离线中 (0%)"
+                btnDownloadBook.isEnabled = false
+                FanqieDownloadManager.startBackgroundDownload(
+                    ctx = this,
+                    fanqieBookId = meta.bookId,
+                    title = meta.title,
+                    author = meta.author,
+                    coverUrl = meta.coverUrl
+                )
+                Toast.makeText(this, "已清空旧缓存并重新启动《${meta.title}》全本离线下载", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("取消", null)
+            .create()
+        EinkRefreshHelper.applyEinkDialogStyle(dlg, rootView)
+        dlg.show()
     }
 
     override fun onStop() {
@@ -664,7 +702,7 @@ class FanqieActivity : AppCompatActivity() {
         }
 
         val cachedCount = FanqieLegadoBridge.getCachedChapterCount(meta.bookId)
-        val shelfBook = FanqieLegadoBridge.findBookByFanqieId(meta.bookId)
+        val shelfBook = FanqieLegadoBridge.findShelfBookVerified(meta.bookId)
         val total = maxOf(meta.downloadableChapterCount(), cachedCount)
 
         btnOpenDownloadedBook.visibility = View.VISIBLE

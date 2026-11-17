@@ -42,7 +42,7 @@ jobs:
           elif [ -f "VERSION" ]; then
             RAW_VERSION=$(head -n 1 VERSION | tr -d '[:space:]')
           else
-            RAW_VERSION="0.4.5"
+            RAW_VERSION="0.4.6"
           fi
           CLEAN_VERSION="${RAW_VERSION#v}"
           echo "$CLEAN_VERSION" > VERSION
@@ -129,10 +129,10 @@ jobs:
           name: "墨水屏阅读器 × 番茄小说原生纯净版 ${{ steps.get_version.outputs.tag }}"
           body: |
             ### 墨水屏阅读器 × 番茄小说原生纯净版 ${{ steps.get_version.outputs.tag }}
-            - **番茄小说正文插图离线下载与墨水屏自适应排版**：完整提取番茄原生 XHTML 与网页章节内的 `<img src>` 插图标签及图注，在秒开阅读与后台全本下载时自动离线缓存正文图片至本地并同步注入阅读器图片缓存与 EPUB 导出包，断网状态下也可原位居中渲染高清插图。
-            - **严格还原番茄小说原生分卷与章节目录命名**：100% 保留番茄官方目录中的原始分卷名与章节名（如「楔子」「番外」「001 惊蛰」「第一卷 灾厄降临」），不再强行拼接人工前缀。
-            - **仿番茄 App 的阅读器内分卷与子目录折叠/展开**：阅读器主目录页支持直接点击任意分卷标题行（`▼ / ▶`）原地秒级折叠或展开该卷下的全部子章节，并在底部栏提供「折叠分卷 / 展开分卷」一键切换按钮。
-            - **全局所有弹出窗口重绘为 1-bit 纯黑白线框 + 零动画 + 弹出/关闭双向防残影**：全面重绘 `BaseDialogFragment`、`BasePrefDialogFragment`、`AlertDialog`、`WaitDialog`、`PopupAction`、`SliderPopup` 及 65 个弹窗布局文件，移除一切半透明遮罩、阴影、圆角与过渡动画，并在弹窗弹出与关闭时自动执行白场局刷，彻底消除墨水屏弹窗残影。
+            - **修复阅读页正文插图只画空框不显示图片内容的问题**：恢复并重构 `ImageColumn` 真实位图渲染引擎（`ImageProvider.getImage` + `canvas.drawBitmap` + 异步缺失自愈重绘），修复 `<img ...>` 在 `<p>` 标签内的换行提取逻辑，确保下载抓取的正文插图在阅读页中完整清晰渲染。
+            - **修复已删除书籍残留缓存导致番茄书城仍显示「已下载」无法重下的问题**：在 `Book.delete()`、`LocalBook.deleteBook()`、`BookshelfManageViewModel.deleteBook()`、`BookHelp.clearCache()` 全链路挂载 `purgeFanqieBookOnDelete`，删除书籍时同步物理清空章节 JSON 缓存、合成 TXT、`.toc.json`、封面与插图目录；并在番茄书城内支持孤儿缓存自动识别清零与「重新下载」按钮。
+            - **修复番茄书城按钮文字挤压与裁切显示不全问题**：将番茄书城详情卡片操作按钮重构为宽敞的双排网格布局，并为所有按钮显式配置 `includeFontPadding="false"`、`minWidth="0dp"`、`minHeight="0dp"`、`paddingVertical="0dp"`，彻底消除高分屏与大字号下的按钮文字截断。
+            - **仿番茄 App 原生目录命名、分卷折叠与 1-bit 无残影线框弹窗**：100% 保留番茄原生分卷与章节命名，支持点击分卷折叠/展开子目录，全局弹窗采用 1-bit 纯黑白线框与弹出/关闭双向白场局刷。
           files: release-dist/*.apk
           draft: false
           prerelease: false
